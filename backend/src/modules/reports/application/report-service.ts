@@ -8,8 +8,8 @@ import type {
 export class ReportService {
   constructor(private readonly repository: ReportRepository) {}
 
-  create(input: CreateStreetReport): Promise<StreetReport> {
-    return this.repository.create(input);
+  create(input: CreateStreetReport, userId?: string | null): Promise<StreetReport> {
+    return this.repository.create(input, userId);
   }
 
   findNearby(query: NearbyReportsQuery): Promise<StreetReport[]> {

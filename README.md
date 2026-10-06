@@ -6,14 +6,15 @@ MVP para consultar y reportar problemas de circulación en calles de la Ciudad A
 
 - Mapa interactivo de CABA con Leaflet y OpenStreetMap, marcador de ubicación del usuario y reportes cargados desde la API según el viewport visible.
 - Creación de reportes desde el mapa con selección de ubicación, validación y envío a la API.
-- Confirmaciones comunitarias por reporte; cada sesión puede confirmar o indicar que ya no existe, y cambiar su voto.
+- Confirmaciones comunitarias por reporte; cada usuario puede confirmar o indicar que ya no existe, y cambiar su voto.
+- Registro, ingreso, cierre de sesión y perfil con sesión persistida y cookie protegida.
 - Street Score estimado por áreas geográficas con reportes suficientes, visible como celdas explicables en el mapa.
 - API Fastify con health check y endpoints REST para persistir y consultar reportes.
 - Reportes almacenados en PostgreSQL con `GEOGRAPHY(POINT, 4326)` y consultas de radio ejecutadas por PostGIS.
 - Migraciones versionadas con Drizzle Kit.
 - TypeScript estricto, ESLint, Prettier y tests de integración.
 
-No hay autenticación ni moderación avanzada.
+No hay login social ni moderación avanzada.
 
 ## Requisitos
 
@@ -92,6 +93,11 @@ La API está bajo `/api`. Los tipos admitidos son `POTHOLE`, `FLOOD`, `ROAD_DAMA
 | `GET /api/reports?lat=-34.6037&lng=-58.3816&radius=1000`         | Buscar en un radio, expresado en metros      |
 | `POST /api/reports`                                              | Crear un reporte                             |
 | `POST /api/reports/:id/feedback`                                 | Crear o cambiar la confirmación comunitaria  |
+| `POST /api/auth/register`                                        | Crear una cuenta e iniciar sesión            |
+| `POST /api/auth/login`                                           | Iniciar sesión                               |
+| `POST /api/auth/logout`                                          | Revocar la sesión actual                     |
+| `GET /api/auth/session`                                          | Consultar la sesión actual                   |
+| `GET /api/users/me`                                              | Perfil y estadísticas de reputación          |
 | `GET /api/reports/:id`                                           | Consultar un reporte                         |
 | `PATCH /api/reports/:id/status`                                  | Cambiar entre `ACTIVE`, `STALE` y `RESOLVED` |
 
@@ -109,7 +115,15 @@ La API devuelve DTOs con `{ latitude, longitude }`, fechas ISO y enums públicos
 
 Para crear un reporte, presionar **Reportar problema**, tocar el mapa para marcar la ubicación y completar tipo y severidad. La descripción es opcional (máximo 500 caracteres). La API valida tipo, severidad, coordenadas y longitud de descripción; si se omite, persiste una descripción vacía. Una creación correcta devuelve el DTO del reporte, que se agrega al mapa inmediatamente.
 
-Cada reporte incluye `feedback.confirmations`, `feedback.resolvedReports` y `feedback.userFeedback`. Para votar, la aplicación envía `POST /api/reports/:id/feedback` con `{ "type": "CONFIRM" | "RESOLVED" }` y un encabezado `X-Voter-Id` UUID. El navegador conserva este identificador anónimo en `localStorage`; la base tiene una restricción única por reporte e identificador, por lo que repetir o cambiar el voto actualiza la misma fila. Este identificador no reemplaza autenticación y puede restablecerse o falsificarse; asociar el campo `voter_id` a un usuario autenticado y agregar rate limiting son evoluciones previstas.
+## Cuentas y sesión
+
+El registro pide email, nombre visible y contraseña de al menos 12 caracteres. El backend almacena exclusivamente un hash `scrypt` con salt aleatorio (N=32768, r=8, p=1); el login responde con un error genérico cuando email o contraseña no coinciden. Registro y login están limitados a 5 intentos por minuto por IP; creación de reportes, a 20; feedback, a 30. Si el backend está detrás de un proxy, `TRUST_PROXY` debe listar las IP/CIDR del proxy de confianza para calcular la IP cliente correctamente; no lo configures como `*`.
+
+El BFF emite un token aleatorio opaco de 256 bits como cookie `street_status_session` (`HttpOnly`, `SameSite=Lax`, `Path=/api`, 30 días); la base conserva solo su SHA-256 y vencimiento. En producción la cookie usa `Secure`. El frontend envía cookies con `credentials: include`; no guarda tokens, contraseñas ni identificadores de voto en `localStorage`. El BFF comprueba `Origin` contra `CORS_ORIGIN` en solicitudes con origen y CORS permite credenciales únicamente para los orígenes configurados. Publicá frontend y BFF bajo el mismo site (idealmente detrás de un mismo origen/reverse proxy) para que `SameSite=Lax` funcione. Configurá HTTPS y `NODE_ENV=production` detrás del proxy de producción.
+
+`POST /api/reports/:id/feedback` y `PATCH /api/reports/:id/status` requieren sesión. Los reportes pueden seguir creándose sin cuenta; si hay sesión, se registra el propietario. Los votos nuevos se asocian a `user_id` y cada usuario puede tener una decisión por reporte. Las filas históricas de votos anónimos siguen agregándose y la migración conserva el identificador temporal solo para esas filas previas; la aplicación ya no lo emite ni lo consume. Los reportes previos conservan sus datos con `user_id` nulo.
+
+El perfil muestra nombre, email, fecha de registro, total de reportes, confirmaciones dadas y métricas descriptivas de reputación (reportes propios confirmados/resueltos y feedback útil). Son contadores derivados; no representan puntos ni un ranking.
 
 La política central `ReportFreshnessPolicy` calcula los campos `status` y `freshness` al responder la API. Un reporte o confirmación de hasta un día se muestra como `FRESH`; hasta 30 días, como `AGING`; después de 30 días sin confirmaciones recientes, como `STALE`. `RESOLVED` permanece resuelto. La confianza combina una señal de recencia con votos comunitarios ponderados por una vida media de 30 días; los votos viejos pierden peso progresivamente. Los umbrales están centralizados en el dominio. La frescura se deriva al leer: reportes y votos se conservan para el histórico.
 
@@ -167,6 +181,7 @@ backend/
         application/       # Servicio y contrato del repositorio
         http/              # Rutas, validación y DTOs
       health/
+      users/               # Identidad, hashing, sesiones y perfil
       streets/             # Reservado para el dominio de calles
     infrastructure/
       database/            # Pool, esquema Drizzle y repositorio PostGIS

@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReportDto } from '../../api/reportTypes.js';
 import { ReportMarkerPopup } from './ReportMarkerPopup.js';
 
@@ -26,7 +26,11 @@ const defaultProps = {
   onVote: vi.fn(),
   isVoting: false,
   feedbackError: null,
+  authenticated: true,
+  onRequestLogin: vi.fn(),
 };
+
+afterEach(() => cleanup());
 
 describe('ReportMarkerPopup freshness', () => {
   it('uses visible text as well as a neutral icon for stale reports', () => {
@@ -51,5 +55,19 @@ describe('ReportMarkerPopup freshness', () => {
 
     expect(screen.getByText('Resuelto')).toBeInTheDocument();
     expect(screen.getByText('Estado: Resuelto')).toBeInTheDocument();
+  });
+
+  it('asks signed-out visitors to log in before voting', () => {
+    const onRequestLogin = vi.fn();
+    render(
+      <ReportMarkerPopup {...defaultProps} authenticated={false} onRequestLogin={onRequestLogin} />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: /Iniciá sesión para confirmar/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sigue existiendo/ })).toBeDisabled();
+    screen.getByRole('button', { name: /Iniciá sesión para confirmar/ }).click();
+    expect(onRequestLogin).toHaveBeenCalledOnce();
   });
 });

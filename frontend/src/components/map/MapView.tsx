@@ -19,6 +19,7 @@ import { reportTypeLabelsForMap } from './ReportMarkerPopup.js';
 import { useViewportReports } from './useViewportReports.js';
 import type { UserLocation } from './types.js';
 import 'leaflet/dist/leaflet.css';
+import { useAuth } from '../../auth/AuthContext.js';
 
 const reportTypeClasses: Record<keyof typeof reportTypeLabelsForMap, string> = {
   POTHOLE: 'pothole',
@@ -106,6 +107,7 @@ function getLocationErrorMessage(error: unknown): string {
 }
 
 export default function MapView() {
+  const { user, openAuthDialog, refreshProfile } = useAuth();
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
@@ -126,6 +128,9 @@ export default function MapView() {
     updateReportFeedback,
     replaceReport,
   } = useViewportReports();
+  useEffect(() => {
+    retry();
+  }, [user?.id, retry]);
   const handleViewportChange = useCallback(
     (bounds: ViewportBounds) => requestBounds(bounds),
     [requestBounds],
@@ -170,6 +175,7 @@ export default function MapView() {
   async function submitReport(input: CreateReportInput) {
     const createdReport = await createReport(input);
     addReport(createdReport);
+    void refreshProfile().catch(() => undefined);
     setScoreRefreshKey((current) => current + 1);
     const createdLocation = createdReport.location;
     setReportFocusLocation(createdLocation);
@@ -204,6 +210,7 @@ export default function MapView() {
     try {
       const updatedReport = await submitReportFeedback(reportId, type);
       replaceReport(updatedReport);
+      void refreshProfile().catch(() => undefined);
       setScoreRefreshKey((current) => current + 1);
     } catch (error) {
       updateReportFeedback(reportId, previousFeedback);
@@ -266,6 +273,8 @@ export default function MapView() {
             onVote={(type) => void voteOnReport(report.id, type)}
             isVoting={votingReportIds.has(report.id)}
             feedbackError={feedbackErrors[report.id] || null}
+            authenticated={Boolean(user)}
+            onRequestLogin={openAuthDialog}
           />
         ))}
         {userLocation && (

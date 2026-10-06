@@ -43,6 +43,8 @@ interface ReportMarkerPopupProps {
   onVote: (type: ReportFeedbackType) => void;
   isVoting: boolean;
   feedbackError: string | null;
+  authenticated: boolean;
+  onRequestLogin: () => void;
 }
 
 export function ReportMarkerPopup({
@@ -50,6 +52,8 @@ export function ReportMarkerPopup({
   onVote,
   isVoting,
   feedbackError,
+  authenticated,
+  onRequestLogin,
 }: ReportMarkerPopupProps) {
   const severity = severityLabels[report.severity];
   const freshness = freshnessLabels[report.freshness.level];
@@ -82,7 +86,7 @@ export function ReportMarkerPopup({
           type="button"
           className={report.feedback.userFeedback === 'CONFIRM' ? 'is-selected' : ''}
           aria-pressed={report.feedback.userFeedback === 'CONFIRM'}
-          disabled={isVoting}
+          disabled={isVoting || !authenticated}
           onClick={() => onVote('CONFIRM')}
         >
           <span>👍 Sigue existiendo</span>
@@ -92,13 +96,18 @@ export function ReportMarkerPopup({
           type="button"
           className={report.feedback.userFeedback === 'RESOLVED' ? 'is-selected' : ''}
           aria-pressed={report.feedback.userFeedback === 'RESOLVED'}
-          disabled={isVoting}
+          disabled={isVoting || !authenticated}
           onClick={() => onVote('RESOLVED')}
         >
           <span>👎 Ya no existe</span>
           <strong>{report.feedback.resolvedReports}</strong>
         </button>
       </div>
+      {!authenticated && (
+        <button type="button" className="report-popup__login" onClick={onRequestLogin}>
+          Iniciá sesión para confirmar este reporte
+        </button>
+      )}
       {feedbackError && (
         <span className="report-popup__feedback-error" role="alert">
           {feedbackError}

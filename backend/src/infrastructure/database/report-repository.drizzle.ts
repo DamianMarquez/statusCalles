@@ -61,10 +61,11 @@ const reportProjection = sql`
 export class DrizzleReportRepository implements ReportRepository {
   constructor(private readonly database: StreetStatusDatabase) {}
 
-  async create(input: CreateStreetReport): Promise<StreetReport> {
+  async create(input: CreateStreetReport, userId?: string | null): Promise<StreetReport> {
     const result = await this.database.execute<ReportRow>(sql`
-      INSERT INTO street_reports (type, severity, description, location)
+      INSERT INTO street_reports (user_id, type, severity, description, location)
       VALUES (
+        ${userId ?? null}::uuid,
         ${input.type}::report_type,
         ${SEVERITY_LEVELS[input.severity]},
         ${input.description},

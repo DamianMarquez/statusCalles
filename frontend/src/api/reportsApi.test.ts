@@ -92,7 +92,6 @@ describe('createReport', () => {
   });
 
   it('submits a feedback vote and returns the updated aggregate', async () => {
-    localStorage.setItem('street-status-voter-id', '40000000-0000-4000-8000-000000000001');
     const updatedReport: ReportDto = {
       ...report,
       feedback: { confirmations: 1, resolvedReports: 0, userFeedback: 'CONFIRM' },
@@ -105,7 +104,7 @@ describe('createReport', () => {
       expect.stringContaining('/api/reports/report-1/feedback'),
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'X-Voter-Id': '40000000-0000-4000-8000-000000000001' }),
+        credentials: 'include',
       }),
     );
   });

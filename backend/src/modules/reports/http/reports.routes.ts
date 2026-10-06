@@ -48,26 +48,15 @@ interface UpdateStatusBody {
 const reportIdPattern =
   '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
 
-function readVoterId(raw: string | string[] | undefined): {
-  valid: boolean;
-  voterId: string | null;
-} {
-  if (raw === undefined) return { valid: true, voterId: null };
-  if (Array.isArray(raw) || !new RegExp(reportIdPattern).test(raw)) {
-    return { valid: false, voterId: null };
-  }
-  return { valid: true, voterId: raw.toLowerCase() };
-}
-
 async function toReportsDto(
   reports: StreetReport[],
-  voterId: string | null,
+  userId: string | null,
   feedbackService: ReportFeedbackService,
 ) {
   const evaluatedAt = feedbackService.now();
   const summaries = await feedbackService.summariesForReports(
     reports.map((report) => report.id),
-    voterId,
+    userId,
     evaluatedAt,
   );
   return reports.map((report) =>
@@ -112,10 +101,6 @@ export async function registerReportsRoutes(
       },
     },
     async (request, reply) => {
-      const { valid, voterId } = readVoterId(request.headers['x-voter-id']);
-      if (!valid) {
-        return reply.code(400).send({ code: 'INVALID_VOTER_ID', message: 'Invalid voter ID.' });
-      }
       let reports;
       if ('south' in request.query) {
         const { south, north, west, east } = request.query;
@@ -130,13 +115,14 @@ export async function registerReportsRoutes(
           radiusMeters: request.query.radius,
         });
       }
-      return toReportsDto(reports, voterId, feedbackService);
+      return toReportsDto(reports, request.authUser?.id ?? null, feedbackService);
     },
   );
 
   app.post<{ Body: CreateReportBody }>(
     '/reports',
     {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: {
         body: {
           type: 'object',
@@ -153,15 +139,18 @@ export async function registerReportsRoutes(
       },
     },
     async (request, reply) => {
-      const report = await service.create({
-        type: request.body.type,
-        severity: request.body.severity,
-        description: request.body.description?.trim() ?? '',
-        location: {
-          latitude: request.body.latitude,
-          longitude: request.body.longitude,
+      const report = await service.create(
+        {
+          type: request.body.type,
+          severity: request.body.severity,
+          description: request.body.description?.trim() ?? '',
+          location: {
+            latitude: request.body.latitude,
+            longitude: request.body.longitude,
+          },
         },
-      });
+        request.authUser?.id ?? null,
+      );
       return reply
         .code(201)
         .send(toReportDto(report, emptyReportFeedbackSummary, feedbackService.now()));
@@ -184,11 +173,7 @@ export async function registerReportsRoutes(
       if (!report) {
         return reply.code(404).send({ code: 'REPORT_NOT_FOUND', message: 'Report not found.' });
       }
-      const { valid, voterId } = readVoterId(request.headers['x-voter-id']);
-      if (!valid) {
-        return reply.code(400).send({ code: 'INVALID_VOTER_ID', message: 'Invalid voter ID.' });
-      }
-      const [dto] = await toReportsDto([report], voterId, feedbackService);
+      const [dto] = await toReportsDto([report], request.authUser?.id ?? null, feedbackService);
       return dto;
     },
   );
@@ -196,6 +181,13 @@ export async function registerReportsRoutes(
   app.patch<{ Params: ReportIdParams; Body: UpdateStatusBody }>(
     '/reports/:id/status',
     {
+      preHandler: async (request, reply) => {
+        if (!request.authUser) {
+          return reply
+            .code(401)
+            .send({ code: 'AUTHENTICATION_REQUIRED', message: 'Iniciá sesión para continuar.' });
+        }
+      },
       schema: {
         params: {
           type: 'object',
@@ -215,11 +207,7 @@ export async function registerReportsRoutes(
       if (!report) {
         return reply.code(404).send({ code: 'REPORT_NOT_FOUND', message: 'Report not found.' });
       }
-      const { valid, voterId } = readVoterId(request.headers['x-voter-id']);
-      if (!valid) {
-        return reply.code(400).send({ code: 'INVALID_VOTER_ID', message: 'Invalid voter ID.' });
-      }
-      const [dto] = await toReportsDto([report], voterId, feedbackService);
+      const [dto] = await toReportsDto([report], request.authUser?.id ?? null, feedbackService);
       return dto;
     },
   );

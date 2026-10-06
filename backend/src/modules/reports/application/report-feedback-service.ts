@@ -14,7 +14,7 @@ export class ReportFeedbackService {
   submit(
     input: {
       reportId: string;
-      voterId: string;
+      userId: string;
       type: ReportFeedbackType;
     },
     asOf = this.now(),
@@ -24,9 +24,9 @@ export class ReportFeedbackService {
 
   summariesForReports(
     reportIds: string[],
-    voterId: string | null,
+    userId: string | null,
     asOf = this.now(),
   ): Promise<Map<string, ReportFeedbackSummary>> {
-    return this.repository.summariesForReports(reportIds, voterId, asOf);
+    return this.repository.summariesForReports(reportIds, userId, asOf);
   }
 }

@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReportDto } from '../../api/reportTypes.js';
 import MapView from './MapView.js';
+import { AuthContext, type AuthContextValue } from '../../auth/AuthContext.js';
 
 const mocks = vi.hoisted(() => ({
   getReportsInViewport: vi.fn(),
@@ -85,9 +86,34 @@ async function selectReportLocation() {
   expect(await screen.findByRole('dialog')).toBeInTheDocument();
 }
 
+function renderAuthenticatedMap() {
+  const authValue: AuthContextValue = {
+    user: {
+      id: 'user-1',
+      email: 'user@example.com',
+      displayName: 'User',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    },
+    profile: null,
+    loading: false,
+    dialogOpen: false,
+    openAuthDialog: vi.fn(),
+    closeAuthDialog: vi.fn(),
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+    refreshProfile: vi.fn().mockResolvedValue(undefined),
+  };
+  return render(
+    <AuthContext.Provider value={authValue}>
+      <MapView />
+    </AuthContext.Provider>,
+  );
+}
+
 describe('MapView report creation', () => {
   it('opens the form after choosing a location on the map', async () => {
-    render(<MapView />);
+    renderAuthenticatedMap();
     await selectReportLocation();
 
     expect(screen.getByText('-34.60370, -58.38160')).toBeInTheDocument();
@@ -95,7 +121,7 @@ describe('MapView report creation', () => {
   });
 
   it('validates required fields before sending', async () => {
-    render(<MapView />);
+    renderAuthenticatedMap();
     await selectReportLocation();
 
     const form = screen.getByRole('dialog').querySelector('form');
@@ -173,7 +199,7 @@ describe('MapView report creation', () => {
       feedback: { confirmations: 4, resolvedReports: 2, userFeedback: 'CONFIRM' },
       freshness: { ...report.freshness, confidence: 82 },
     });
-    render(<MapView />);
+    renderAuthenticatedMap();
 
     const confirmButton = await screen.findByRole('button', { name: /Sigue existiendo/ });
     fireEvent.click(confirmButton);
@@ -189,7 +215,7 @@ describe('MapView report creation', () => {
   it('restores the current vote and shows an error if feedback is rejected', async () => {
     mocks.getReportsInViewport.mockResolvedValue([report]);
     mocks.submitReportFeedback.mockRejectedValue(new Error('No pudimos registrar tu respuesta.'));
-    render(<MapView />);
+    renderAuthenticatedMap();
 
     fireEvent.click(await screen.findByRole('button', { name: /Ya no existe/ }));
 

@@ -14,7 +14,7 @@ export interface ReportViewportQuery {
 }
 
 export interface ReportRepository {
-  create(input: CreateStreetReport): Promise<StreetReport>;
+  create(input: CreateStreetReport, userId?: string | null): Promise<StreetReport>;
   findNearby(query: NearbyReportsQuery): Promise<StreetReport[]>;
   findInViewport(query: ReportViewportQuery): Promise<StreetReport[]>;
   findById(id: string): Promise<StreetReport | null>;

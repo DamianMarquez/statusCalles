@@ -2,7 +2,7 @@ import type { ReportFeedbackSummary, ReportFeedbackType } from '../domain/report
 
 export interface SubmitReportFeedback {
   reportId: string;
-  voterId: string;
+  userId: string;
   type: ReportFeedbackType;
 }
 
@@ -10,7 +10,7 @@ export interface ReportFeedbackRepository {
   submit(input: SubmitReportFeedback, asOf: Date): Promise<ReportFeedbackSummary | null>;
   summariesForReports(
     reportIds: string[],
-    voterId: string | null,
+    userId: string | null,
     asOf: Date,
   ): Promise<Map<string, ReportFeedbackSummary>>;
 }

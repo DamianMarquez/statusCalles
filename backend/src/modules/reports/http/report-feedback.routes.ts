@@ -23,6 +23,14 @@ export async function registerReportFeedbackRoutes(
   app.post<{ Params: ReportIdParams; Body: FeedbackBody }>(
     '/reports/:id/feedback',
     {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: async (request, reply) => {
+        if (!request.authUser) {
+          return reply
+            .code(401)
+            .send({ code: 'AUTHENTICATION_REQUIRED', message: 'Iniciá sesión para continuar.' });
+        }
+      },
       schema: {
         params: {
           type: 'object',
@@ -38,18 +46,11 @@ export async function registerReportFeedbackRoutes(
       },
     },
     async (request, reply) => {
-      const voterId = request.headers['x-voter-id'];
-      if (typeof voterId !== 'string' || !new RegExp(uuidPattern).test(voterId)) {
-        return reply
-          .code(400)
-          .send({ code: 'INVALID_VOTER_ID', message: 'A valid voter ID is required.' });
-      }
-
       const evaluatedAt = feedbackService.now();
       const feedback = await feedbackService.submit(
         {
           reportId: request.params.id,
-          voterId: voterId.toLowerCase(),
+          userId: request.authUser!.id,
           type: request.body.type,
         },
         evaluatedAt,

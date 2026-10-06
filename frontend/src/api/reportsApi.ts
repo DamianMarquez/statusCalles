@@ -7,7 +7,6 @@ import type {
   ReportFeedbackType,
   ViewportBounds,
 } from './reportTypes.js';
-import { getVoterSessionId } from './voterSession.js';
 
 const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const reportTypes: ReportType[] = [
@@ -70,7 +69,8 @@ export async function getReportsInViewport(
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl}/api/reports?${query.toString()}`, {
-      headers: { Accept: 'application/json', 'X-Voter-Id': getVoterSessionId() },
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
       signal,
     });
   } catch (error) {
@@ -104,8 +104,8 @@ export async function createReport(input: CreateReportInput): Promise<ReportDto>
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        'X-Voter-Id': getVoterSessionId(),
       },
+      credentials: 'include',
       body: JSON.stringify(input),
     });
   } catch {
@@ -144,15 +144,16 @@ export async function submitReportFeedback(
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        'X-Voter-Id': getVoterSessionId(),
       },
       body: JSON.stringify({ type }),
+      credentials: 'include',
     });
   } catch {
     throw new ReportsApiError('No se pudo conectar con el servicio de reportes.');
   }
 
   if (response.status === 404) throw new ReportsApiError('Este reporte ya no está disponible.');
+  if (response.status === 401) throw new ReportsApiError('Iniciá sesión para confirmar reportes.');
   if (response.status === 400) throw new ReportsApiError('No pudimos registrar tu respuesta.');
   if (!response.ok)
     throw new ReportsApiError('No pudimos registrar tu respuesta. Intentá de nuevo.');

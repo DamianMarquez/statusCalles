@@ -34,29 +34,29 @@ export class DrizzleReportFeedbackRepository implements ReportFeedbackRepository
   async submit(
     input: {
       reportId: string;
-      voterId: string;
+      userId: string;
       type: ReportFeedbackType;
     },
     asOf: Date,
   ): Promise<ReportFeedbackSummary | null> {
     const vote = await this.database.execute<{ report_id: string }>(sql`
-      INSERT INTO report_feedback (report_id, voter_id, type)
-      SELECT id, ${input.voterId}::uuid, ${input.type}::report_feedback_type
+      INSERT INTO report_feedback (report_id, user_id, voter_id, type)
+      SELECT id, ${input.userId}::uuid, NULL, ${input.type}::report_feedback_type
       FROM street_reports
       WHERE id = ${input.reportId}::uuid
-      ON CONFLICT (report_id, voter_id)
+      ON CONFLICT (report_id, user_id) WHERE user_id IS NOT NULL
       DO UPDATE SET type = EXCLUDED.type, updated_at = NOW()
       RETURNING report_id::text AS report_id
     `);
     if (!vote.rows[0]) return null;
 
-    const summaries = await this.summariesForReports([input.reportId], input.voterId, asOf);
+    const summaries = await this.summariesForReports([input.reportId], input.userId, asOf);
     return summaries.get(input.reportId) ?? null;
   }
 
   async summariesForReports(
     reportIds: string[],
-    voterId: string | null,
+    userId: string | null,
     asOf: Date,
   ): Promise<Map<string, ReportFeedbackSummary>> {
     if (reportIds.length === 0) return new Map();
@@ -69,7 +69,7 @@ export class DrizzleReportFeedbackRepository implements ReportFeedbackRepository
         report_id::text AS report_id,
         COUNT(*) FILTER (WHERE type = 'CONFIRM') AS confirmations,
         COUNT(*) FILTER (WHERE type = 'RESOLVED') AS resolved_reports,
-        MAX(type) FILTER (WHERE voter_id = ${voterId}::uuid) AS user_feedback,
+        MAX(type) FILTER (WHERE user_id = ${userId}::uuid) AS user_feedback,
         SUM(EXP(-LN(2) * GREATEST(EXTRACT(EPOCH FROM (${asOf}::timestamptz - updated_at)) / 86400.0, 0) / ${reportFreshnessThresholds.confirmationHalfLifeDays}))
           FILTER (WHERE type = 'CONFIRM') AS weighted_confirmations,
         SUM(EXP(-LN(2) * GREATEST(EXTRACT(EPOCH FROM (${asOf}::timestamptz - updated_at)) / 86400.0, 0) / ${reportFreshnessThresholds.confirmationHalfLifeDays}))

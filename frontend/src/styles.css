@@ -900,6 +900,162 @@ a {
   line-height: 1.4;
 }
 
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.account-button,
+.auth-submit {
+  border: 0;
+  border-radius: 9px;
+  background: #176d4b;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.account-button {
+  max-width: 180px;
+  padding: 9px 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-backdrop {
+  position: fixed;
+  z-index: 2000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgb(15 28 21 / 48%);
+}
+
+.auth-panel {
+  position: relative;
+  width: min(100%, 430px);
+  max-height: min(90dvh, 720px);
+  overflow: auto;
+  padding: 30px;
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 20%);
+}
+
+.auth-panel__close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  border: 0;
+  background: transparent;
+  color: #526259;
+  font-size: 1.7rem;
+  cursor: pointer;
+}
+
+.auth-panel__eyebrow {
+  color: #287451;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.auth-panel h2 {
+  margin: 7px 0 18px;
+  font:
+    800 1.55rem Manrope,
+    sans-serif;
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 6px;
+  color: #344b3c;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.auth-form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #ccd8cf;
+  border-radius: 8px;
+  background: #fff;
+  color: #192a25;
+  font: inherit;
+}
+
+.auth-submit {
+  min-height: 44px;
+  padding: 10px 16px;
+}
+
+.auth-submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.auth-switch {
+  width: 100%;
+  margin-top: 15px;
+  border: 0;
+  background: transparent;
+  color: #176d4b;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-panel__error {
+  color: #ae2b22;
+  font-size: 0.88rem;
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin: 18px 0;
+}
+
+.profile-stats div {
+  padding: 10px;
+  border-radius: 9px;
+  background: #f0f5f1;
+}
+
+.profile-stats dt {
+  color: #526259;
+  font-size: 0.75rem;
+}
+
+.profile-stats dd {
+  margin: 3px 0 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.report-popup__login {
+  border: 0;
+  padding: 4px 0;
+  background: transparent;
+  color: #176d4b;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
 .street-score-status {
   left: 12px;
   right: auto;

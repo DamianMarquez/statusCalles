@@ -28,11 +28,15 @@ export function ReportMarker({
   onVote,
   isVoting,
   feedbackError,
+  authenticated,
+  onRequestLogin,
 }: {
   report: ReportDto;
   onVote: (type: ReportFeedbackType) => void;
   isVoting: boolean;
   feedbackError: string | null;
+  authenticated: boolean;
+  onRequestLogin: () => void;
 }) {
   return (
     <Marker
@@ -45,6 +49,8 @@ export function ReportMarker({
           onVote={onVote}
           isVoting={isVoting}
           feedbackError={feedbackError}
+          authenticated={authenticated}
+          onRequestLogin={onRequestLogin}
         />
       </Popup>
     </Marker>
