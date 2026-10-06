@@ -3,6 +3,13 @@ export type ReportType =
 
 export type ReportSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type ReportStatus = 'ACTIVE' | 'RESOLVED';
+export type ReportFeedbackType = 'CONFIRM' | 'RESOLVED';
+
+export interface ReportFeedbackSummary {
+  confirmations: number;
+  resolvedReports: number;
+  userFeedback: ReportFeedbackType | null;
+}
 
 export interface ReportDto {
   id: string;
@@ -16,6 +23,7 @@ export interface ReportDto {
   status: ReportStatus;
   createdAt: string;
   updatedAt: string;
+  feedback: ReportFeedbackSummary;
 }
 
 export interface ViewportBounds {

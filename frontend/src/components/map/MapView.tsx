@@ -2,7 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { divIcon } from 'leaflet';
 import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import { createReport } from '../../api/reportsApi.js';
-import type { CreateReportInput, ViewportBounds } from '../../api/reportTypes.js';
+import type {
+  CreateReportInput,
+  ReportFeedbackSummary,
+  ReportFeedbackType,
+  ViewportBounds,
+} from '../../api/reportTypes.js';
+import { submitReportFeedback } from '../../api/reportsApi.js';
 import { GeolocationError, requestUserLocation } from './geolocation.js';
 import { mapConfig } from './mapConfig.js';
 import { ReportForm } from './ReportForm.js';
@@ -107,7 +113,16 @@ export default function MapView() {
   const [reportLocation, setReportLocation] = useState<UserLocation | null>(null);
   const [reportFocusLocation, setReportFocusLocation] = useState<UserLocation | null>(null);
   const [reportSuccess, setReportSuccess] = useState(false);
-  const { reports, status: reportStatus, requestBounds, retry, addReport } = useViewportReports();
+  const [votingReportIds, setVotingReportIds] = useState<Set<string>>(() => new Set());
+  const [feedbackErrors, setFeedbackErrors] = useState<Record<string, string>>({});
+  const {
+    reports,
+    status: reportStatus,
+    requestBounds,
+    retry,
+    addReport,
+    updateReportFeedback,
+  } = useViewportReports();
   const handleViewportChange = useCallback(
     (bounds: ViewportBounds) => requestBounds(bounds),
     [requestBounds],
@@ -164,6 +179,45 @@ export default function MapView() {
     if (userLocation) selectReportLocation(userLocation);
   }
 
+  async function voteOnReport(reportId: string, type: ReportFeedbackType) {
+    const report = reports.find((item) => item.id === reportId);
+    if (!report || report.feedback.userFeedback === type || votingReportIds.has(reportId)) return;
+
+    const previousFeedback = report.feedback;
+    const confirmations =
+      previousFeedback.confirmations - (previousFeedback.userFeedback === 'CONFIRM' ? 1 : 0);
+    const resolvedReports =
+      previousFeedback.resolvedReports - (previousFeedback.userFeedback === 'RESOLVED' ? 1 : 0);
+    const optimisticFeedback: ReportFeedbackSummary = {
+      confirmations: confirmations + (type === 'CONFIRM' ? 1 : 0),
+      resolvedReports: resolvedReports + (type === 'RESOLVED' ? 1 : 0),
+      userFeedback: type,
+    };
+
+    updateReportFeedback(reportId, optimisticFeedback);
+    setFeedbackErrors((current) => ({ ...current, [reportId]: '' }));
+    setVotingReportIds((current) => new Set(current).add(reportId));
+    try {
+      const summary = await submitReportFeedback(reportId, type);
+      updateReportFeedback(reportId, summary);
+    } catch (error) {
+      updateReportFeedback(reportId, previousFeedback);
+      setFeedbackErrors((current) => ({
+        ...current,
+        [reportId]:
+          error instanceof Error
+            ? error.message
+            : 'No pudimos registrar tu respuesta. Intentá de nuevo.',
+      }));
+    } finally {
+      setVotingReportIds((current) => {
+        const next = new Set(current);
+        next.delete(reportId);
+        return next;
+      });
+    }
+  }
+
   const reportCount = reports.length;
   const statusMessage =
     reportStatus === 'loading'
@@ -200,7 +254,13 @@ export default function MapView() {
           onSelect={selectReportLocation}
         />
         {reports.map((report) => (
-          <ReportMarker key={report.id} report={report} />
+          <ReportMarker
+            key={report.id}
+            report={report}
+            onVote={(type) => void voteOnReport(report.id, type)}
+            isVoting={votingReportIds.has(report.id)}
+            feedbackError={feedbackErrors[report.id] || null}
+          />
         ))}
         {userLocation && (
           <>

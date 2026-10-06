@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getReportsInViewport } from '../../api/reportsApi.js';
-import type { ReportDto, ViewportBounds } from '../../api/reportTypes.js';
+import type { ReportDto, ReportFeedbackSummary, ViewportBounds } from '../../api/reportTypes.js';
 
 export type ReportLoadStatus = 'loading' | 'error' | 'empty' | 'loaded';
 
@@ -66,6 +66,12 @@ export function useViewportReports(debounceMs = 300) {
     setStatus('loaded');
   }, []);
 
+  const updateReportFeedback = useCallback((reportId: string, feedback: ReportFeedbackSummary) => {
+    setReports((current) =>
+      current.map((report) => (report.id === reportId ? { ...report, feedback } : report)),
+    );
+  }, []);
+
   useEffect(
     () => () => {
       requestId.current += 1;
@@ -75,5 +81,5 @@ export function useViewportReports(debounceMs = 300) {
     [],
   );
 
-  return { reports, status, requestBounds, retry, addReport };
+  return { reports, status, requestBounds, retry, addReport, updateReportFeedback };
 }

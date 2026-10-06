@@ -6,6 +6,7 @@ MVP para consultar y reportar problemas de circulación en calles de la Ciudad A
 
 - Mapa interactivo de CABA con Leaflet y OpenStreetMap, marcador de ubicación del usuario y reportes cargados desde la API según el viewport visible.
 - Creación de reportes desde el mapa con selección de ubicación, validación y envío a la API.
+- Confirmaciones comunitarias por reporte; cada sesión puede confirmar o indicar que ya no existe, y cambiar su voto.
 - API Fastify con health check y endpoints REST para persistir y consultar reportes.
 - Reportes almacenados en PostgreSQL con `GEOGRAPHY(POINT, 4326)` y consultas de radio ejecutadas por PostGIS.
 - Migraciones versionadas con Drizzle Kit.
@@ -83,14 +84,15 @@ La aplicación usa los tiles estándar de OpenStreetMap y muestra su atribución
 
 La API está bajo `/api`. Los tipos admitidos son `POTHOLE`, `FLOOD`, `ROAD_DAMAGE`, `ROAD_BLOCKED`, `ROAD_WORK`, `TRAFFIC_LIGHT` y `OTHER`. Las severidades aceptan `LOW`, `MEDIUM`, `HIGH` y `CRITICAL`, almacenadas como los niveles numéricos 1 a 4. Los estados son `ACTIVE` y `RESOLVED`.
 
-| Método y ruta                                                    | Uso                                     |
-| ---------------------------------------------------------------- | --------------------------------------- |
-| `GET /api/health`                                                | Health check                            |
-| `GET /api/reports?south=-34.7&north=-34.5&west=-58.5&east=-58.3` | Buscar dentro del viewport visible      |
-| `GET /api/reports?lat=-34.6037&lng=-58.3816&radius=1000`         | Buscar en un radio, expresado en metros |
-| `POST /api/reports`                                              | Crear un reporte                        |
-| `GET /api/reports/:id`                                           | Consultar un reporte                    |
-| `PATCH /api/reports/:id/status`                                  | Cambiar entre `ACTIVE` y `RESOLVED`     |
+| Método y ruta                                                    | Uso                                         |
+| ---------------------------------------------------------------- | ------------------------------------------- |
+| `GET /api/health`                                                | Health check                                |
+| `GET /api/reports?south=-34.7&north=-34.5&west=-58.5&east=-58.3` | Buscar dentro del viewport visible          |
+| `GET /api/reports?lat=-34.6037&lng=-58.3816&radius=1000`         | Buscar en un radio, expresado en metros     |
+| `POST /api/reports`                                              | Crear un reporte                            |
+| `POST /api/reports/:id/feedback`                                 | Crear o cambiar la confirmación comunitaria |
+| `GET /api/reports/:id`                                           | Consultar un reporte                        |
+| `PATCH /api/reports/:id/status`                                  | Cambiar entre `ACTIVE` y `RESOLVED`         |
 
 Ejemplo de creación:
 
@@ -105,6 +107,8 @@ Las coordenadas se validan dentro de los rangos de latitud y longitud, la descri
 La API devuelve DTOs con `{ latitude, longitude }`, fechas ISO y enums públicos; no serializa filas o tipos internos de la base.
 
 Para crear un reporte, presionar **Reportar problema**, tocar el mapa para marcar la ubicación y completar tipo y severidad. La descripción es opcional (máximo 500 caracteres). La API valida tipo, severidad, coordenadas y longitud de descripción; si se omite, persiste una descripción vacía. Una creación correcta devuelve el DTO del reporte, que se agrega al mapa inmediatamente.
+
+Cada reporte incluye `feedback.confirmations`, `feedback.resolvedReports` y `feedback.userFeedback`. Para votar, la aplicación envía `POST /api/reports/:id/feedback` con `{ "type": "CONFIRM" | "RESOLVED" }` y un encabezado `X-Voter-Id` UUID. El navegador conserva este identificador anónimo en `localStorage`; la base tiene una restricción única por reporte e identificador, por lo que repetir o cambiar el voto actualiza la misma fila. Este identificador no reemplaza autenticación y puede restablecerse o falsificarse; asociar el campo `voter_id` a un usuario autenticado y agregar rate limiting son evoluciones previstas.
 
 ## Persistencia y decisión de ORM
 

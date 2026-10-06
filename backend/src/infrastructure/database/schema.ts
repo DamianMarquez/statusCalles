@@ -7,10 +7,12 @@ import {
   pgTable,
   smallint,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
 import { REPORT_STATUSES, REPORT_TYPES } from '../../modules/reports/domain/street-report.js';
+import { REPORT_FEEDBACK_TYPES } from '../../modules/reports/domain/report-feedback.js';
 
 const geographyPoint = customType<{ data: string; driverData: string }>({
   dataType: () => 'geography(Point,4326)',
@@ -18,6 +20,7 @@ const geographyPoint = customType<{ data: string; driverData: string }>({
 
 export const reportTypeEnum = pgEnum('report_type', REPORT_TYPES);
 export const reportStatusEnum = pgEnum('report_status', REPORT_STATUSES);
+export const reportFeedbackTypeEnum = pgEnum('report_feedback_type', REPORT_FEEDBACK_TYPES);
 
 export const streetReports = pgTable(
   'street_reports',
@@ -36,4 +39,18 @@ export const streetReports = pgTable(
     index('street_reports_location_gix').using('gist', table.location),
     index('street_reports_created_at_idx').on(table.createdAt),
   ],
+);
+
+export const reportFeedback = pgTable(
+  'report_feedback',
+  {
+    reportId: uuid('report_id')
+      .notNull()
+      .references(() => streetReports.id, { onDelete: 'cascade' }),
+    voterId: uuid('voter_id').notNull(),
+    type: reportFeedbackTypeEnum('type').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('report_feedback_report_voter_unique').on(table.reportId, table.voterId)],
 );

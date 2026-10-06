@@ -1,4 +1,4 @@
-import type { ReportDto } from '../../api/reportTypes.js';
+import type { ReportDto, ReportFeedbackType } from '../../api/reportTypes.js';
 
 const reportTypeLabels: Record<ReportDto['type'], string> = {
   POTHOLE: 'BACHE',
@@ -31,7 +31,19 @@ function formatReportedAt(dateValue: string, now = Date.now()): string {
   return relativeTime.format(-Math.floor(hours / 24), 'day');
 }
 
-export function ReportMarkerPopup({ report }: { report: ReportDto }) {
+interface ReportMarkerPopupProps {
+  report: ReportDto;
+  onVote: (type: ReportFeedbackType) => void;
+  isVoting: boolean;
+  feedbackError: string | null;
+}
+
+export function ReportMarkerPopup({
+  report,
+  onVote,
+  isVoting,
+  feedbackError,
+}: ReportMarkerPopupProps) {
   const severity = severityLabels[report.severity];
 
   return (
@@ -45,6 +57,33 @@ export function ReportMarkerPopup({ report }: { report: ReportDto }) {
         Estado: {report.status === 'ACTIVE' ? 'Activo' : 'Resuelto'}
       </span>
       <span className="report-popup__meta">Reportado: {formatReportedAt(report.createdAt)}</span>
+      <div className="report-feedback" aria-label="Confirmación comunitaria">
+        <button
+          type="button"
+          className={report.feedback.userFeedback === 'CONFIRM' ? 'is-selected' : ''}
+          aria-pressed={report.feedback.userFeedback === 'CONFIRM'}
+          disabled={isVoting}
+          onClick={() => onVote('CONFIRM')}
+        >
+          <span>👍 Sigue existiendo</span>
+          <strong>{report.feedback.confirmations}</strong>
+        </button>
+        <button
+          type="button"
+          className={report.feedback.userFeedback === 'RESOLVED' ? 'is-selected' : ''}
+          aria-pressed={report.feedback.userFeedback === 'RESOLVED'}
+          disabled={isVoting}
+          onClick={() => onVote('RESOLVED')}
+        >
+          <span>👎 Ya no existe</span>
+          <strong>{report.feedback.resolvedReports}</strong>
+        </button>
+      </div>
+      {feedbackError && (
+        <span className="report-popup__feedback-error" role="alert">
+          {feedbackError}
+        </span>
+      )}
     </div>
   );
 }

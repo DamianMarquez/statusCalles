@@ -4,8 +4,11 @@ import type {
   ReportSeverity,
   ReportStatus,
   ReportType,
+  ReportFeedbackSummary,
+  ReportFeedbackType,
   ViewportBounds,
 } from './reportTypes.js';
+import { getVoterSessionId } from './voterSession.js';
 
 const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const reportTypes: ReportType[] = [
@@ -42,7 +45,12 @@ function isReportDto(value: unknown): value is ReportDto {
     typeof report.status === 'string' &&
     reportStatuses.includes(report.status as ReportStatus) &&
     typeof report.createdAt === 'string' &&
-    typeof report.updatedAt === 'string'
+    typeof report.updatedAt === 'string' &&
+    typeof report.feedback?.confirmations === 'number' &&
+    typeof report.feedback?.resolvedReports === 'number' &&
+    (report.feedback.userFeedback === null ||
+      report.feedback.userFeedback === 'CONFIRM' ||
+      report.feedback.userFeedback === 'RESOLVED')
   );
 }
 
@@ -58,7 +66,7 @@ export async function getReportsInViewport(
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl}/api/reports?${query.toString()}`, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', 'X-Voter-Id': getVoterSessionId() },
       signal,
     });
   } catch (error) {
@@ -89,7 +97,11 @@ export async function createReport(input: CreateReportInput): Promise<ReportDto>
   try {
     response = await fetch(`${apiBaseUrl}/api/reports`, {
       method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Voter-Id': getVoterSessionId(),
+      },
       body: JSON.stringify(input),
     });
   } catch {
@@ -115,4 +127,47 @@ export async function createReport(input: CreateReportInput): Promise<ReportDto>
   }
 
   return result;
+}
+
+export async function submitReportFeedback(
+  reportId: string,
+  type: ReportFeedbackType,
+): Promise<ReportFeedbackSummary> {
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}/api/reports/${encodeURIComponent(reportId)}/feedback`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Voter-Id': getVoterSessionId(),
+      },
+      body: JSON.stringify({ type }),
+    });
+  } catch {
+    throw new ReportsApiError('No se pudo conectar con el servicio de reportes.');
+  }
+
+  if (response.status === 404) throw new ReportsApiError('Este reporte ya no está disponible.');
+  if (response.status === 400) throw new ReportsApiError('No pudimos registrar tu respuesta.');
+  if (!response.ok)
+    throw new ReportsApiError('No pudimos registrar tu respuesta. Intentá de nuevo.');
+
+  let result: unknown;
+  try {
+    result = await response.json();
+  } catch {
+    throw new ReportsApiError('El servicio devolvió una respuesta inválida.');
+  }
+
+  if (
+    !result ||
+    typeof result !== 'object' ||
+    typeof (result as ReportFeedbackSummary).confirmations !== 'number' ||
+    typeof (result as ReportFeedbackSummary).resolvedReports !== 'number' ||
+    !['CONFIRM', 'RESOLVED'].includes(String((result as ReportFeedbackSummary).userFeedback))
+  ) {
+    throw new ReportsApiError('El servicio devolvió una respuesta inválida.');
+  }
+  return result as ReportFeedbackSummary;
 }

@@ -1,6 +1,6 @@
 import { divIcon } from 'leaflet';
 import { Marker, Popup } from 'react-leaflet';
-import type { ReportDto } from '../../api/reportTypes.js';
+import type { ReportDto, ReportFeedbackType } from '../../api/reportTypes.js';
 import { ReportMarkerPopup } from './ReportMarkerPopup.js';
 
 const markerClasses: Record<ReportDto['type'], string> = {
@@ -23,14 +23,29 @@ function createReportIcon(type: ReportDto['type']) {
   });
 }
 
-export function ReportMarker({ report }: { report: ReportDto }) {
+export function ReportMarker({
+  report,
+  onVote,
+  isVoting,
+  feedbackError,
+}: {
+  report: ReportDto;
+  onVote: (type: ReportFeedbackType) => void;
+  isVoting: boolean;
+  feedbackError: string | null;
+}) {
   return (
     <Marker
       position={[report.location.latitude, report.location.longitude]}
       icon={createReportIcon(report.type)}
     >
-      <Popup>
-        <ReportMarkerPopup report={report} />
+      <Popup minWidth={240}>
+        <ReportMarkerPopup
+          report={report}
+          onVote={onVote}
+          isVoting={isVoting}
+          feedbackError={feedbackError}
+        />
       </Popup>
     </Marker>
   );

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { ReportService } from '../application/report-service.js';
+import { ReportFeedbackService } from '../application/report-feedback-service.js';
 import {
   REPORT_STATUSES,
   REPORT_TYPES,
@@ -8,6 +9,8 @@ import {
   type ReportStatus,
 } from '../domain/street-report.js';
 import { toReportDto } from './report.dto.js';
+import { emptyReportFeedbackSummary } from '../domain/report-feedback.js';
+import type { StreetReport } from '../domain/street-report.js';
 
 const severityNames = Object.keys(SEVERITY_LEVELS) as ReportSeverity[];
 
@@ -45,11 +48,36 @@ interface UpdateStatusBody {
 const reportIdPattern =
   '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
 
+function readVoterId(raw: string | string[] | undefined): {
+  valid: boolean;
+  voterId: string | null;
+} {
+  if (raw === undefined) return { valid: true, voterId: null };
+  if (Array.isArray(raw) || !new RegExp(reportIdPattern).test(raw)) {
+    return { valid: false, voterId: null };
+  }
+  return { valid: true, voterId: raw.toLowerCase() };
+}
+
+async function toReportsDto(
+  reports: StreetReport[],
+  voterId: string | null,
+  feedbackService: ReportFeedbackService,
+) {
+  const summaries = await feedbackService.summariesForReports(
+    reports.map((report) => report.id),
+    voterId,
+  );
+  return reports.map((report) =>
+    toReportDto(report, summaries.get(report.id) ?? emptyReportFeedbackSummary),
+  );
+}
+
 export async function registerReportsRoutes(
   app: FastifyInstance,
-  options: { service: ReportService },
+  options: { service: ReportService; feedbackService: ReportFeedbackService },
 ): Promise<void> {
-  const { service } = options;
+  const { service, feedbackService } = options;
 
   app.get<{ Querystring: ReportQuery }>(
     '/reports',
@@ -82,6 +110,10 @@ export async function registerReportsRoutes(
       },
     },
     async (request, reply) => {
+      const { valid, voterId } = readVoterId(request.headers['x-voter-id']);
+      if (!valid) {
+        return reply.code(400).send({ code: 'INVALID_VOTER_ID', message: 'Invalid voter ID.' });
+      }
       let reports;
       if ('south' in request.query) {
         const { south, north, west, east } = request.query;
@@ -96,7 +128,7 @@ export async function registerReportsRoutes(
           radiusMeters: request.query.radius,
         });
       }
-      return reports.map(toReportDto);
+      return toReportsDto(reports, voterId, feedbackService);
     },
   );
 
@@ -148,7 +180,12 @@ export async function registerReportsRoutes(
       if (!report) {
         return reply.code(404).send({ code: 'REPORT_NOT_FOUND', message: 'Report not found.' });
       }
-      return toReportDto(report);
+      const { valid, voterId } = readVoterId(request.headers['x-voter-id']);
+      if (!valid) {
+        return reply.code(400).send({ code: 'INVALID_VOTER_ID', message: 'Invalid voter ID.' });
+      }
+      const [dto] = await toReportsDto([report], voterId, feedbackService);
+      return dto;
     },
   );
 
@@ -174,7 +211,12 @@ export async function registerReportsRoutes(
       if (!report) {
         return reply.code(404).send({ code: 'REPORT_NOT_FOUND', message: 'Report not found.' });
       }
-      return toReportDto(report);
+      const { valid, voterId } = readVoterId(request.headers['x-voter-id']);
+      if (!valid) {
+        return reply.code(400).send({ code: 'INVALID_VOTER_ID', message: 'Invalid voter ID.' });
+      }
+      const [dto] = await toReportsDto([report], voterId, feedbackService);
+      return dto;
     },
   );
 }

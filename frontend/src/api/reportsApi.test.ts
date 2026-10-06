@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createReport, getReportsInViewport, ReportsApiError } from './reportsApi.js';
+import {
+  createReport,
+  getReportsInViewport,
+  ReportsApiError,
+  submitReportFeedback,
+} from './reportsApi.js';
 import type { ReportDto } from './reportTypes.js';
 
 const report: ReportDto = {
@@ -11,9 +16,13 @@ const report: ReportDto = {
   status: 'ACTIVE',
   createdAt: '2026-10-06T12:00:00.000Z',
   updatedAt: '2026-10-06T12:00:00.000Z',
+  feedback: { confirmations: 0, resolvedReports: 0, userFeedback: null },
 };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.removeItem('street-status-voter-id');
+});
 
 describe('getReportsInViewport', () => {
   it('requests and returns reports for the visible bounds', async () => {
@@ -74,5 +83,21 @@ describe('createReport', () => {
     await expect(
       createReport({ type: 'POTHOLE', severity: 'HIGH', latitude: 91, longitude: 0 }),
     ).rejects.toThrow('Revisá el tipo, la severidad y la ubicación del reporte.');
+  });
+
+  it('submits a feedback vote and returns the updated aggregate', async () => {
+    localStorage.setItem('street-status-voter-id', '40000000-0000-4000-8000-000000000001');
+    const summary = { confirmations: 1, resolvedReports: 0, userFeedback: 'CONFIRM' };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => summary });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(submitReportFeedback('report-1', 'CONFIRM')).resolves.toEqual(summary);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/reports/report-1/feedback'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'X-Voter-Id': '40000000-0000-4000-8000-000000000001' }),
+      }),
+    );
   });
 });

@@ -6,6 +6,7 @@ import MapView from './MapView.js';
 const mocks = vi.hoisted(() => ({
   getReportsInViewport: vi.fn(),
   createReport: vi.fn(),
+  submitReportFeedback: vi.fn(),
   mapEvents: {} as Record<string, (event: { latlng: { lat: number; lng: number } }) => void>,
   map: {
     getBounds: () => ({
@@ -22,6 +23,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../api/reportsApi.js', () => ({
   getReportsInViewport: mocks.getReportsInViewport,
   createReport: mocks.createReport,
+  submitReportFeedback: mocks.submitReportFeedback,
 }));
 vi.mock('leaflet', () => ({
   divIcon: (options: unknown) => options,
@@ -59,6 +61,7 @@ const report: ReportDto = {
   status: 'ACTIVE',
   createdAt: new Date(Date.now() - 12 * 60_000).toISOString(),
   updatedAt: new Date().toISOString(),
+  feedback: { confirmations: 3, resolvedReports: 2, userFeedback: null },
 };
 
 beforeEach(() => {
@@ -155,5 +158,39 @@ describe('MapView report creation', () => {
 
     expect(await screen.findByRole('button', { name: 'Enviando…' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cerrar formulario' })).toBeDisabled();
+  });
+
+  it('updates feedback counts immediately after voting on a report', async () => {
+    mocks.getReportsInViewport.mockResolvedValue([report]);
+    mocks.submitReportFeedback.mockResolvedValue({
+      confirmations: 4,
+      resolvedReports: 2,
+      userFeedback: 'CONFIRM',
+    });
+    render(<MapView />);
+
+    const confirmButton = await screen.findByRole('button', { name: /Sigue existiendo/ });
+    fireEvent.click(confirmButton);
+
+    expect(confirmButton).toHaveTextContent('4');
+    expect(await screen.findByRole('button', { name: /Sigue existiendo/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(mocks.submitReportFeedback).toHaveBeenCalledWith('report-1', 'CONFIRM');
+  });
+
+  it('restores the current vote and shows an error if feedback is rejected', async () => {
+    mocks.getReportsInViewport.mockResolvedValue([report]);
+    mocks.submitReportFeedback.mockRejectedValue(new Error('No pudimos registrar tu respuesta.'));
+    render(<MapView />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Ya no existe/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No pudimos registrar tu respuesta.',
+    );
+    expect(screen.getByRole('button', { name: /Ya no existe/ })).toHaveTextContent('2');
+    expect(screen.getByRole('button', { name: /Sigue existiendo/ })).toHaveTextContent('3');
   });
 });
