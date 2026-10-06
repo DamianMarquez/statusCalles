@@ -122,6 +122,7 @@ export default function MapView() {
     retry,
     addReport,
     updateReportFeedback,
+    replaceReport,
   } = useViewportReports();
   const handleViewportChange = useCallback(
     (bounds: ViewportBounds) => requestBounds(bounds),
@@ -198,8 +199,8 @@ export default function MapView() {
     setFeedbackErrors((current) => ({ ...current, [reportId]: '' }));
     setVotingReportIds((current) => new Set(current).add(reportId));
     try {
-      const summary = await submitReportFeedback(reportId, type);
-      updateReportFeedback(reportId, summary);
+      const updatedReport = await submitReportFeedback(reportId, type);
+      replaceReport(updatedReport);
     } catch (error) {
       updateReportFeedback(reportId, previousFeedback);
       setFeedbackErrors((current) => ({

@@ -3,6 +3,17 @@ import {
   emptyReportFeedbackSummary,
   type ReportFeedbackSummary,
 } from '../domain/report-feedback.js';
+import {
+  reportFreshnessPolicy,
+  type ReportLifecycleStatus,
+  type ReportFreshness,
+} from '../domain/report-freshness-policy.js';
+
+export interface ReportFeedbackDto {
+  confirmations: number;
+  resolvedReports: number;
+  userFeedback: ReportFeedbackSummary['userFeedback'];
+}
 
 export interface ReportDto {
   id: string;
@@ -10,25 +21,40 @@ export interface ReportDto {
   severity: StreetReport['severity'];
   description: string;
   location: StreetReport['location'];
-  status: StreetReport['status'];
+  status: ReportLifecycleStatus;
   createdAt: string;
   updatedAt: string;
-  feedback: ReportFeedbackSummary;
+  feedback: ReportFeedbackDto;
+  freshness: Omit<ReportFreshness, 'lastActivityAt' | 'evaluatedAt'> & {
+    lastActivityAt: string;
+    evaluatedAt: string;
+  };
 }
 
 export function toReportDto(
   report: StreetReport,
   feedback: ReportFeedbackSummary = emptyReportFeedbackSummary,
+  evaluatedAt: Date,
 ): ReportDto {
+  const lifecycle = reportFreshnessPolicy.evaluate(report, feedback, evaluatedAt);
   return {
     id: report.id,
     type: report.type,
     severity: report.severity,
     description: report.description,
     location: report.location,
-    status: report.status,
+    status: lifecycle.status,
     createdAt: report.createdAt.toISOString(),
     updatedAt: report.updatedAt.toISOString(),
-    feedback,
+    feedback: {
+      confirmations: feedback.confirmations,
+      resolvedReports: feedback.resolvedReports,
+      userFeedback: feedback.userFeedback,
+    },
+    freshness: {
+      ...lifecycle.freshness,
+      lastActivityAt: lifecycle.freshness.lastActivityAt.toISOString(),
+      evaluatedAt: lifecycle.freshness.evaluatedAt.toISOString(),
+    },
   };
 }

@@ -692,6 +692,39 @@ a {
   font-size: 13px;
 }
 
+.report-popup__freshness {
+  width: fit-content;
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.report-popup__freshness--FRESH {
+  background: #e9f5ec;
+  color: #267349;
+}
+
+.report-popup__freshness--AGING {
+  background: #fbf3dc;
+  color: #826515;
+}
+
+.report-popup__freshness--STALE {
+  background: #eef0ee;
+  color: #657068;
+}
+
+.report-popup__freshness--RESOLVED {
+  background: #f8e9e7;
+  color: #983c37;
+}
+
+.report-popup__confidence {
+  color: #53655b;
+  font-size: 11px;
+}
+
 .report-popup__meta {
   color: #66766d;
   font-size: 11px;

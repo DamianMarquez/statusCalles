@@ -19,7 +19,7 @@ export const SEVERITY_LEVELS = {
 
 export type ReportSeverity = keyof typeof SEVERITY_LEVELS;
 
-export const REPORT_STATUSES = ['ACTIVE', 'RESOLVED'] as const;
+export const REPORT_STATUSES = ['ACTIVE', 'STALE', 'RESOLVED'] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
 export interface Coordinates {

@@ -2,13 +2,21 @@ export type ReportType =
   'POTHOLE' | 'FLOOD' | 'ROAD_DAMAGE' | 'ROAD_BLOCKED' | 'ROAD_WORK' | 'TRAFFIC_LIGHT' | 'OTHER';
 
 export type ReportSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-export type ReportStatus = 'ACTIVE' | 'RESOLVED';
+export type ReportStatus = 'ACTIVE' | 'STALE' | 'RESOLVED';
 export type ReportFeedbackType = 'CONFIRM' | 'RESOLVED';
+export type ReportFreshnessLevel = 'FRESH' | 'AGING' | 'STALE' | 'RESOLVED';
 
 export interface ReportFeedbackSummary {
   confirmations: number;
   resolvedReports: number;
   userFeedback: ReportFeedbackType | null;
+}
+
+export interface ReportFreshness {
+  level: ReportFreshnessLevel;
+  confidence: number;
+  lastActivityAt: string;
+  evaluatedAt: string;
 }
 
 export interface ReportDto {
@@ -24,6 +32,7 @@ export interface ReportDto {
   createdAt: string;
   updatedAt: string;
   feedback: ReportFeedbackSummary;
+  freshness: ReportFreshness;
 }
 
 export interface ViewportBounds {

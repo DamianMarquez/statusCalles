@@ -4,7 +4,6 @@ import type {
   ReportSeverity,
   ReportStatus,
   ReportType,
-  ReportFeedbackSummary,
   ReportFeedbackType,
   ViewportBounds,
 } from './reportTypes.js';
@@ -21,7 +20,7 @@ const reportTypes: ReportType[] = [
   'OTHER',
 ];
 const reportSeverities: ReportSeverity[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-const reportStatuses: ReportStatus[] = ['ACTIVE', 'RESOLVED'];
+const reportStatuses: ReportStatus[] = ['ACTIVE', 'STALE', 'RESOLVED'];
 
 export class ReportsApiError extends Error {
   constructor(message: string) {
@@ -50,7 +49,12 @@ function isReportDto(value: unknown): value is ReportDto {
     typeof report.feedback?.resolvedReports === 'number' &&
     (report.feedback.userFeedback === null ||
       report.feedback.userFeedback === 'CONFIRM' ||
-      report.feedback.userFeedback === 'RESOLVED')
+      report.feedback.userFeedback === 'RESOLVED') &&
+    typeof report.freshness?.level === 'string' &&
+    ['FRESH', 'AGING', 'STALE', 'RESOLVED'].includes(report.freshness.level) &&
+    typeof report.freshness.confidence === 'number' &&
+    typeof report.freshness.lastActivityAt === 'string' &&
+    typeof report.freshness.evaluatedAt === 'string'
   );
 }
 
@@ -132,7 +136,7 @@ export async function createReport(input: CreateReportInput): Promise<ReportDto>
 export async function submitReportFeedback(
   reportId: string,
   type: ReportFeedbackType,
-): Promise<ReportFeedbackSummary> {
+): Promise<ReportDto> {
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl}/api/reports/${encodeURIComponent(reportId)}/feedback`, {
@@ -160,14 +164,8 @@ export async function submitReportFeedback(
     throw new ReportsApiError('El servicio devolvió una respuesta inválida.');
   }
 
-  if (
-    !result ||
-    typeof result !== 'object' ||
-    typeof (result as ReportFeedbackSummary).confirmations !== 'number' ||
-    typeof (result as ReportFeedbackSummary).resolvedReports !== 'number' ||
-    !['CONFIRM', 'RESOLVED'].includes(String((result as ReportFeedbackSummary).userFeedback))
-  ) {
+  if (!isReportDto(result)) {
     throw new ReportsApiError('El servicio devolvió una respuesta inválida.');
   }
-  return result as ReportFeedbackSummary;
+  return result;
 }

@@ -59,9 +59,15 @@ const report: ReportDto = {
   description: 'Bache grande sobre el carril derecho',
   location: { latitude: -34.6037, longitude: -58.3816 },
   status: 'ACTIVE',
-  createdAt: new Date(Date.now() - 12 * 60_000).toISOString(),
-  updatedAt: new Date().toISOString(),
+  createdAt: '2026-10-06T11:48:00.000Z',
+  updatedAt: '2026-10-06T11:48:00.000Z',
   feedback: { confirmations: 3, resolvedReports: 2, userFeedback: null },
+  freshness: {
+    level: 'FRESH',
+    confidence: 70,
+    lastActivityAt: '2026-10-06T11:48:00.000Z',
+    evaluatedAt: '2026-10-06T12:00:00.000Z',
+  },
 };
 
 beforeEach(() => {
@@ -163,9 +169,9 @@ describe('MapView report creation', () => {
   it('updates feedback counts immediately after voting on a report', async () => {
     mocks.getReportsInViewport.mockResolvedValue([report]);
     mocks.submitReportFeedback.mockResolvedValue({
-      confirmations: 4,
-      resolvedReports: 2,
-      userFeedback: 'CONFIRM',
+      ...report,
+      feedback: { confirmations: 4, resolvedReports: 2, userFeedback: 'CONFIRM' },
+      freshness: { ...report.freshness, confidence: 82 },
     });
     render(<MapView />);
 

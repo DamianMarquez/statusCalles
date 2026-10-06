@@ -7,9 +7,10 @@ export interface SubmitReportFeedback {
 }
 
 export interface ReportFeedbackRepository {
-  submit(input: SubmitReportFeedback): Promise<ReportFeedbackSummary | null>;
+  submit(input: SubmitReportFeedback, asOf: Date): Promise<ReportFeedbackSummary | null>;
   summariesForReports(
     reportIds: string[],
     voterId: string | null,
+    asOf: Date,
   ): Promise<Map<string, ReportFeedbackSummary>>;
 }

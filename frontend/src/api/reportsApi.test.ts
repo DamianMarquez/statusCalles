@@ -17,6 +17,12 @@ const report: ReportDto = {
   createdAt: '2026-10-06T12:00:00.000Z',
   updatedAt: '2026-10-06T12:00:00.000Z',
   feedback: { confirmations: 0, resolvedReports: 0, userFeedback: null },
+  freshness: {
+    level: 'FRESH',
+    confidence: 15,
+    lastActivityAt: '2026-10-06T12:00:00.000Z',
+    evaluatedAt: '2026-10-06T12:00:00.000Z',
+  },
 };
 
 afterEach(() => {
@@ -87,11 +93,14 @@ describe('createReport', () => {
 
   it('submits a feedback vote and returns the updated aggregate', async () => {
     localStorage.setItem('street-status-voter-id', '40000000-0000-4000-8000-000000000001');
-    const summary = { confirmations: 1, resolvedReports: 0, userFeedback: 'CONFIRM' };
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => summary });
+    const updatedReport: ReportDto = {
+      ...report,
+      feedback: { confirmations: 1, resolvedReports: 0, userFeedback: 'CONFIRM' },
+    };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => updatedReport });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(submitReportFeedback('report-1', 'CONFIRM')).resolves.toEqual(summary);
+    await expect(submitReportFeedback('report-1', 'CONFIRM')).resolves.toEqual(updatedReport);
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/reports/report-1/feedback'),
       expect.objectContaining({

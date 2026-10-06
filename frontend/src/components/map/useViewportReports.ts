@@ -72,6 +72,12 @@ export function useViewportReports(debounceMs = 300) {
     );
   }, []);
 
+  const replaceReport = useCallback((nextReport: ReportDto) => {
+    setReports((current) =>
+      current.map((report) => (report.id === nextReport.id ? nextReport : report)),
+    );
+  }, []);
+
   useEffect(
     () => () => {
       requestId.current += 1;
@@ -81,5 +87,13 @@ export function useViewportReports(debounceMs = 300) {
     [],
   );
 
-  return { reports, status, requestBounds, retry, addReport, updateReportFeedback };
+  return {
+    reports,
+    status,
+    requestBounds,
+    retry,
+    addReport,
+    updateReportFeedback,
+    replaceReport,
+  };
 }

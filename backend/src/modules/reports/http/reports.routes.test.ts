@@ -5,7 +5,7 @@ import { DrizzleReportRepository } from '../../../infrastructure/database/report
 import { DrizzleReportFeedbackRepository } from '../../../infrastructure/database/report-feedback-repository.drizzle.js';
 import { buildApp } from '../../../app/build-app.js';
 import type { ReportDto } from './report.dto.js';
-import type { ReportFeedbackSummary, ReportFeedbackType } from '../domain/report-feedback.js';
+import type { ReportFeedbackType } from '../domain/report-feedback.js';
 
 const { database, pool } = createDatabase(getDatabaseUrl());
 const app = buildApp(
@@ -39,7 +39,7 @@ async function submitFeedback(
   reportId: string,
   voterId: string,
   type: ReportFeedbackType,
-): Promise<ReportFeedbackSummary> {
+): Promise<ReportDto['feedback']> {
   const response = await app.inject({
     method: 'POST',
     url: `/api/reports/${reportId}/feedback`,
@@ -47,7 +47,7 @@ async function submitFeedback(
     payload: { type },
   });
   expect(response.statusCode).toBe(200);
-  return response.json<ReportFeedbackSummary>();
+  return response.json<ReportDto>().feedback;
 }
 
 describe('reports API with PostgreSQL/PostGIS', () => {

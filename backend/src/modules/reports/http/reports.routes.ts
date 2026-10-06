@@ -64,12 +64,14 @@ async function toReportsDto(
   voterId: string | null,
   feedbackService: ReportFeedbackService,
 ) {
+  const evaluatedAt = feedbackService.now();
   const summaries = await feedbackService.summariesForReports(
     reports.map((report) => report.id),
     voterId,
+    evaluatedAt,
   );
   return reports.map((report) =>
-    toReportDto(report, summaries.get(report.id) ?? emptyReportFeedbackSummary),
+    toReportDto(report, summaries.get(report.id) ?? emptyReportFeedbackSummary, evaluatedAt),
   );
 }
 
@@ -160,7 +162,9 @@ export async function registerReportsRoutes(
           longitude: request.body.longitude,
         },
       });
-      return reply.code(201).send(toReportDto(report));
+      return reply
+        .code(201)
+        .send(toReportDto(report, emptyReportFeedbackSummary, feedbackService.now()));
     },
   );
 

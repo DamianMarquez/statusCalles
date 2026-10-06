@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { ReportFeedbackService } from '../application/report-feedback-service.js';
+import { ReportService } from '../application/report-service.js';
 import { REPORT_FEEDBACK_TYPES } from '../domain/report-feedback.js';
+import { toReportDto } from './report.dto.js';
 
 interface ReportIdParams {
   id: string;
@@ -14,9 +16,9 @@ const uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 
 export async function registerReportFeedbackRoutes(
   app: FastifyInstance,
-  options: { feedbackService: ReportFeedbackService },
+  options: { feedbackService: ReportFeedbackService; reportService: ReportService },
 ): Promise<void> {
-  const { feedbackService } = options;
+  const { feedbackService, reportService } = options;
 
   app.post<{ Params: ReportIdParams; Body: FeedbackBody }>(
     '/reports/:id/feedback',
@@ -43,15 +45,23 @@ export async function registerReportFeedbackRoutes(
           .send({ code: 'INVALID_VOTER_ID', message: 'A valid voter ID is required.' });
       }
 
-      const feedback = await feedbackService.submit({
-        reportId: request.params.id,
-        voterId: voterId.toLowerCase(),
-        type: request.body.type,
-      });
+      const evaluatedAt = feedbackService.now();
+      const feedback = await feedbackService.submit(
+        {
+          reportId: request.params.id,
+          voterId: voterId.toLowerCase(),
+          type: request.body.type,
+        },
+        evaluatedAt,
+      );
       if (!feedback) {
         return reply.code(404).send({ code: 'REPORT_NOT_FOUND', message: 'Report not found.' });
       }
-      return feedback;
+      const report = await reportService.findById(request.params.id);
+      if (!report) {
+        return reply.code(404).send({ code: 'REPORT_NOT_FOUND', message: 'Report not found.' });
+      }
+      return toReportDto(report, feedback, evaluatedAt);
     },
   );
 }

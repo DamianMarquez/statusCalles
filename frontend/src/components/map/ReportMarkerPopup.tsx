@@ -17,7 +17,14 @@ const severityLabels: Record<ReportDto['severity'], { icon: string; label: strin
   CRITICAL: { icon: '🆘', label: 'Crítica' },
 };
 
-function formatReportedAt(dateValue: string, now = Date.now()): string {
+const freshnessLabels: Record<ReportDto['freshness']['level'], { icon: string; label: string }> = {
+  FRESH: { icon: '🟢', label: 'Reciente' },
+  AGING: { icon: '🟡', label: 'Hace un tiempo' },
+  STALE: { icon: '⚪', label: 'Antiguo' },
+  RESOLVED: { icon: '🔴', label: 'Resuelto' },
+};
+
+function formatReportedAt(dateValue: string, now: number): string {
   const reportedAt = new Date(dateValue).getTime();
   if (!Number.isFinite(reportedAt)) return 'Fecha no disponible';
 
@@ -45,6 +52,8 @@ export function ReportMarkerPopup({
   feedbackError,
 }: ReportMarkerPopupProps) {
   const severity = severityLabels[report.severity];
+  const freshness = freshnessLabels[report.freshness.level];
+  const evaluatedAt = new Date(report.freshness.evaluatedAt).getTime();
 
   return (
     <div className="report-popup">
@@ -53,10 +62,21 @@ export function ReportMarkerPopup({
         <span aria-hidden="true">{severity.icon}</span> {severity.label}
       </span>
       {report.description && <p className="report-popup__description">{report.description}</p>}
-      <span className="report-popup__meta">
-        Estado: {report.status === 'ACTIVE' ? 'Activo' : 'Resuelto'}
+      <span
+        className={`report-popup__freshness report-popup__freshness--${report.freshness.level}`}
+      >
+        <span aria-hidden="true">{freshness.icon}</span> {freshness.label}
       </span>
-      <span className="report-popup__meta">Reportado: {formatReportedAt(report.createdAt)}</span>
+      <span className="report-popup__confidence">
+        Confianza comunitaria: {report.freshness.confidence}%
+      </span>
+      <span className="report-popup__meta">
+        Estado:{' '}
+        {report.status === 'ACTIVE' ? 'Activo' : report.status === 'STALE' ? 'Antiguo' : 'Resuelto'}
+      </span>
+      <span className="report-popup__meta">
+        Reportado: {formatReportedAt(report.createdAt, evaluatedAt)}
+      </span>
       <div className="report-feedback" aria-label="Confirmación comunitaria">
         <button
           type="button"

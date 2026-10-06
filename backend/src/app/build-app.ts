@@ -20,14 +20,17 @@ export function buildApp(
 
   app.register(cors, { origin: allowedOrigins });
   app.register(registerHealthRoutes, { prefix: '/api' });
+  const reportService = new ReportService(reportRepository);
+  const feedbackService = new ReportFeedbackService(feedbackRepository);
   app.register(registerReportsRoutes, {
     prefix: '/api',
-    service: new ReportService(reportRepository),
-    feedbackService: new ReportFeedbackService(feedbackRepository),
+    service: reportService,
+    feedbackService,
   });
   app.register(registerReportFeedbackRoutes, {
     prefix: '/api',
-    feedbackService: new ReportFeedbackService(feedbackRepository),
+    feedbackService,
+    reportService,
   });
 
   return app;
