@@ -70,4 +70,24 @@ describe('ReportMarkerPopup freshness', () => {
     screen.getByRole('button', { name: /Iniciá sesión para confirmar/ }).click();
     expect(onRequestLogin).toHaveBeenCalledOnce();
   });
+
+  it('shows the official street, neighborhood, and commune when a report is associated', () => {
+    render(
+      <ReportMarkerPopup
+        {...defaultProps}
+        report={{
+          ...report,
+          street: {
+            id: 'street-1',
+            officialName: 'Av. Corrientes',
+            neighborhoodName: 'Almagro',
+            communeName: 'Comuna 5',
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText('Av. Corrientes')).toBeInTheDocument();
+    expect(screen.getByText('Almagro')).toBeInTheDocument();
+    expect(screen.getByText('Comuna 5')).toBeInTheDocument();
+  });
 });

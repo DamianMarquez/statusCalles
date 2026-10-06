@@ -11,6 +11,10 @@ import { registerReportFeedbackRoutes } from '../modules/reports/http/report-fee
 import { registerModerationRoutes } from '../modules/reports/http/moderation.routes.js';
 import { registerReportsRoutes } from '../modules/reports/http/reports.routes.js';
 import type { StreetScoreRepository } from '../modules/streets/application/street-score-repository.js';
+import type { StreetCatalogRepository } from '../modules/streets/application/street-catalog.js';
+import { StreetCatalogService } from '../modules/streets/application/street-catalog.js';
+import { StreetLocationResolverService } from '../modules/streets/application/street-location-resolver.js';
+import { registerStreetCatalogRoutes } from '../modules/streets/http/street-catalog.routes.js';
 import { StreetScoreService } from '../modules/streets/application/street-score-service.js';
 import { registerStreetScoreRoutes } from '../modules/streets/http/street-score.routes.js';
 import type { AuthRepository } from '../modules/users/application/auth-repository.js';
@@ -27,6 +31,7 @@ export function buildApp(
     streetScoreRepository?: StreetScoreRepository;
     authRepository?: AuthRepository;
     moderationDatabase?: StreetStatusDatabase;
+    streetCatalogRepository?: StreetCatalogRepository;
   } = {},
 ): FastifyInstance {
   const trustedProxies = (process.env.TRUST_PROXY ?? '')
@@ -46,7 +51,13 @@ export function buildApp(
   app.register(rateLimit, { global: false });
   app.decorateRequest('authUser', null);
   app.register(registerHealthRoutes, { prefix: '/api' });
-  const reportService = new ReportService(reportRepository);
+  const streetCatalog = options.streetCatalogRepository
+    ? new StreetCatalogService(options.streetCatalogRepository)
+    : undefined;
+  const reportService = new ReportService(
+    reportRepository,
+    streetCatalog ? new StreetLocationResolverService(streetCatalog) : undefined,
+  );
   const feedbackService = new ReportFeedbackService(feedbackRepository);
   app.register(registerReportsRoutes, {
     prefix: '/api',
@@ -68,6 +79,14 @@ export function buildApp(
     app.register(registerStreetScoreRoutes, {
       prefix: '/api',
       service: new StreetScoreService(options.streetScoreRepository),
+    });
+  }
+  if (streetCatalog) {
+    app.register(registerStreetCatalogRoutes, {
+      prefix: '/api',
+      catalog: streetCatalog,
+      reports: reportService,
+      feedback: feedbackService,
     });
   }
   if (options.authRepository) {

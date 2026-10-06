@@ -24,6 +24,12 @@ interface ReportRow extends Record<string, unknown> {
   status: ReportStatus;
   created_at: Date | string;
   updated_at: Date | string;
+  street: {
+    id: string;
+    officialName: string;
+    neighborhoodName: string | null;
+    communeName: string | null;
+  } | null;
 }
 
 const severityByLevel = new Map<number, ReportSeverity>(
@@ -43,6 +49,7 @@ function mapReport(row: ReportRow): StreetReport {
     status: row.status,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
+    street: row.street ?? null,
   };
 }
 
@@ -55,17 +62,35 @@ const reportProjection = sql`
   ST_X(location::geometry) AS longitude,
   status,
   created_at,
-  updated_at
+  updated_at,
+  (SELECT jsonb_build_object(
+      'id', st.id,
+      'officialName', st.official_name,
+      'neighborhoodName', n.name,
+      'communeName', c.name
+    )
+    FROM streets st
+    LEFT JOIN street_segments ss ON ss.id = street_reports.street_segment_id
+    LEFT JOIN neighborhoods n ON n.id = ss.neighborhood_id
+    LEFT JOIN communes c ON c.id = ss.commune_id
+    WHERE st.id = street_reports.street_id
+  ) AS street
 `;
 
 export class DrizzleReportRepository implements ReportRepository {
   constructor(private readonly database: StreetStatusDatabase) {}
 
-  async create(input: CreateStreetReport, userId?: string | null): Promise<StreetReport> {
+  async create(
+    input: CreateStreetReport,
+    userId?: string | null,
+    street?: { streetId: string; streetSegmentId: string } | null,
+  ): Promise<StreetReport> {
     const result = await this.database.execute<ReportRow>(sql`
-      INSERT INTO street_reports (user_id, type, severity, description, location)
+      INSERT INTO street_reports (user_id, street_id, street_segment_id, type, severity, description, location)
       VALUES (
         ${userId ?? null}::uuid,
+        ${street?.streetId ?? null}::uuid,
+        ${street?.streetSegmentId ?? null}::uuid,
         ${input.type}::report_type,
         ${SEVERITY_LEVELS[input.severity]},
         ${input.description},
@@ -117,6 +142,18 @@ export class DrizzleReportRepository implements ReportRepository {
     `);
     const row = result.rows[0];
     return row ? mapReport(row) : null;
+  }
+
+  async findByStreetId(id: string, limit = 200): Promise<StreetReport[]> {
+    const safeLimit = Math.max(1, Math.min(200, Math.floor(limit)));
+    const result = await this.database.execute<ReportRow>(sql`
+      SELECT ${reportProjection}
+      FROM street_reports
+      WHERE street_id = ${id}::uuid AND moderation_status = 'VISIBLE'
+      ORDER BY created_at DESC
+      LIMIT ${safeLimit}
+    `);
+    return result.rows.map(mapReport);
   }
 
   async isOwner(id: string, userId: string): Promise<boolean> {

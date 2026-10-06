@@ -11,6 +11,7 @@ const unusedReportRepository: ReportRepository = {
   findInViewport: async () => [],
   findSimilar: async () => null,
   findById: async () => null,
+  findByStreetId: async () => [],
   isOwner: async () => false,
   updateStatus: async () => null,
 };

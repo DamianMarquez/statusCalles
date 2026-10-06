@@ -66,6 +66,13 @@ export function ReportMarkerPopup({
         <span aria-hidden="true">{severity.icon}</span> {severity.label}
       </span>
       {report.description && <p className="report-popup__description">{report.description}</p>}
+      {report.street && (
+        <div className="report-popup__street" aria-label="Ubicación oficial">
+          <strong>{report.street.officialName}</strong>
+          {report.street.neighborhoodName && <span>{report.street.neighborhoodName}</span>}
+          {report.street.communeName && <span>{report.street.communeName}</span>}
+        </div>
+      )}
       <span
         className={`report-popup__freshness report-popup__freshness--${report.freshness.level}`}
       >

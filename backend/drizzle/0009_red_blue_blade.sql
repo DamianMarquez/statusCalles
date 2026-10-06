@@ -1,0 +1,1 @@
+CREATE INDEX "communes_geometry_gix" ON "communes" USING gist ("geometry");

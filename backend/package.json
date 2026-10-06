@@ -9,7 +9,11 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
-    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts"
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+    "import:caba:streets": "tsx src/infrastructure/external/caba/import-cli.ts streets",
+    "import:caba:neighborhoods": "tsx src/infrastructure/external/caba/import-cli.ts neighborhoods",
+    "import:caba:communes": "tsx src/infrastructure/external/caba/import-cli.ts communes",
+    "import:caba:all": "tsx src/infrastructure/external/caba/import-cli.ts all"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

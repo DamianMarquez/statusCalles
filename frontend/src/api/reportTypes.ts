@@ -31,6 +31,12 @@ export interface ReportDto {
   status: ReportStatus;
   createdAt: string;
   updatedAt: string;
+  street?: {
+    id: string;
+    officialName: string;
+    neighborhoodName: string | null;
+    communeName: string | null;
+  } | null;
   feedback: ReportFeedbackSummary;
   freshness: ReportFreshness;
 }

@@ -5,6 +5,8 @@ import {
   index,
   pgEnum,
   pgTable,
+  jsonb,
+  integer,
   smallint,
   timestamp,
   uniqueIndex,
@@ -31,6 +33,115 @@ export const reportFlagReasonEnum = pgEnum('report_flag_reason', [
   'FALSE_INFORMATION',
   'OTHER',
 ]);
+
+const geometryMultiLineString = customType<{ data: string; driverData: string }>({
+  dataType: () => 'geometry(MultiLineString,4326)',
+});
+const geometryMultiPolygon = customType<{ data: string; driverData: string }>({
+  dataType: () => 'geometry(MultiPolygon,4326)',
+});
+
+export const geographicSources = pgTable(
+  'geographic_sources',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    slug: varchar('slug', { length: 80 }).notNull(),
+    name: varchar('name', { length: 160 }).notNull(),
+    provider: varchar('provider', { length: 120 }).notNull(),
+    dataset: varchar('dataset', { length: 120 }).notNull(),
+    sourceUrl: text('source_url').notNull(),
+    license: varchar('license', { length: 80 }).notNull(),
+    lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
+    lastStatus: varchar('last_status', { length: 20 }).notNull().default('NEVER'),
+    lastRecordCount: integer('last_record_count'),
+    lastError: text('last_error'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('geographic_sources_slug_unique').on(table.slug)],
+);
+
+export const communes = pgTable(
+  'communes',
+  {
+    id: integer('id').primaryKey(),
+    name: varchar('name', { length: 80 }).notNull(),
+    geometry: geometryMultiPolygon('geometry').notNull(),
+    sourceId: uuid('source_id')
+      .notNull()
+      .references(() => geographicSources.id),
+    metadata: jsonb('metadata').notNull().default({}),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('communes_geometry_gix').using('gist', table.geometry)],
+);
+
+export const neighborhoods = pgTable(
+  'neighborhoods',
+  {
+    id: integer('id').primaryKey(),
+    name: varchar('name', { length: 120 }).notNull(),
+    normalizedName: varchar('normalized_name', { length: 120 }).notNull(),
+    communeId: integer('commune_id')
+      .notNull()
+      .references(() => communes.id),
+    geometry: geometryMultiPolygon('geometry').notNull(),
+    sourceId: uuid('source_id')
+      .notNull()
+      .references(() => geographicSources.id),
+    metadata: jsonb('metadata').notNull().default({}),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('neighborhoods_name_normalized_unique').on(table.normalizedName),
+    index('neighborhoods_commune_id_idx').on(table.communeId),
+    index('neighborhoods_geometry_gix').using('gist', table.geometry),
+  ],
+);
+
+export const streets = pgTable(
+  'streets',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    sourceCode: varchar('source_code', { length: 100 }).notNull(),
+    officialName: varchar('official_name', { length: 200 }).notNull(),
+    normalizedName: varchar('normalized_name', { length: 200 }).notNull(),
+    sourceId: uuid('source_id')
+      .notNull()
+      .references(() => geographicSources.id),
+    metadata: jsonb('metadata').notNull().default({}),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('streets_source_code_name_unique').on(table.sourceCode, table.normalizedName),
+    index('streets_name_normalized_idx').on(table.normalizedName),
+  ],
+);
+
+export const streetSegments = pgTable(
+  'street_segments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    sourceSegmentId: varchar('source_segment_id', { length: 100 }).notNull(),
+    streetId: uuid('street_id')
+      .notNull()
+      .references(() => streets.id),
+    neighborhoodId: integer('neighborhood_id').references(() => neighborhoods.id),
+    communeId: integer('commune_id').references(() => communes.id),
+    geometry: geometryMultiLineString('geometry').notNull(),
+    sourceId: uuid('source_id')
+      .notNull()
+      .references(() => geographicSources.id),
+    metadata: jsonb('metadata').notNull().default({}),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('street_segments_source_id_unique').on(table.sourceSegmentId),
+    index('street_segments_street_id_idx').on(table.streetId),
+    index('street_segments_neighborhood_id_idx').on(table.neighborhoodId),
+    index('street_segments_commune_id_idx').on(table.communeId),
+    index('street_segments_geometry_gix').using('gist', table.geometry),
+  ],
+);
 
 export const users = pgTable(
   'users',
@@ -67,6 +178,10 @@ export const streetReports = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    streetId: uuid('street_id').references(() => streets.id, { onDelete: 'set null' }),
+    streetSegmentId: uuid('street_segment_id').references(() => streetSegments.id, {
+      onDelete: 'set null',
+    }),
     type: reportTypeEnum('type').notNull(),
     severity: smallint('severity').notNull(),
     description: varchar('description', { length: 500 }).notNull(),
@@ -81,6 +196,7 @@ export const streetReports = pgTable(
     index('street_reports_location_gix').using('gist', table.location),
     index('street_reports_created_at_idx').on(table.createdAt),
     index('street_reports_user_id_idx').on(table.userId),
+    index('street_reports_street_id_idx').on(table.streetId),
   ],
 );
 

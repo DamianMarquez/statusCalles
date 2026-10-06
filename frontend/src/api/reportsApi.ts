@@ -47,6 +47,13 @@ function isReportDto(value: unknown): value is ReportDto {
     reportStatuses.includes(report.status as ReportStatus) &&
     typeof report.createdAt === 'string' &&
     typeof report.updatedAt === 'string' &&
+    (report.street === undefined ||
+      report.street === null ||
+      (typeof report.street.id === 'string' &&
+        typeof report.street.officialName === 'string' &&
+        (report.street.neighborhoodName === null ||
+          typeof report.street.neighborhoodName === 'string') &&
+        (report.street.communeName === null || typeof report.street.communeName === 'string'))) &&
     typeof report.feedback?.confirmations === 'number' &&
     typeof report.feedback?.resolvedReports === 'number' &&
     (report.feedback.userFeedback === null ||

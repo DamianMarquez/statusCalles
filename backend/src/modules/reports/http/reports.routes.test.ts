@@ -6,6 +6,7 @@ import { DrizzleReportFeedbackRepository } from '../../../infrastructure/databas
 import { buildApp } from '../../../app/build-app.js';
 import { DrizzleStreetScoreRepository } from '../../../infrastructure/database/street-score-repository.drizzle.js';
 import { DrizzleAuthRepository } from '../../../infrastructure/database/auth-repository.drizzle.js';
+import { DrizzleStreetCatalogRepository } from '../../../infrastructure/database/street-catalog-repository.drizzle.js';
 import type { ReportDto } from './report.dto.js';
 import type { ReportFeedbackType } from '../domain/report-feedback.js';
 import { randomUUID } from 'node:crypto';
@@ -21,6 +22,7 @@ const app = buildApp(
     streetScoreRepository: new DrizzleStreetScoreRepository(database),
     authRepository: new DrizzleAuthRepository(database),
     moderationDatabase: database,
+    streetCatalogRepository: new DrizzleStreetCatalogRepository(database),
   },
 );
 const createdIds: string[] = [];
@@ -255,6 +257,72 @@ describe('reports API with PostgreSQL/PostGIS', () => {
       resolvedReports: 0,
       userFeedback: 'CONFIRM',
     });
+  });
+
+  it('associates a report with an official street when a nearby segment is within tolerance', async () => {
+    const report = await createReport({
+      ...validReport,
+      description: 'Reporte sobre un tramo oficial',
+      latitude: -34.53451590464167,
+      longitude: -58.462187566063186,
+    });
+    expect(report.street).toMatchObject({
+      officialName: 'CANTILO, INT.',
+      neighborhoodName: 'Nuñez',
+      communeName: 'Comuna 13',
+    });
+  });
+
+  it('keeps valid reports unassociated when there is no nearby official street', async () => {
+    const report = await createReport({
+      ...validReport,
+      description: 'Reporte fuera de la red oficial',
+      latitude: 0,
+      longitude: 0,
+    });
+    expect(report.street).toBeNull();
+  });
+
+  it('serves official streets, neighborhoods, communes, and nearby reports by street', async () => {
+    const nearby = await app.inject({
+      method: 'GET',
+      url: '/api/streets/nearby?lat=-34.5345159046&lng=-58.4621875661&radius=150',
+    });
+    expect(nearby.statusCode).toBe(200);
+    const street = nearby
+      .json<Array<{ id: string; officialName: string }>>()
+      .find((item) => item.officialName === 'CANTILO, INT.');
+    expect(street).toBeDefined();
+    const detail = await app.inject({ method: 'GET', url: `/api/streets/${street!.id}` });
+    expect(detail.json()).toMatchObject({
+      officialName: 'CANTILO, INT.',
+      neighborhoods: expect.arrayContaining(['Nuñez']),
+      communes: ['Comuna 13'],
+    });
+    const associatedReport = await createReport({
+      ...validReport,
+      latitude: -34.53451590464167,
+      longitude: -58.462187566063186,
+    });
+    const reports = await app.inject({ method: 'GET', url: `/api/streets/${street!.id}/reports` });
+    expect(reports.json<ReportDto[]>().map((item) => item.id)).toContain(associatedReport.id);
+    const neighborhoods = await app.inject({ method: 'GET', url: '/api/neighborhoods' });
+    const communes = await app.inject({ method: 'GET', url: '/api/communes' });
+    expect(neighborhoods.json<unknown[]>()).toHaveLength(48);
+    expect(communes.json<unknown[]>()).toHaveLength(15);
+  });
+
+  it('validates nearby search bounds and returns 404 for an unknown official street', async () => {
+    const invalidNearby = await app.inject({
+      method: 'GET',
+      url: '/api/streets/nearby?lat=-34.6&lng=-58.4&radius=6000',
+    });
+    const unknownStreet = await app.inject({
+      method: 'GET',
+      url: '/api/streets/00000000-0000-4000-8000-000000000001',
+    });
+    expect(invalidNearby.statusCode).toBe(400);
+    expect(unknownStreet.statusCode).toBe(404);
   });
 
   it('rejects inverted viewport bounds', async () => {

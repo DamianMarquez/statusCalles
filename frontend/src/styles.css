@@ -692,6 +692,22 @@ a {
   font-size: 13px;
 }
 
+.report-popup__street {
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
+  border-left: 3px solid #287451;
+  border-radius: 4px;
+  background: #f0f6f1;
+  color: #526259;
+  font-size: 11px;
+}
+
+.report-popup__street strong {
+  color: #1d3b2c;
+  font-size: 12px;
+}
+
 .report-popup__freshness {
   width: fit-content;
   padding: 4px 7px;

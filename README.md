@@ -149,6 +149,38 @@ La primera fórmula está implementada en `StreetScoreCalculator` y es determini
 
 El score se etiqueta como muy malo (0–34), malo (35–59), regular (60–79) o bueno (80–100). La respuesta incluye reportes activos, cantidad de alta severidad, confirmaciones, resoluciones y fecha del último reporte para que la estimación se pueda entender. Los reportes resueltos no reducen el score; sí aparecen como contexto histórico. La interfaz dibuja las celdas disponibles y aclara que son estimaciones, no calles identificadas. La fórmula es una primera aproximación y se puede ajustar cuando haya más datos reales o un modelo de segmentos.
 
+## Geografía oficial de CABA
+
+La app mantiene su base cartográfica propia en PostgreSQL/PostGIS y conserva Leaflet/OpenStreetMap para renderizar los tiles. La fuente oficial es Buenos Aires Data, bajo licencia CC-BY-2.5-AR: [Calles](https://data.buenosaires.gob.ar/dataset/calles), [Barrios](https://data.buenosaires.gob.ar/dataset/barrios) y [Comunas](https://data.buenosaires.gob.ar/dataset/comunas).
+
+El Callejero inspeccionado contiene registros lineales con `id` de tramo, `codigo` de calle, `nomoficial`, geometría GeoJSON `LineString`, alturas, sentido, barrio y comuna. Por eso `StreetSegment` conserva cada tramo publicado por GCBA y `Street` agrupa por `codigo`; no se cortan geometrías artificialmente. Los barrios publican polígonos con `id`, `nombre` y `comuna`; las comunas publican el número y su geometría. Los adaptadores del formato original están aislados en `backend/src/infrastructure/external/caba`; el dominio recibe nombres normalizados y GeoJSON de líneas o polígonos.
+
+La migración `0008_tidy_junta.sql` crea `streets`, `street_segments`, `neighborhoods`, `communes` y `geographic_sources`, agrega índices GiST a todas las columnas geométricas y deja `street_id`/`street_segment_id` opcionales en reportes antiguos. Las geometrías se guardan como `geometry(MultiLineString,4326)` o `geometry(MultiPolygon,4326)`. La importación valida coordenadas, anillos cerrados y geometrías con PostGIS; hace upsert por los identificadores oficiales, registra fuente, licencia, URL, fecha, estado, cantidad y error de la última sincronización. Puede ejecutarse repetidamente sin duplicar registros. No corre durante el startup.
+
+Con la base levantada y las migraciones aplicadas, importar manualmente:
+
+```bash
+npm run import:caba:communes
+npm run import:caba:neighborhoods
+npm run import:caba:streets
+```
+
+O ejecutar las tres en el orden requerido con `npm run import:caba:all`. Cada comando descarga el GeoJSON oficial; para usar un archivo ya descargado, ejecutar `npm run import:caba:streets --workspace backend -- --file=/ruta/al/archivo.geojson`. Las URL se pueden cambiar mediante `CABA_COMMUNES_URL`, `CABA_NEIGHBORHOODS_URL` y `CABA_STREETS_URL` (sus valores oficiales están en `.env.example`). Barrios referencia comuna, y los tramos resuelven barrio/comuna si esos catálogos ya están importados; por eso el orden indicado permite dejar todas las relaciones pobladas. Un tramo que no trae barrio o comuna oficiales se conserva con esa relación nula.
+
+Al crear un reporte, `StreetLocationResolverService` busca con PostGIS el tramo más cercano en un radio máximo de 35 m. La búsqueda usa el GiST de geometría para acotar candidatos y `ST_DWithin`/`ST_Distance` sobre geography para confirmar distancia real. Si no hay coincidencia dentro del umbral, el reporte queda sin calle asociada y sigue siendo válido. La API devuelve `street` como un DTO resumido; el popup muestra nombre oficial, barrio y comuna cuando existen.
+
+Rutas agregadas:
+
+| Método y ruta                                              | Uso                                              |
+| ---------------------------------------------------------- | ------------------------------------------------ |
+| `GET /api/streets/nearby?lat=-34.60&lng=-58.38&radius=500` | Calles más cercanas (radio máximo 5 km)          |
+| `GET /api/streets/:id`                                     | Nombre oficial y zonas que atraviesan sus tramos |
+| `GET /api/streets/:id/reports`                             | Hasta 200 reportes públicos asociados            |
+| `GET /api/neighborhoods`                                   | Barrios, comuna y geometría GeoJSON              |
+| `GET /api/communes`                                        | Comunas y geometría GeoJSON                      |
+
+La primera importación verificada en desarrollo incorporó 15 comunas, 48 barrios, 2.741 calles oficiales y 31.961 tramos. Las calles se agrupan por código y nombre oficial normalizado, ya que un mismo código de origen puede aparecer con nombres distintos. `npm run import:caba:all` se puede volver a ejecutar para sincronizar el catálogo.
+
 ## Persistencia y decisión de ORM
 
 Se eligió **Drizzle ORM + Drizzle Kit** por sus tipos TypeScript y migraciones versionadas para PostgreSQL. Drizzle tiene soporte PostGIS para geometry; para conservar `GEOGRAPHY(POINT, 4326)`, el esquema declara un tipo custom y la migración contiene el SQL específico para crear la extensión y la columna. La creación y lectura geográfica usan las funciones PostGIS necesarias a través del SQL parametrizado de Drizzle.

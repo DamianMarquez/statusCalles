@@ -24,6 +24,7 @@ export interface ReportDto {
   status: ReportLifecycleStatus;
   createdAt: string;
   updatedAt: string;
+  street: StreetReport['street'];
   feedback: ReportFeedbackDto;
   freshness: Omit<ReportFreshness, 'lastActivityAt' | 'evaluatedAt'> & {
     lastActivityAt: string;
@@ -46,6 +47,7 @@ export function toReportDto(
     status: lifecycle.status,
     createdAt: report.createdAt.toISOString(),
     updatedAt: report.updatedAt.toISOString(),
+    street: report.street ?? null,
     feedback: {
       confirmations: feedback.confirmations,
       resolvedReports: feedback.resolvedReports,

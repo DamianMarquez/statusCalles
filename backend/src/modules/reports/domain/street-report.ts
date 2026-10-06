@@ -36,6 +36,12 @@ export interface StreetReport {
   status: ReportStatus;
   createdAt: Date;
   updatedAt: Date;
+  street?: {
+    id: string;
+    officialName: string;
+    neighborhoodName: string | null;
+    communeName: string | null;
+  } | null;
 }
 
 export interface CreateStreetReport {
