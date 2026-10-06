@@ -1,4 +1,9 @@
+import { useEffect, useState } from 'react';
 import type { ReportDto, ReportFeedbackType } from '../../api/reportTypes.js';
+import {
+  getStreetInfrastructure,
+  type OfficialMobilityInfrastructure,
+} from '../../api/streetsApi.js';
 
 const reportTypeLabels: Record<ReportDto['type'], string> = {
   POTHOLE: 'BACHE',
@@ -45,6 +50,7 @@ interface ReportMarkerPopupProps {
   feedbackError: string | null;
   authenticated: boolean;
   onRequestLogin: () => void;
+  popupOpen?: boolean;
 }
 
 export function ReportMarkerPopup({
@@ -54,7 +60,24 @@ export function ReportMarkerPopup({
   feedbackError,
   authenticated,
   onRequestLogin,
+  popupOpen = true,
 }: ReportMarkerPopupProps) {
+  const [infrastructure, setInfrastructure] = useState<OfficialMobilityInfrastructure[]>([]);
+  const [infrastructureError, setInfrastructureError] = useState(false);
+  useEffect(() => {
+    if (!popupOpen || !report.street?.id) return;
+    const controller = new AbortController();
+    void getStreetInfrastructure(report.street.id, controller.signal)
+      .then((items) => {
+        setInfrastructure(items);
+        setInfrastructureError(false);
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === 'AbortError'))
+          setInfrastructureError(true);
+      });
+    return () => controller.abort();
+  }, [popupOpen, report.street?.id]);
   const severity = severityLabels[report.severity];
   const freshness = freshnessLabels[report.freshness.level];
   const evaluatedAt = new Date(report.freshness.evaluatedAt).getTime();
@@ -72,6 +95,24 @@ export function ReportMarkerPopup({
           {report.street.neighborhoodName && <span>{report.street.neighborhoodName}</span>}
           {report.street.communeName && <span>{report.street.communeName}</span>}
         </div>
+      )}
+      {popupOpen && report.street && infrastructure.length > 0 && (
+        <section className="report-popup__official" aria-label="Infraestructura de fuente oficial">
+          <strong>Infraestructura · Fuente oficial</strong>
+          {infrastructure.map((item) => (
+            <span key={item.id}>
+              {item.type === 'BIKE_LANE'
+                ? 'Ciclovía'
+                : item.type === 'METROBUS_CORRIDOR'
+                  ? 'Corredor Metrobus'
+                  : 'Parada Metrobus'}
+              {item.name && ` · ${item.name}`}
+            </span>
+          ))}
+        </section>
+      )}
+      {infrastructureError && (
+        <span className="report-popup__meta">No se pudo consultar la infraestructura oficial.</span>
       )}
       <span
         className={`report-popup__freshness report-popup__freshness--${report.freshness.level}`}

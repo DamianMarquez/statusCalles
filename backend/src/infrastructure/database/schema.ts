@@ -40,6 +40,9 @@ const geometryMultiLineString = customType<{ data: string; driverData: string }>
 const geometryMultiPolygon = customType<{ data: string; driverData: string }>({
   dataType: () => 'geometry(MultiPolygon,4326)',
 });
+const geometryAny = customType<{ data: string; driverData: string }>({
+  dataType: () => 'geometry(Geometry,4326)',
+});
 
 export const geographicSources = pgTable(
   'geographic_sources',
@@ -52,12 +55,37 @@ export const geographicSources = pgTable(
     sourceUrl: text('source_url').notNull(),
     license: varchar('license', { length: 80 }).notNull(),
     lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
     lastStatus: varchar('last_status', { length: 20 }).notNull().default('NEVER'),
     lastRecordCount: integer('last_record_count'),
     lastError: text('last_error'),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex('geographic_sources_slug_unique').on(table.slug)],
+);
+
+export const mobilityInfrastructure = pgTable(
+  'mobility_infrastructure',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    sourceId: uuid('source_id')
+      .notNull()
+      .references(() => geographicSources.id),
+    externalId: varchar('external_id', { length: 180 }).notNull(),
+    type: varchar('type', { length: 40 }).notNull(),
+    name: varchar('name', { length: 200 }).notNull(),
+    geometry: geometryAny('geometry').notNull(),
+    metadata: jsonb('metadata').notNull().default({}),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('mobility_infrastructure_source_external_unique').on(
+      table.sourceId,
+      table.externalId,
+    ),
+    index('mobility_infrastructure_geometry_gix').using('gist', table.geometry),
+    index('mobility_infrastructure_type_idx').on(table.type),
+  ],
 );
 
 export const communes = pgTable(

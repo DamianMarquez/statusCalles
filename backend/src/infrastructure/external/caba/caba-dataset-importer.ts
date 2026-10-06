@@ -90,12 +90,12 @@ async function sourceId(
 ): Promise<string> {
   const source = cabaDatasets[kind];
   const result = await database.execute<{ id: string }>(sql`
-    INSERT INTO geographic_sources (slug, name, provider, dataset, source_url, license, last_status, updated_at)
-    VALUES (${source.slug}, ${source.name}, 'Gobierno de la Ciudad Autónoma de Buenos Aires', ${source.dataset}, ${sourceUrl}, 'CC-BY-2.5-AR', 'PROCESSING', NOW())
+    INSERT INTO geographic_sources (slug, name, provider, dataset, source_url, license, last_status, last_attempt_at, updated_at)
+    VALUES (${source.slug}, ${source.name}, 'Gobierno de la Ciudad Autónoma de Buenos Aires', ${source.dataset}, ${sourceUrl}, 'CC-BY-2.5-AR', 'PROCESSING', NOW(), NOW())
     ON CONFLICT (slug) DO UPDATE SET
       name = EXCLUDED.name, provider = EXCLUDED.provider, dataset = EXCLUDED.dataset,
       source_url = EXCLUDED.source_url, license = EXCLUDED.license,
-      last_status = 'PROCESSING', last_error = NULL, updated_at = NOW()
+      last_status = 'PROCESSING', last_attempt_at = NOW(), last_error = NULL, updated_at = NOW()
     RETURNING id::text AS id
   `);
   const row = result.rows[0];

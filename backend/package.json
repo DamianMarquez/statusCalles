@@ -13,7 +13,11 @@
     "import:caba:streets": "tsx src/infrastructure/external/caba/import-cli.ts streets",
     "import:caba:neighborhoods": "tsx src/infrastructure/external/caba/import-cli.ts neighborhoods",
     "import:caba:communes": "tsx src/infrastructure/external/caba/import-cli.ts communes",
-    "import:caba:all": "tsx src/infrastructure/external/caba/import-cli.ts all"
+    "import:caba:all": "tsx src/infrastructure/external/caba/import-cli.ts all",
+    "sync:caba:ciclovias": "tsx src/infrastructure/external/caba/mobility-import-cli.ts ciclovias",
+    "sync:caba:metrobus": "tsx src/infrastructure/external/caba/mobility-import-cli.ts metrobus",
+    "sync:caba:metrobus-stops": "tsx src/infrastructure/external/caba/mobility-import-cli.ts metrobusStops",
+    "sync:caba:infrastructure": "tsx src/infrastructure/external/caba/mobility-import-cli.ts all"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

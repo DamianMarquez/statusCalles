@@ -708,6 +708,22 @@ a {
   font-size: 12px;
 }
 
+.report-popup__official {
+  display: grid;
+  gap: 3px;
+  padding: 7px 9px;
+  border-left: 3px solid #2468a2;
+  border-radius: 4px;
+  background: #edf5fb;
+  color: #35566d;
+  font-size: 11px;
+}
+
+.report-popup__official strong {
+  color: #174b75;
+  font-size: 12px;
+}
+
 .report-popup__freshness {
   width: fit-content;
   padding: 4px 7px;

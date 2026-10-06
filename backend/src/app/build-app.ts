@@ -17,6 +17,9 @@ import { StreetLocationResolverService } from '../modules/streets/application/st
 import { registerStreetCatalogRoutes } from '../modules/streets/http/street-catalog.routes.js';
 import { StreetScoreService } from '../modules/streets/application/street-score-service.js';
 import { registerStreetScoreRoutes } from '../modules/streets/http/street-score.routes.js';
+import type { MobilityCatalogRepository } from '../modules/mobility/application/mobility-catalog.js';
+import { MobilityCatalogService } from '../modules/mobility/application/mobility-catalog.js';
+import { registerMobilityRoutes } from '../modules/mobility/http/mobility.routes.js';
 import type { AuthRepository } from '../modules/users/application/auth-repository.js';
 import { AuthService } from '../modules/users/application/auth-service.js';
 import { sessionCookieName } from '../modules/users/http/auth-context.js';
@@ -32,6 +35,7 @@ export function buildApp(
     authRepository?: AuthRepository;
     moderationDatabase?: StreetStatusDatabase;
     streetCatalogRepository?: StreetCatalogRepository;
+    mobilityCatalogRepository?: MobilityCatalogRepository;
   } = {},
 ): FastifyInstance {
   const trustedProxies = (process.env.TRUST_PROXY ?? '')
@@ -54,6 +58,12 @@ export function buildApp(
   const streetCatalog = options.streetCatalogRepository
     ? new StreetCatalogService(options.streetCatalogRepository)
     : undefined;
+  if (options.mobilityCatalogRepository) {
+    app.register(registerMobilityRoutes, {
+      prefix: '/api',
+      catalog: new MobilityCatalogService(options.mobilityCatalogRepository),
+    });
+  }
   const reportService = new ReportService(
     reportRepository,
     streetCatalog ? new StreetLocationResolverService(streetCatalog) : undefined,

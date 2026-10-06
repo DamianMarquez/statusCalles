@@ -1,7 +1,12 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReportDto } from '../../api/reportTypes.js';
+import { getStreetInfrastructure } from '../../api/streetsApi.js';
 import { ReportMarkerPopup } from './ReportMarkerPopup.js';
+
+vi.mock('../../api/streetsApi.js', () => ({
+  getStreetInfrastructure: vi.fn(),
+}));
 
 const report: ReportDto = {
   id: 'report-1',
@@ -28,6 +33,7 @@ const defaultProps = {
   feedbackError: null,
   authenticated: true,
   onRequestLogin: vi.fn(),
+  popupOpen: false,
 };
 
 afterEach(() => cleanup());
@@ -89,5 +95,38 @@ describe('ReportMarkerPopup freshness', () => {
     expect(screen.getByText('Av. Corrientes')).toBeInTheDocument();
     expect(screen.getByText('Almagro')).toBeInTheDocument();
     expect(screen.getByText('Comuna 5')).toBeInTheDocument();
+  });
+
+  it('labels nearby official mobility infrastructure separately from community reports', async () => {
+    vi.mocked(getStreetInfrastructure).mockResolvedValueOnce([
+      {
+        id: 'bike-lane-1',
+        type: 'BIKE_LANE',
+        name: 'Av. Corrientes',
+        details: {},
+        source: {
+          name: 'Ciclovías oficiales de CABA',
+          url: 'https://example.invalid',
+          lastSuccessfulSync: null,
+        },
+      },
+    ]);
+    render(
+      <ReportMarkerPopup
+        {...defaultProps}
+        popupOpen
+        report={{
+          ...report,
+          street: {
+            id: 'street-1',
+            officialName: 'Av. Corrientes',
+            neighborhoodName: 'Almagro',
+            communeName: 'Comuna 5',
+          },
+        }}
+      />,
+    );
+    expect(await screen.findByText('Infraestructura · Fuente oficial')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Ciclovía · Av. Corrientes')).toBeInTheDocument());
   });
 });

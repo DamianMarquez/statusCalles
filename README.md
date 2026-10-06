@@ -153,7 +153,7 @@ El score se etiqueta como muy malo (0–34), malo (35–59), regular (60–79) o
 
 La app mantiene su base cartográfica propia en PostgreSQL/PostGIS y conserva Leaflet/OpenStreetMap para renderizar los tiles. La fuente oficial es Buenos Aires Data, bajo licencia CC-BY-2.5-AR: [Calles](https://data.buenosaires.gob.ar/dataset/calles), [Barrios](https://data.buenosaires.gob.ar/dataset/barrios) y [Comunas](https://data.buenosaires.gob.ar/dataset/comunas).
 
-El Callejero inspeccionado contiene registros lineales con `id` de tramo, `codigo` de calle, `nomoficial`, geometría GeoJSON `LineString`, alturas, sentido, barrio y comuna. Por eso `StreetSegment` conserva cada tramo publicado por GCBA y `Street` agrupa por `codigo`; no se cortan geometrías artificialmente. Los barrios publican polígonos con `id`, `nombre` y `comuna`; las comunas publican el número y su geometría. Los adaptadores del formato original están aislados en `backend/src/infrastructure/external/caba`; el dominio recibe nombres normalizados y GeoJSON de líneas o polígonos.
+El Callejero inspeccionado contiene registros lineales con `id` de tramo, `codigo` de calle, `nomoficial`, geometría GeoJSON `LineString`, alturas, sentido, barrio y comuna. Por eso `StreetSegment` conserva cada tramo publicado por GCBA y `Street` agrupa por `codigo` y nombre oficial normalizado; no se cortan geometrías artificialmente. Los barrios publican polígonos con `id`, `nombre` y `comuna`; las comunas publican el número y su geometría. Los adaptadores del formato original están aislados en `backend/src/infrastructure/external/caba`; el dominio recibe nombres normalizados y GeoJSON de líneas o polígonos.
 
 La migración `0008_tidy_junta.sql` crea `streets`, `street_segments`, `neighborhoods`, `communes` y `geographic_sources`, agrega índices GiST a todas las columnas geométricas y deja `street_id`/`street_segment_id` opcionales en reportes antiguos. Las geometrías se guardan como `geometry(MultiLineString,4326)` o `geometry(MultiPolygon,4326)`. La importación valida coordenadas, anillos cerrados y geometrías con PostGIS; hace upsert por los identificadores oficiales, registra fuente, licencia, URL, fecha, estado, cantidad y error de la última sincronización. Puede ejecutarse repetidamente sin duplicar registros. No corre durante el startup.
 
@@ -180,6 +180,26 @@ Rutas agregadas:
 | `GET /api/communes`                                        | Comunas y geometría GeoJSON                      |
 
 La primera importación verificada en desarrollo incorporó 15 comunas, 48 barrios, 2.741 calles oficiales y 31.961 tramos. Las calles se agrupan por código y nombre oficial normalizado, ya que un mismo código de origen puede aparecer con nombres distintos. `npm run import:caba:all` se puede volver a ejecutar para sincronizar el catálogo.
+
+## Datos oficiales de movilidad
+
+La revisión del portal oficial se hizo el 6 de octubre de 2026. Se eligieron tres recursos GeoJSON batch: [Ciclovías](https://data.buenosaires.gob.ar/dataset/ciclovias), con segmentos `LineString`/ID/nombre/tipo y actualización semestral (el portal mostraba actualización del 2 de octubre de 2026); [recorrido Metrobus](https://data.buenosaires.gob.ar/dataset/metrobus), con corredores `MultiLineString` y atributos de corredor, calle y sentido (frecuencia eventual; última actualización mostrada 23 de junio de 2026); y estaciones Metrobus, con ubicaciones `Point` (mismo conjunto/frecuencia eventual). Son datos batch, descargables sin autenticación, publicados bajo CC-BY-2.5-AR. El formato y frecuencia pueden cambiar y el importador rechaza datos vacíos o no válidos para preservar la última carga correcta. Las URL externas se limitan a hosts HTTPS oficiales de GCBA.
+
+El dataset [Volumen Vehicular](https://data.buenosaires.gob.ar/dataset/volumen_vehicular) sí publica conteos históricos, pero los recursos actuales son XLSX (base anual 2024 y detalle de una semana típica), además de ubicaciones de sensores y diccionario. No es una API realtime ni una serie con actualización vigente que convenga tratar como tráfico actual; queda como siguiente integración batch después de fijar el mapeo de sus planillas. La [API de Transporte Público](https://data.buenosaires.gob.ar/dataset/api-transporte-publico) documenta colectivos, transporte y cortes, y la documentación lista rutas como `/transito/v1/cortes` y `/transito/v1/eventos`; sin embargo, el portal indica que los recursos con formato API y GTFS están suspendidos y en revisión. No se conectó ningún endpoint en vivo ni se creó información de cortes ficticia. La autenticación de esos recursos no se considera verificada mientras el servicio esté suspendido. `TrafficDataProvider`, `OfficialIncidentProvider` y `TrafficVolumeProvider` definen contratos; el adaptador actual devuelve explícitamente no disponible y no emite solicitudes.
+
+Los GeoJSON se normalizan detrás del adaptador `CabaMobilityDatasetImporter` y se guardan como `mobility_infrastructure` con geometría PostGIS e índice GiST. La carga reemplaza sólo los registros de su propia fuente, y lo hace dentro de una transacción después de validar toda la colección. El catálogo conserva estado de intento, última sincronización exitosa, cantidad importada y error. No hay descargas automáticas al iniciar la aplicación ni scheduler.
+
+Con la base migrada, sincronizar manualmente:
+
+```bash
+npm run sync:caba:ciclovias
+npm run sync:caba:metrobus
+npm run sync:caba:metrobus-stops
+# o las tres fuentes
+npm run sync:caba:infrastructure
+```
+
+Las URL se configuran con `CABA_CICLOVIAS_URL`, `CABA_METROBUS_URL` y `CABA_METROBUS_STOPS_URL`; se admite `--file=/ruta/al/archivo.geojson` para importar un archivo local. `GET /api/streets/:id/infrastructure` devuelve los elementos oficiales próximos a los segmentos de esa calle (25 m); `GET /api/mobility/sources` expone el estado de sincronización. `GET /api/streets/:id/incidents` y `/traffic` devuelven `503 UNAVAILABLE` mientras la API oficial esté suspendida, en vez de presentar la falta de datos como ausencia de cortes o tráfico. Los popups cargan la infraestructura al abrirse y la rotulan por separado como “Fuente oficial”, diferenciándola de los reportes comunitarios. No se modelan sensores independientes ni volúmenes recientes todavía.
 
 ## Persistencia y decisión de ORM
 

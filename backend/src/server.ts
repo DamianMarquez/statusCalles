@@ -6,6 +6,7 @@ import { DrizzleStreetScoreRepository } from './infrastructure/database/street-s
 import { buildApp } from './app/build-app.js';
 import { DrizzleAuthRepository } from './infrastructure/database/auth-repository.drizzle.js';
 import { DrizzleStreetCatalogRepository } from './infrastructure/database/street-catalog-repository.drizzle.js';
+import { DrizzleMobilityCatalogRepository } from './infrastructure/database/mobility-catalog-repository.drizzle.js';
 
 const { database, pool } = createDatabase(getDatabaseUrl());
 const app = buildApp(
@@ -16,6 +17,7 @@ const app = buildApp(
     authRepository: new DrizzleAuthRepository(database),
     moderationDatabase: database,
     streetCatalogRepository: new DrizzleStreetCatalogRepository(database),
+    mobilityCatalogRepository: new DrizzleMobilityCatalogRepository(database),
   },
 );
 const host = process.env.BACKEND_HOST ?? '0.0.0.0';

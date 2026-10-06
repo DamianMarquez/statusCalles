@@ -3,6 +3,47 @@ import type { StreetScoreAreaDto } from './streetScoreTypes.js';
 
 const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 
+export interface OfficialMobilityInfrastructure {
+  id: string;
+  type: 'BIKE_LANE' | 'METROBUS_CORRIDOR' | 'METROBUS_STOP';
+  name: string;
+  details: Record<string, unknown>;
+  source: { name: string; url: string; lastSuccessfulSync: string | null };
+}
+
+export async function getStreetInfrastructure(
+  streetId: string,
+  signal?: AbortSignal,
+): Promise<OfficialMobilityInfrastructure[]> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${apiBaseUrl}/api/streets/${encodeURIComponent(streetId)}/infrastructure`,
+      { headers: { Accept: 'application/json' }, signal },
+    );
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new StreetsApiError('No se pudo consultar la infraestructura oficial.');
+  }
+  if (!response.ok) throw new StreetsApiError('No pudimos cargar la infraestructura oficial.');
+  const result: unknown = await response.json().catch(() => null);
+  if (
+    !Array.isArray(result) ||
+    !result.every(
+      (item) =>
+        item &&
+        typeof item.id === 'string' &&
+        typeof item.name === 'string' &&
+        ['BIKE_LANE', 'METROBUS_CORRIDOR', 'METROBUS_STOP'].includes(item.type) &&
+        item.source &&
+        typeof item.source.name === 'string' &&
+        typeof item.source.url === 'string',
+    )
+  )
+    throw new StreetsApiError('El servicio devolvió infraestructura inválida.');
+  return result as OfficialMobilityInfrastructure[];
+}
+
 export class StreetsApiError extends Error {
   constructor(message: string) {
     super(message);

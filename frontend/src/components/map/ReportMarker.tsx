@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { divIcon } from 'leaflet';
 import { Marker, Popup } from 'react-leaflet';
 import type { ReportDto, ReportFeedbackType } from '../../api/reportTypes.js';
@@ -38,12 +39,16 @@ export function ReportMarker({
   authenticated: boolean;
   onRequestLogin: () => void;
 }) {
+  const [popupOpen, setPopupOpen] = useState(false);
   return (
     <Marker
       position={[report.location.latitude, report.location.longitude]}
       icon={createReportIcon(report.type)}
     >
-      <Popup minWidth={240}>
+      <Popup
+        minWidth={240}
+        eventHandlers={{ add: () => setPopupOpen(true), remove: () => setPopupOpen(false) }}
+      >
         <ReportMarkerPopup
           report={report}
           onVote={onVote}
@@ -51,6 +56,7 @@ export function ReportMarker({
           feedbackError={feedbackError}
           authenticated={authenticated}
           onRequestLogin={onRequestLogin}
+          popupOpen={popupOpen}
         />
       </Popup>
     </Marker>
