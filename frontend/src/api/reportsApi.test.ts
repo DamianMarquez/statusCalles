@@ -91,6 +91,23 @@ describe('createReport', () => {
     ).rejects.toThrow('Revisá el tipo, la severidad y la ubicación del reporte.');
   });
 
+  it('surfaces duplicate warnings and supports an explicit override', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 409 }));
+    await expect(
+      createReport({ type: 'POTHOLE', severity: 'HIGH', latitude: -34.6, longitude: -58.4 }),
+    ).rejects.toMatchObject({ code: 'SIMILAR_REPORT_EXISTS' });
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => report });
+    vi.stubGlobal('fetch', fetchMock);
+    await createReport(
+      { type: 'POTHOLE', severity: 'HIGH', latitude: -34.6, longitude: -58.4 },
+      true,
+    );
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+      allowSimilar: true,
+    });
+  });
+
   it('submits a feedback vote and returns the updated aggregate', async () => {
     const updatedReport: ReportDto = {
       ...report,

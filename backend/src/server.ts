@@ -13,6 +13,7 @@ const app = buildApp(
   {
     streetScoreRepository: new DrizzleStreetScoreRepository(database),
     authRepository: new DrizzleAuthRepository(database),
+    moderationDatabase: database,
   },
 );
 const host = process.env.BACKEND_HOST ?? '0.0.0.0';

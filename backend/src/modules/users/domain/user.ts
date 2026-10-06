@@ -3,7 +3,11 @@ export interface PublicUser {
   email: string;
   displayName: string;
   createdAt: Date;
+  role: UserRole;
 }
+
+export const USER_ROLES = ['USER', 'MODERATOR', 'ADMIN'] as const;
+export type UserRole = (typeof USER_ROLES)[number];
 
 export interface UserProfile extends PublicUser {
   reportCount: number;

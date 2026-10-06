@@ -6,6 +6,7 @@ import {
   InvalidRegistrationError,
 } from '../application/auth-service.js';
 import { cookieOptions, sessionCookieName } from './auth-context.js';
+import { endpointRateLimit } from '../../../shared/rate-limits.js';
 
 interface RegistrationBody {
   email: string;
@@ -54,7 +55,7 @@ export async function registerAuthRoutes(
   app.post<{ Body: RegistrationBody }>(
     '/auth/register',
     {
-      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+      config: { rateLimit: endpointRateLimit('REGISTER') },
       preHandler: protectOrigin,
       schema: {
         body: {
@@ -92,7 +93,7 @@ export async function registerAuthRoutes(
   app.post<{ Body: LoginBody }>(
     '/auth/login',
     {
-      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+      config: { rateLimit: endpointRateLimit('LOGIN') },
       preHandler: protectOrigin,
       schema: { body: authBodySchema },
     },

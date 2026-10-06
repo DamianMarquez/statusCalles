@@ -44,6 +44,8 @@ vi.mock('react-leaflet', async () => {
     Marker: ({ children }: React.PropsWithChildren) =>
       React.createElement('div', { 'data-testid': 'marker' }, children),
     Popup: ({ children }: React.PropsWithChildren) => React.createElement('div', null, children),
+    Rectangle: ({ children }: React.PropsWithChildren) =>
+      React.createElement('div', null, children),
     TileLayer: () => null,
     useMap: () => mocks.map,
     useMapEvents: (handlers: typeof mocks.mapEvents) => {

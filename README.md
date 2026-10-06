@@ -9,12 +9,13 @@ MVP para consultar y reportar problemas de circulación en calles de la Ciudad A
 - Confirmaciones comunitarias por reporte; cada usuario puede confirmar o indicar que ya no existe, y cambiar su voto.
 - Registro, ingreso, cierre de sesión y perfil con sesión persistida y cookie protegida.
 - Street Score estimado por áreas geográficas con reportes suficientes, visible como celdas explicables en el mapa.
-- API Fastify con health check y endpoints REST para persistir y consultar reportes.
+- Moderación básica con detección de duplicados, marcación de contenido y cola administrativa con auditoría.
+- API Fastify con health check y endpoints REST para persistir, consultar y moderar reportes.
 - Reportes almacenados en PostgreSQL con `GEOGRAPHY(POINT, 4326)` y consultas de radio ejecutadas por PostGIS.
 - Migraciones versionadas con Drizzle Kit.
 - TypeScript estricto, ESLint, Prettier y tests de integración.
 
-No hay login social ni moderación avanzada.
+No hay login social ni dashboard de moderación.
 
 ## Requisitos
 
@@ -100,6 +101,9 @@ La API está bajo `/api`. Los tipos admitidos son `POTHOLE`, `FLOOD`, `ROAD_DAMA
 | `GET /api/users/me`                                              | Perfil y estadísticas de reputación          |
 | `GET /api/reports/:id`                                           | Consultar un reporte                         |
 | `PATCH /api/reports/:id/status`                                  | Cambiar entre `ACTIVE`, `STALE` y `RESOLVED` |
+| `POST /api/reports/:id/flags`                                    | Marcar contenido para revisión               |
+| `GET /api/admin/reports`                                         | Cola de reportes marcados (moderador/admin)  |
+| `PATCH /api/admin/reports/:id/moderation`                        | Ocultar o volver a mostrar (moderador/admin) |
 
 Ejemplo de creación:
 
@@ -113,15 +117,19 @@ Las coordenadas se validan dentro de los rangos de latitud y longitud, la descri
 
 La API devuelve DTOs con `{ latitude, longitude }`, fechas ISO y enums públicos; no serializa filas o tipos internos de la base.
 
-Para crear un reporte, presionar **Reportar problema**, tocar el mapa para marcar la ubicación y completar tipo y severidad. La descripción es opcional (máximo 500 caracteres). La API valida tipo, severidad, coordenadas y longitud de descripción; si se omite, persiste una descripción vacía. Una creación correcta devuelve el DTO del reporte, que se agrega al mapa inmediatamente.
+Para crear un reporte, presionar **Reportar problema**, tocar el mapa para marcar la ubicación y completar tipo y severidad. La descripción es opcional (máximo 500 caracteres). La API valida tipo, severidad, coordenadas y longitud de descripción; si se omite, persiste una descripción vacía. Una creación correcta devuelve el DTO del reporte, que se agrega al mapa inmediatamente. Antes de crear, el backend busca por PostGIS reportes visibles del mismo tipo a 50 metros o menos, creados en las últimas 24 horas y no resueltos. Ante una coincidencia devuelve `409 SIMILAR_REPORT_EXISTS`; la interfaz avisa y permite reintentar confirmando `allowSimilar: true`. No se elimina ni se fusiona ningún reporte.
 
 ## Cuentas y sesión
 
-El registro pide email, nombre visible y contraseña de al menos 12 caracteres. El backend almacena exclusivamente un hash `scrypt` con salt aleatorio (N=32768, r=8, p=1); el login responde con un error genérico cuando email o contraseña no coinciden. Registro y login están limitados a 5 intentos por minuto por IP; creación de reportes, a 20; feedback, a 30. Si el backend está detrás de un proxy, `TRUST_PROXY` debe listar las IP/CIDR del proxy de confianza para calcular la IP cliente correctamente; no lo configures como `*`.
+El registro pide email, nombre visible y contraseña de al menos 12 caracteres. El backend almacena exclusivamente un hash `scrypt` con salt aleatorio (N=32768, r=8, p=1); el login responde con un error genérico cuando email o contraseña no coinciden. Los límites por IP se configuran con `RATE_LIMIT_{REPORTS,FEEDBACK,FLAGS,LOGIN,REGISTER,REPORT_STATUS}_MAX` y `RATE_LIMIT_{REPORTS,FEEDBACK,FLAGS,LOGIN,REGISTER,REPORT_STATUS}_WINDOW_SECONDS`; los valores del `.env.example` son 20, 30, 5, 5, 5 y 10 solicitudes por 60 segundos respectivamente. Se validan como enteros positivos. El limitador usa memoria local por proceso, suficiente para esta fase; con varias réplicas se necesita un almacén compartido antes de distribuir el tráfico. Si el backend está detrás de un proxy, `TRUST_PROXY` debe listar las IP/CIDR del proxy de confianza para calcular la IP cliente correctamente; no lo configures como `*`.
 
 El BFF emite un token aleatorio opaco de 256 bits como cookie `street_status_session` (`HttpOnly`, `SameSite=Lax`, `Path=/api`, 30 días); la base conserva solo su SHA-256 y vencimiento. En producción la cookie usa `Secure`. El frontend envía cookies con `credentials: include`; no guarda tokens, contraseñas ni identificadores de voto en `localStorage`. El BFF comprueba `Origin` contra `CORS_ORIGIN` en solicitudes con origen y CORS permite credenciales únicamente para los orígenes configurados. Publicá frontend y BFF bajo el mismo site (idealmente detrás de un mismo origen/reverse proxy) para que `SameSite=Lax` funcione. Configurá HTTPS y `NODE_ENV=production` detrás del proxy de producción.
 
-`POST /api/reports/:id/feedback` y `PATCH /api/reports/:id/status` requieren sesión. Los reportes pueden seguir creándose sin cuenta; si hay sesión, se registra el propietario. Los votos nuevos se asocian a `user_id` y cada usuario puede tener una decisión por reporte. Las filas históricas de votos anónimos siguen agregándose y la migración conserva el identificador temporal solo para esas filas previas; la aplicación ya no lo emite ni lo consume. Los reportes previos conservan sus datos con `user_id` nulo.
+`POST /api/reports/:id/feedback`, `POST /api/reports/:id/flags` y `PATCH /api/reports/:id/status` requieren sesión. Un usuario puede cambiar su feedback, pero el índice único mantiene una sola decisión actual por reporte y usuario. Los reportes pueden seguir creándose sin cuenta; si hay sesión, se registra el propietario. Solo el autor del reporte puede cambiar su estado; moderadores y administradores pueden hacerlo también. Las filas históricas de votos anónimos siguen agregándose y la migración conserva el identificador temporal solo para esas filas previas; la aplicación ya no lo emite ni lo consume. Los reportes previos conservan sus datos con `user_id` nulo.
+
+Las cuentas nuevas reciben el rol `USER`. `MODERATOR` y `ADMIN` no se pueden asignar desde la API pública: un operador debe otorgarlos de forma controlada desde la base de datos. La cola administrativa solo acepta esos roles. Cada cuenta puede marcar una sola vez cada reporte con motivo `SPAM`, `INAPPROPRIATE`, `FALSE_INFORMATION` u `OTHER`; las repeticiones reciben `409`. La acción administrativa `VISIBLE`/`HIDDEN` se guarda en `moderation_audit`, junto con actor, cambio, fecha y nota; las denuncias revisadas conservan su fecha de revisión. Los reportes ocultos se excluyen de consultas públicas, feedback y Street Score, sin borrar el contenido histórico. Ejemplo de promoción operativa, ejecutado únicamente por un operador autorizado: `UPDATE users SET role = 'MODERATOR' WHERE email = 'moderador@ejemplo.com';`.
+
+Las solicitudes mutables con `Origin` se validan contra `CORS_ORIGIN`; cookies `HttpOnly`, `SameSite=Lax` y validación de origen son las defensas CSRF actuales. La cookie es `Secure` en producción. Respuestas y descripciones se renderizan como texto por React y no como HTML; los filtros y mutaciones SQL parametrizan valores con Drizzle. Los controles de moderación son básicos: no verifican la veracidad automáticamente ni sustituyen una revisión humana.
 
 El perfil muestra nombre, email, fecha de registro, total de reportes, confirmaciones dadas y métricas descriptivas de reputación (reportes propios confirmados/resueltos y feedback útil). Son contadores derivados; no representan puntos ni un ranking.
 

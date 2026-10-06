@@ -22,7 +22,10 @@ const reportSeverities: ReportSeverity[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 const reportStatuses: ReportStatus[] = ['ACTIVE', 'STALE', 'RESOLVED'];
 
 export class ReportsApiError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
     super(message);
     this.name = 'ReportsApiError';
   }
@@ -96,7 +99,10 @@ export async function getReportsInViewport(
   return result;
 }
 
-export async function createReport(input: CreateReportInput): Promise<ReportDto> {
+export async function createReport(
+  input: CreateReportInput,
+  allowSimilar = false,
+): Promise<ReportDto> {
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl}/api/reports`, {
@@ -106,13 +112,19 @@ export async function createReport(input: CreateReportInput): Promise<ReportDto>
         'Content-Type': 'application/json',
       },
       credentials: 'include',
-      body: JSON.stringify(input),
+      body: JSON.stringify({ ...input, ...(allowSimilar ? { allowSimilar: true } : {}) }),
     });
   } catch {
     throw new ReportsApiError('No se pudo conectar con el servicio de reportes.');
   }
 
   if (!response.ok) {
+    if (response.status === 409) {
+      throw new ReportsApiError(
+        'Ya existe un reporte similar cerca de esta ubicación.',
+        'SIMILAR_REPORT_EXISTS',
+      );
+    }
     if (response.status === 400) {
       throw new ReportsApiError('Revisá el tipo, la severidad y la ubicación del reporte.');
     }

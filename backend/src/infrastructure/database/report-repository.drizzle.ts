@@ -86,7 +86,7 @@ export class DrizzleReportRepository implements ReportRepository {
         location,
         ST_SetSRID(ST_MakePoint(${query.longitude}, ${query.latitude}), 4326)::geography,
         ${query.radiusMeters}
-      )
+      ) AND moderation_status = 'VISIBLE'
       ORDER BY created_at DESC
       LIMIT 200
     `);
@@ -100,6 +100,7 @@ export class DrizzleReportRepository implements ReportRepository {
       FROM street_reports
       WHERE location && (${envelope})::geography
         AND ST_Intersects(location::geometry, ${envelope})
+        AND moderation_status = 'VISIBLE'
       ORDER BY created_at DESC
       LIMIT 200
     `);
@@ -111,17 +112,60 @@ export class DrizzleReportRepository implements ReportRepository {
       SELECT ${reportProjection}
       FROM street_reports
       WHERE id = ${id}::uuid
+        AND moderation_status = 'VISIBLE'
       LIMIT 1
     `);
     const row = result.rows[0];
     return row ? mapReport(row) : null;
   }
 
+  async isOwner(id: string, userId: string): Promise<boolean> {
+    const result = await this.database.execute<{ owned: boolean }>(sql`
+      SELECT EXISTS (SELECT 1 FROM street_reports WHERE id = ${id}::uuid AND user_id = ${userId}::uuid) AS owned
+    `);
+    return result.rows[0]?.owned === true;
+  }
+
+  async findSimilar(
+    input: CreateStreetReport,
+  ): Promise<{ id: string; distanceMeters: number; createdAt: Date } | null> {
+    const result = await this.database.execute<{
+      id: string;
+      distance_meters: number | string;
+      created_at: Date | string;
+    }>(sql`
+      SELECT id, ST_Distance(
+        location,
+        ST_SetSRID(ST_MakePoint(${input.location.longitude}, ${input.location.latitude}), 4326)::geography
+      ) AS distance_meters, created_at
+      FROM street_reports
+      WHERE type = ${input.type}::report_type
+        AND status <> 'RESOLVED'
+        AND moderation_status = 'VISIBLE'
+        AND created_at >= NOW() - INTERVAL '24 hours'
+        AND ST_DWithin(
+          location,
+          ST_SetSRID(ST_MakePoint(${input.location.longitude}, ${input.location.latitude}), 4326)::geography,
+          50
+        )
+      ORDER BY location <-> ST_SetSRID(ST_MakePoint(${input.location.longitude}, ${input.location.latitude}), 4326)::geography
+      LIMIT 1
+    `);
+    const row = result.rows[0];
+    return row
+      ? {
+          id: row.id,
+          distanceMeters: Number(row.distance_meters),
+          createdAt: new Date(row.created_at),
+        }
+      : null;
+  }
+
   async updateStatus(id: string, status: ReportStatus): Promise<StreetReport | null> {
     const result = await this.database.execute<ReportRow>(sql`
       UPDATE street_reports
       SET status = ${status}::report_status, updated_at = NOW()
-      WHERE id = ${id}::uuid
+      WHERE id = ${id}::uuid AND moderation_status = 'VISIBLE'
       RETURNING ${reportProjection}
     `);
     const row = result.rows[0];

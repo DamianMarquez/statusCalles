@@ -55,6 +55,7 @@ export class AuthService {
       email: userWithPassword.email,
       displayName: userWithPassword.displayName,
       createdAt: userWithPassword.createdAt,
+      role: userWithPassword.role,
     };
     return this.startSession(user);
   }

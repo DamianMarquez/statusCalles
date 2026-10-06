@@ -3,6 +3,7 @@ import { ReportFeedbackService } from '../application/report-feedback-service.js
 import { ReportService } from '../application/report-service.js';
 import { REPORT_FEEDBACK_TYPES } from '../domain/report-feedback.js';
 import { toReportDto } from './report.dto.js';
+import { endpointRateLimit } from '../../../shared/rate-limits.js';
 
 interface ReportIdParams {
   id: string;
@@ -23,7 +24,7 @@ export async function registerReportFeedbackRoutes(
   app.post<{ Params: ReportIdParams; Body: FeedbackBody }>(
     '/reports/:id/feedback',
     {
-      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      config: { rateLimit: endpointRateLimit('FEEDBACK') },
       preHandler: async (request, reply) => {
         if (!request.authUser) {
           return reply

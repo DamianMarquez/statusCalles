@@ -10,6 +10,8 @@ import type { ReportDto } from './report.dto.js';
 import type { ReportFeedbackType } from '../domain/report-feedback.js';
 import { randomUUID } from 'node:crypto';
 
+process.env.RATE_LIMIT_REPORTS_MAX = '500';
+
 const { database, pool } = createDatabase(getDatabaseUrl());
 const app = buildApp(
   new DrizzleReportRepository(database),
@@ -18,6 +20,7 @@ const app = buildApp(
     logger: false,
     streetScoreRepository: new DrizzleStreetScoreRepository(database),
     authRepository: new DrizzleAuthRepository(database),
+    moderationDatabase: database,
   },
 );
 const createdIds: string[] = [];
@@ -57,7 +60,7 @@ async function createReport(payload: unknown = validReport, cookie?: string): Pr
   const response = await app.inject({
     method: 'POST',
     url: '/api/reports',
-    payload: payload as object,
+    payload: { ...(payload as object), allowSimilar: true },
     headers: cookie ? { cookie } : undefined,
   });
   expect(response.statusCode).toBe(201);
@@ -91,6 +94,9 @@ describe('reports API with PostgreSQL/PostGIS', () => {
 
   afterAll(async () => {
     if (createdIds.length > 0) {
+      await pool.query('DELETE FROM moderation_audit WHERE report_id = ANY($1::uuid[])', [
+        createdIds,
+      ]);
       await pool.query('DELETE FROM street_reports WHERE id = ANY($1::uuid[])', [createdIds]);
     }
     if (testUsers.length > 0) {
@@ -115,6 +121,81 @@ describe('reports API with PostgreSQL/PostGIS', () => {
     expect(report.id).toMatch(/^[0-9a-f-]{36}$/i);
     expect(new Date(report.createdAt).toISOString()).toBe(report.createdAt);
     expect(new Date(report.updatedAt).toISOString()).toBe(report.updatedAt);
+  });
+
+  it('warns about nearby same-type reports and accepts an explicit override', async () => {
+    await createReport({ ...validReport, latitude: -34.6041, longitude: -58.3818 });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/reports',
+      payload: { ...validReport, latitude: -34.6041, longitude: -58.3818 },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      code: 'SIMILAR_REPORT_EXISTS',
+      message: 'Ya existe un reporte similar cerca de esta ubicación.',
+      similarReport: { distanceMeters: 0 },
+    });
+
+    const override = await app.inject({
+      method: 'POST',
+      url: '/api/reports',
+      payload: { ...validReport, latitude: -34.6041, longitude: -58.3818, allowSimilar: true },
+    });
+    expect(override.statusCode).toBe(201);
+    createdIds.push(override.json<ReportDto>().id);
+  });
+
+  it('accepts one abuse flag per account and protects admin moderation with role checks', async () => {
+    const report = await createReport();
+    const user = testUsers[0]!;
+    const flag = await app.inject({
+      method: 'POST',
+      url: `/api/reports/${report.id}/flags`,
+      headers: { cookie: user.cookie },
+      payload: { reason: 'SPAM' },
+    });
+    expect(flag.statusCode).toBe(201);
+    const repeated = await app.inject({
+      method: 'POST',
+      url: `/api/reports/${report.id}/flags`,
+      headers: { cookie: user.cookie },
+      payload: { reason: 'SPAM' },
+    });
+    expect(repeated.statusCode).toBe(409);
+
+    const forbidden = await app.inject({
+      method: 'GET',
+      url: '/api/admin/reports',
+      headers: { cookie: user.cookie },
+    });
+    expect(forbidden.statusCode).toBe(403);
+    const admin = testUsers[2]!;
+    await pool.query("UPDATE users SET role = 'ADMIN' WHERE id = $1", [admin.id]);
+    const queue = await app.inject({
+      method: 'GET',
+      url: '/api/admin/reports',
+      headers: { cookie: admin.cookie },
+    });
+    expect(queue.statusCode).toBe(200);
+    expect(
+      queue.json<Array<{ id: string; flag_count: number }>>().some((item) => item.id === report.id),
+    ).toBe(true);
+
+    const hidden = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/reports/${report.id}/moderation`,
+      headers: { cookie: admin.cookie },
+      payload: { status: 'HIDDEN', note: 'Contenido denunciado para revisión.' },
+    });
+    expect(hidden.statusCode).toBe(200);
+    const noLongerPublic = await app.inject({ method: 'GET', url: `/api/reports/${report.id}` });
+    expect(noLongerPublic.statusCode).toBe(404);
+    const audit = await pool.query('SELECT * FROM moderation_audit WHERE report_id = $1', [
+      report.id,
+    ]);
+    expect(audit.rowCount).toBe(1);
+    await pool.query("UPDATE users SET role = 'USER' WHERE id = $1", [admin.id]);
   });
 
   it('allows creating a report without an optional description', async () => {
@@ -324,16 +405,29 @@ describe('reports API with PostgreSQL/PostGIS', () => {
   });
 
   it('updates a report status', async () => {
-    const created = await createReport();
+    const owner = testUsers[0]!;
+    const created = await createReport(validReport, owner.cookie);
     const response = await app.inject({
       method: 'PATCH',
       url: `/api/reports/${created.id}/status`,
-      headers: { cookie: testUsers[0]!.cookie },
+      headers: { cookie: owner.cookie },
       payload: { status: 'RESOLVED' },
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.json<ReportDto>()).toMatchObject({ id: created.id, status: 'RESOLVED' });
+  });
+
+  it('prevents an unrelated account from changing a report status', async () => {
+    const owner = testUsers[0]!;
+    const report = await createReport(validReport, owner.cookie);
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/reports/${report.id}/status`,
+      headers: { cookie: testUsers[1]!.cookie },
+      payload: { status: 'RESOLVED' },
+    });
+    expect(response.statusCode).toBe(403);
   });
 
   it('associates authenticated report creation with its account', async () => {

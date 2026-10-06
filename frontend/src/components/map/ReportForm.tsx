@@ -29,7 +29,7 @@ interface ReportFormProps {
   currentLocation: UserLocation | null;
   onUseCurrentLocation: () => void;
   onCancel: () => void;
-  onSubmit: (input: CreateReportInput) => Promise<ReportDto>;
+  onSubmit: (input: CreateReportInput, allowSimilar?: boolean) => Promise<ReportDto>;
 }
 
 export function ReportForm({
@@ -44,6 +44,7 @@ export function ReportForm({
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [similarFound, setSimilarFound] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,13 +62,23 @@ export function ReportForm({
     };
 
     try {
-      await onSubmit(input);
+      await onSubmit(input, similarFound);
     } catch (submitError) {
-      setError(
-        submitError instanceof Error
-          ? submitError.message
-          : 'No pudimos enviar el reporte. Intentá de nuevo.',
-      );
+      if (
+        submitError instanceof Error &&
+        'code' in submitError &&
+        submitError.code === 'SIMILAR_REPORT_EXISTS'
+      ) {
+        setSimilarFound(true);
+        setError(
+          'Ya existe un reporte similar cerca de esta ubicación. Revisalo en el mapa antes de continuar.',
+        );
+      } else
+        setError(
+          submitError instanceof Error
+            ? submitError.message
+            : 'No pudimos enviar el reporte. Intentá de nuevo.',
+        );
       setIsSubmitting(false);
     }
   }
@@ -155,6 +166,20 @@ export function ReportForm({
             <p className="report-form__error" role="alert">
               {error}
             </p>
+          )}
+
+          {similarFound && (
+            <button
+              className="report-form__submit"
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => {
+                const form = document.querySelector<HTMLFormElement>('.report-form');
+                form?.requestSubmit();
+              }}
+            >
+              Continuar y crear igualmente
+            </button>
           )}
 
           <div className="report-form__actions">

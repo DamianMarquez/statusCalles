@@ -99,6 +99,7 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
       ) f ON TRUE
       WHERE r.location && (${envelope})::geography
         AND ST_Intersects(r.location::geometry, ${envelope})
+        AND r.moderation_status = 'VISIBLE'
       ORDER BY r.created_at DESC
       LIMIT 5000
     `);

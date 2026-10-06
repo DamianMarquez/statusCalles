@@ -14,6 +14,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { REPORT_STATUSES, REPORT_TYPES } from '../../modules/reports/domain/street-report.js';
 import { REPORT_FEEDBACK_TYPES } from '../../modules/reports/domain/report-feedback.js';
+import { USER_ROLES } from '../../modules/users/domain/user.js';
 
 const geographyPoint = customType<{ data: string; driverData: string }>({
   dataType: () => 'geography(Point,4326)',
@@ -22,6 +23,14 @@ const geographyPoint = customType<{ data: string; driverData: string }>({
 export const reportTypeEnum = pgEnum('report_type', REPORT_TYPES);
 export const reportStatusEnum = pgEnum('report_status', REPORT_STATUSES);
 export const reportFeedbackTypeEnum = pgEnum('report_feedback_type', REPORT_FEEDBACK_TYPES);
+export const userRoleEnum = pgEnum('user_role', USER_ROLES);
+export const reportModerationStatusEnum = pgEnum('report_moderation_status', ['VISIBLE', 'HIDDEN']);
+export const reportFlagReasonEnum = pgEnum('report_flag_reason', [
+  'SPAM',
+  'INAPPROPRIATE',
+  'FALSE_INFORMATION',
+  'OTHER',
+]);
 
 export const users = pgTable(
   'users',
@@ -30,6 +39,7 @@ export const users = pgTable(
     email: varchar('email', { length: 254 }).notNull(),
     displayName: varchar('display_name', { length: 80 }).notNull(),
     passwordHash: text('password_hash').notNull(),
+    role: userRoleEnum('role').notNull().default('USER'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -62,6 +72,7 @@ export const streetReports = pgTable(
     description: varchar('description', { length: 500 }).notNull(),
     location: geographyPoint('location').notNull(),
     status: reportStatusEnum('status').notNull().default('ACTIVE'),
+    moderationStatus: reportModerationStatusEnum('moderation_status').notNull().default('VISIBLE'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -72,6 +83,40 @@ export const streetReports = pgTable(
     index('street_reports_user_id_idx').on(table.userId),
   ],
 );
+
+export const reportFlags = pgTable(
+  'report_flags',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    reportId: uuid('report_id')
+      .notNull()
+      .references(() => streetReports.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    reason: reportFlagReasonEnum('reason').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('report_flags_report_user_unique').on(table.reportId, table.userId),
+    index('report_flags_reviewed_created_idx').on(table.reviewedAt, table.createdAt),
+  ],
+);
+
+export const moderationAudit = pgTable('moderation_audit', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  moderatorId: uuid('moderator_id')
+    .notNull()
+    .references(() => users.id),
+  reportId: uuid('report_id')
+    .notNull()
+    .references(() => streetReports.id),
+  previousStatus: reportModerationStatusEnum('previous_status').notNull(),
+  newStatus: reportModerationStatusEnum('new_status').notNull(),
+  note: varchar('note', { length: 500 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const reportFeedback = pgTable(
   'report_feedback',

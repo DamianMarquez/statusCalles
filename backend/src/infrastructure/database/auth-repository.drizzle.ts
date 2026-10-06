@@ -1,12 +1,18 @@
 import { sql } from 'drizzle-orm';
 import type { StreetStatusDatabase } from './database.js';
 import type { AuthRepository } from '../../modules/users/application/auth-repository.js';
-import type { CreateUser, PublicUser, UserProfile } from '../../modules/users/domain/user.js';
+import type {
+  CreateUser,
+  PublicUser,
+  UserProfile,
+  UserRole,
+} from '../../modules/users/domain/user.js';
 
 interface UserRow extends Record<string, unknown> {
   id: string;
   email: string;
   display_name: string;
+  role: UserRole;
   password_hash?: string;
   created_at: Date | string;
   report_count?: number | string;
@@ -22,10 +28,11 @@ function toPublicUser(row: UserRow): PublicUser {
     email: row.email,
     displayName: row.display_name,
     createdAt: new Date(row.created_at),
+    role: row.role ?? 'USER',
   };
 }
 
-const userProjection = sql`id, email, display_name, created_at`;
+const userProjection = sql`id, email, display_name, role, created_at`;
 
 export class DrizzleAuthRepository implements AuthRepository {
   constructor(private readonly database: StreetStatusDatabase) {}
@@ -110,7 +117,7 @@ export class DrizzleAuthRepository implements AuthRepository {
 
   async findUserForSession(tokenHash: string, now: Date): Promise<PublicUser | null> {
     const result = await this.database.execute<UserRow>(sql`
-      SELECT u.id, u.email, u.display_name, u.created_at
+      SELECT u.id, u.email, u.display_name, u.role, u.created_at
       FROM auth_sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ${tokenHash} AND s.expires_at > ${now}
       LIMIT 1

@@ -20,8 +20,16 @@ export class ReportService {
     return this.repository.findInViewport(query);
   }
 
+  findSimilar(input: CreateStreetReport) {
+    return this.repository.findSimilar(input);
+  }
+
   findById(id: string): Promise<StreetReport | null> {
     return this.repository.findById(id);
+  }
+
+  isOwner(id: string, userId: string): Promise<boolean> {
+    return this.repository.isOwner(id, userId);
   }
 
   updateStatus(id: string, status: ReportStatus): Promise<StreetReport | null> {

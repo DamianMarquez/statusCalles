@@ -9,7 +9,9 @@ const unusedReportRepository: ReportRepository = {
   },
   findNearby: async () => [],
   findInViewport: async () => [],
+  findSimilar: async () => null,
   findById: async () => null,
+  isOwner: async () => false,
   updateStatus: async () => null,
 };
 

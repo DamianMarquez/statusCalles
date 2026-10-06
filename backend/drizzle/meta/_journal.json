@@ -50,6 +50,13 @@
       "when": 1791317890581,
       "tag": "0006_nappy_stick",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791319044172,
+      "tag": "0007_stiff_terrax",
+      "breakpoints": true
     }
   ]
 }

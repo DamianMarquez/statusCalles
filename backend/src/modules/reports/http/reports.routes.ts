@@ -11,6 +11,7 @@ import {
 import { toReportDto } from './report.dto.js';
 import { emptyReportFeedbackSummary } from '../domain/report-feedback.js';
 import type { StreetReport } from '../domain/street-report.js';
+import { endpointRateLimit } from '../../../shared/rate-limits.js';
 
 const severityNames = Object.keys(SEVERITY_LEVELS) as ReportSeverity[];
 
@@ -35,6 +36,7 @@ interface CreateReportBody {
   description?: string;
   latitude: number;
   longitude: number;
+  allowSimilar?: boolean;
 }
 
 interface ReportIdParams {
@@ -122,7 +124,7 @@ export async function registerReportsRoutes(
   app.post<{ Body: CreateReportBody }>(
     '/reports',
     {
-      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      config: { rateLimit: endpointRateLimit('REPORTS') },
       schema: {
         body: {
           type: 'object',
@@ -134,23 +136,32 @@ export async function registerReportsRoutes(
             description: { type: 'string', maxLength: 500, pattern: '\\S' },
             latitude: { type: 'number', minimum: -90, maximum: 90 },
             longitude: { type: 'number', minimum: -180, maximum: 180 },
+            allowSimilar: { type: 'boolean' },
           },
         },
       },
     },
     async (request, reply) => {
-      const report = await service.create(
-        {
-          type: request.body.type,
-          severity: request.body.severity,
-          description: request.body.description?.trim() ?? '',
-          location: {
-            latitude: request.body.latitude,
-            longitude: request.body.longitude,
-          },
+      const input = {
+        type: request.body.type,
+        severity: request.body.severity,
+        description: request.body.description?.trim() ?? '',
+        location: {
+          latitude: request.body.latitude,
+          longitude: request.body.longitude,
         },
-        request.authUser?.id ?? null,
-      );
+      };
+      if (!request.body.allowSimilar) {
+        const similar = await service.findSimilar(input);
+        if (similar) {
+          return reply.code(409).send({
+            code: 'SIMILAR_REPORT_EXISTS',
+            message: 'Ya existe un reporte similar cerca de esta ubicación.',
+            similarReport: { id: similar.id, distanceMeters: Math.round(similar.distanceMeters) },
+          });
+        }
+      }
+      const report = await service.create(input, request.authUser?.id ?? null);
       return reply
         .code(201)
         .send(toReportDto(report, emptyReportFeedbackSummary, feedbackService.now()));
@@ -181,6 +192,7 @@ export async function registerReportsRoutes(
   app.patch<{ Params: ReportIdParams; Body: UpdateStatusBody }>(
     '/reports/:id/status',
     {
+      config: { rateLimit: endpointRateLimit('REPORT_STATUS') },
       preHandler: async (request, reply) => {
         if (!request.authUser) {
           return reply
@@ -203,6 +215,19 @@ export async function registerReportsRoutes(
       },
     },
     async (request, reply) => {
+      const user = request.authUser;
+      if (!user) {
+        return reply
+          .code(401)
+          .send({ code: 'AUTHENTICATION_REQUIRED', message: 'Iniciá sesión para continuar.' });
+      }
+      const elevated = user.role === 'MODERATOR' || user.role === 'ADMIN';
+      if (!elevated && !(await service.isOwner(request.params.id, user.id))) {
+        return reply.code(403).send({
+          code: 'FORBIDDEN',
+          message: 'Solo quien creó el reporte puede cambiar su estado.',
+        });
+      }
       const report = await service.updateStatus(request.params.id, request.body.status);
       if (!report) {
         return reply.code(404).send({ code: 'REPORT_NOT_FOUND', message: 'Report not found.' });

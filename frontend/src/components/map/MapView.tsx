@@ -172,8 +172,10 @@ export default function MapView() {
     setReportLocation(null);
   }
 
-  async function submitReport(input: CreateReportInput) {
-    const createdReport = await createReport(input);
+  async function submitReport(input: CreateReportInput, allowSimilar = false) {
+    const createdReport = allowSimilar
+      ? await createReport(input, true)
+      : await createReport(input);
     addReport(createdReport);
     void refreshProfile().catch(() => undefined);
     setScoreRefreshKey((current) => current + 1);

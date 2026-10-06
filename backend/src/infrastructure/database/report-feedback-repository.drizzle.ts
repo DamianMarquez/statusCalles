@@ -43,7 +43,7 @@ export class DrizzleReportFeedbackRepository implements ReportFeedbackRepository
       INSERT INTO report_feedback (report_id, user_id, voter_id, type)
       SELECT id, ${input.userId}::uuid, NULL, ${input.type}::report_feedback_type
       FROM street_reports
-      WHERE id = ${input.reportId}::uuid
+      WHERE id = ${input.reportId}::uuid AND moderation_status = 'VISIBLE'
       ON CONFLICT (report_id, user_id) WHERE user_id IS NOT NULL
       DO UPDATE SET type = EXCLUDED.type, updated_at = NOW()
       RETURNING report_id::text AS report_id

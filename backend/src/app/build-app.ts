@@ -8,6 +8,7 @@ import { ReportService } from '../modules/reports/application/report-service.js'
 import type { ReportFeedbackRepository } from '../modules/reports/application/report-feedback-repository.js';
 import { ReportFeedbackService } from '../modules/reports/application/report-feedback-service.js';
 import { registerReportFeedbackRoutes } from '../modules/reports/http/report-feedback.routes.js';
+import { registerModerationRoutes } from '../modules/reports/http/moderation.routes.js';
 import { registerReportsRoutes } from '../modules/reports/http/reports.routes.js';
 import type { StreetScoreRepository } from '../modules/streets/application/street-score-repository.js';
 import { StreetScoreService } from '../modules/streets/application/street-score-service.js';
@@ -16,6 +17,7 @@ import type { AuthRepository } from '../modules/users/application/auth-repositor
 import { AuthService } from '../modules/users/application/auth-service.js';
 import { sessionCookieName } from '../modules/users/http/auth-context.js';
 import { registerAuthRoutes } from '../modules/users/http/auth.routes.js';
+import type { StreetStatusDatabase } from '../infrastructure/database/database.js';
 
 export function buildApp(
   reportRepository: ReportRepository,
@@ -24,6 +26,7 @@ export function buildApp(
     logger?: boolean;
     streetScoreRepository?: StreetScoreRepository;
     authRepository?: AuthRepository;
+    moderationDatabase?: StreetStatusDatabase;
   } = {},
 ): FastifyInstance {
   const trustedProxies = (process.env.TRUST_PROXY ?? '')
@@ -55,6 +58,12 @@ export function buildApp(
     feedbackService,
     reportService,
   });
+  if (options.moderationDatabase) {
+    app.register(registerModerationRoutes, {
+      prefix: '/api',
+      database: options.moderationDatabase,
+    });
+  }
   if (options.streetScoreRepository) {
     app.register(registerStreetScoreRoutes, {
       prefix: '/api',
