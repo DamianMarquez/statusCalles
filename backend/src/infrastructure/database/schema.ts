@@ -33,10 +33,6 @@ export const streetReports = pgTable(
   },
   (table) => [
     check('street_reports_severity_range_check', sql`${table.severity} BETWEEN 1 AND 4`),
-    check(
-      'street_reports_description_not_blank_check',
-      sql`length(trim(${table.description})) > 0`,
-    ),
     index('street_reports_location_gix').using('gist', table.location),
     index('street_reports_created_at_idx').on(table.createdAt),
   ],

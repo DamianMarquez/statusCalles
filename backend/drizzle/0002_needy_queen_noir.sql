@@ -1,0 +1,1 @@
+ALTER TABLE "street_reports" DROP CONSTRAINT "street_reports_description_not_blank_check";

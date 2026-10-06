@@ -57,6 +57,17 @@ describe('reports API with PostgreSQL/PostGIS', () => {
     expect(new Date(report.updatedAt).toISOString()).toBe(report.updatedAt);
   });
 
+  it('allows creating a report without an optional description', async () => {
+    const report = await createReport({
+      type: 'POTHOLE',
+      severity: 'MEDIUM',
+      latitude: -34.6037,
+      longitude: -58.3816,
+    });
+
+    expect(report.description).toBe('');
+  });
+
   it('uses PostGIS to return only reports within the requested radius', async () => {
     const nearby = await createReport();
     const farAway = await createReport({

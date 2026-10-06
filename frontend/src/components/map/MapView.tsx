@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { divIcon } from 'leaflet';
 import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { createReport } from '../../api/reportsApi.js';
+import type { CreateReportInput, ViewportBounds } from '../../api/reportTypes.js';
 import { GeolocationError, requestUserLocation } from './geolocation.js';
 import { mapConfig } from './mapConfig.js';
-import type { ViewportBounds } from '../../api/reportTypes.js';
+import { ReportForm } from './ReportForm.js';
+import { ReportLocationPicker } from './ReportLocationPicker.js';
 import { ReportMarker } from './ReportMarker.js';
 import { reportTypeLabelsForMap } from './ReportMarkerPopup.js';
 import { useViewportReports } from './useViewportReports.js';
@@ -63,6 +66,18 @@ function LocationFocus({ location }: { location: UserLocation }) {
   return null;
 }
 
+function ReportFocus({ location }: { location: UserLocation | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (location) {
+      map.setView([location.latitude, location.longitude], Math.max(map.getZoom(), 16), {
+        animate: true,
+      });
+    }
+  }, [location, map]);
+  return null;
+}
+
 function getGeolocationProvider(): Geolocation | undefined {
   return typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
 }
@@ -87,7 +102,12 @@ export default function MapView() {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
-  const { reports, status: reportStatus, requestBounds, retry } = useViewportReports();
+  const [isPickingReportLocation, setIsPickingReportLocation] = useState(false);
+  const [isReportFormOpen, setIsReportFormOpen] = useState(false);
+  const [reportLocation, setReportLocation] = useState<UserLocation | null>(null);
+  const [reportFocusLocation, setReportFocusLocation] = useState<UserLocation | null>(null);
+  const [reportSuccess, setReportSuccess] = useState(false);
+  const { reports, status: reportStatus, requestBounds, retry, addReport } = useViewportReports();
   const handleViewportChange = useCallback(
     (bounds: ViewportBounds) => requestBounds(bounds),
     [requestBounds],
@@ -110,6 +130,40 @@ export default function MapView() {
     }
   }
 
+  function startReport() {
+    setReportSuccess(false);
+    setReportLocation(null);
+    setIsReportFormOpen(false);
+    setIsPickingReportLocation(true);
+  }
+
+  function selectReportLocation(location: UserLocation) {
+    setReportLocation(location);
+    setIsPickingReportLocation(false);
+    setIsReportFormOpen(true);
+  }
+
+  function cancelReport() {
+    setIsReportFormOpen(false);
+    setIsPickingReportLocation(false);
+    setReportLocation(null);
+  }
+
+  async function submitReport(input: CreateReportInput) {
+    const createdReport = await createReport(input);
+    addReport(createdReport);
+    const createdLocation = createdReport.location;
+    setReportFocusLocation(createdLocation);
+    setReportLocation(null);
+    setIsReportFormOpen(false);
+    setReportSuccess(true);
+    return createdReport;
+  }
+
+  function useCurrentReportLocation() {
+    if (userLocation) selectReportLocation(userLocation);
+  }
+
   const reportCount = reports.length;
   const statusMessage =
     reportStatus === 'loading'
@@ -123,7 +177,10 @@ export default function MapView() {
           : `${reportCount} ${reportCount === 1 ? 'reporte' : 'reportes'} en esta zona.`;
 
   return (
-    <section className="map-stage" aria-label="Mapa de calles de Buenos Aires">
+    <section
+      className={`map-stage${isPickingReportLocation ? ' map-stage--picking' : ''}`}
+      aria-label="Mapa de calles de Buenos Aires"
+    >
       <MapContainer
         center={mapConfig.center}
         zoom={mapConfig.zoom}
@@ -136,6 +193,12 @@ export default function MapView() {
       >
         <TileLayer url={mapConfig.tileUrl} attribution={mapConfig.tileAttribution} />
         <ViewportReports onViewportChange={handleViewportChange} />
+        <ReportFocus location={reportFocusLocation} />
+        <ReportLocationPicker
+          active={isPickingReportLocation}
+          location={reportLocation}
+          onSelect={selectReportLocation}
+        />
         {reports.map((report) => (
           <ReportMarker key={report.id} report={report} />
         ))}
@@ -162,6 +225,14 @@ export default function MapView() {
       </div>
       <div className="map-toolbar">
         <button
+          className="report-start-button"
+          type="button"
+          onClick={startReport}
+          disabled={isPickingReportLocation || isReportFormOpen}
+        >
+          + Reportar problema
+        </button>
+        <button
           className="locate-button"
           type="button"
           onClick={handleLocateMe}
@@ -179,6 +250,43 @@ export default function MapView() {
           </p>
         )}
       </div>
+      {isPickingReportLocation && (
+        <div className="report-pick-prompt" role="status">
+          <strong>Elegí la ubicación del problema</strong>
+          <span>Tocá el mapa para colocar el marcador.</span>
+          <div>
+            {userLocation && (
+              <button type="button" onClick={() => selectReportLocation(userLocation)}>
+                Usar mi ubicación
+              </button>
+            )}
+            <button type="button" onClick={cancelReport}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+      {reportSuccess && (
+        <div className="report-success" role="status">
+          <span>Reporte enviado. Gracias por ayudar a mejorar las calles.</span>
+          <button
+            type="button"
+            aria-label="Cerrar confirmación"
+            onClick={() => setReportSuccess(false)}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      {isReportFormOpen && reportLocation && (
+        <ReportForm
+          location={reportLocation}
+          currentLocation={userLocation}
+          onUseCurrentLocation={useCurrentReportLocation}
+          onCancel={cancelReport}
+          onSubmit={submitReport}
+        />
+      )}
       <div className="map-legend" aria-label="Tipos de reporte">
         {Object.entries(reportTypeLabelsForMap).map(([type, label]) => (
           <span className="map-legend__item" key={type}>

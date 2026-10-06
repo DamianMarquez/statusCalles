@@ -5,12 +5,13 @@ MVP para consultar y reportar problemas de circulación en calles de la Ciudad A
 ## Alcance actual
 
 - Mapa interactivo de CABA con Leaflet y OpenStreetMap, marcador de ubicación del usuario y reportes cargados desde la API según el viewport visible.
+- Creación de reportes desde el mapa con selección de ubicación, validación y envío a la API.
 - API Fastify con health check y endpoints REST para persistir y consultar reportes.
 - Reportes almacenados en PostgreSQL con `GEOGRAPHY(POINT, 4326)` y consultas de radio ejecutadas por PostGIS.
 - Migraciones versionadas con Drizzle Kit.
 - TypeScript estricto, ESLint, Prettier y tests de integración.
 
-No hay autenticación, creación de reportes desde el mapa ni moderación avanzada.
+No hay autenticación ni moderación avanzada.
 
 ## Requisitos
 
@@ -103,6 +104,8 @@ Las coordenadas se validan dentro de los rangos de latitud y longitud, la descri
 
 La API devuelve DTOs con `{ latitude, longitude }`, fechas ISO y enums públicos; no serializa filas o tipos internos de la base.
 
+Para crear un reporte, presionar **Reportar problema**, tocar el mapa para marcar la ubicación y completar tipo y severidad. La descripción es opcional (máximo 500 caracteres). La API valida tipo, severidad, coordenadas y longitud de descripción; si se omite, persiste una descripción vacía. Una creación correcta devuelve el DTO del reporte, que se agrega al mapa inmediatamente.
+
 ## Persistencia y decisión de ORM
 
 Se eligió **Drizzle ORM + Drizzle Kit** por sus tipos TypeScript y migraciones versionadas para PostgreSQL. Drizzle tiene soporte PostGIS para geometry; para conservar `GEOGRAPHY(POINT, 4326)`, el esquema declara un tipo custom y la migración contiene el SQL específico para crear la extensión y la columna. La creación y lectura geográfica usan las funciones PostGIS necesarias a través del SQL parametrizado de Drizzle.
@@ -131,7 +134,8 @@ Para detener PostgreSQL: `docker compose down`. Para borrar también sus datos: 
 
 ```text
 frontend/
-  src/components/map/     # Mapa, configuración, geolocalización y datos mock
+  src/api/                # Cliente HTTP y contratos públicos de reportes
+  src/components/map/     # Mapa, formulario, selector de ubicación y marcadores
 backend/
   drizzle/                # Migraciones SQL y snapshots de Drizzle Kit
   src/

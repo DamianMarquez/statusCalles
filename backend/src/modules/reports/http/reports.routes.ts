@@ -29,7 +29,7 @@ type ReportQuery = RadiusReportQuery | ViewportReportQuery;
 interface CreateReportBody {
   type: (typeof REPORT_TYPES)[number];
   severity: ReportSeverity;
-  description: string;
+  description?: string;
   latitude: number;
   longitude: number;
 }
@@ -106,12 +106,12 @@ export async function registerReportsRoutes(
       schema: {
         body: {
           type: 'object',
-          required: ['type', 'severity', 'description', 'latitude', 'longitude'],
+          required: ['type', 'severity', 'latitude', 'longitude'],
           additionalProperties: false,
           properties: {
             type: { type: 'string', enum: REPORT_TYPES },
             severity: { type: 'string', enum: severityNames },
-            description: { type: 'string', minLength: 1, maxLength: 500, pattern: '\\S' },
+            description: { type: 'string', maxLength: 500, pattern: '\\S' },
             latitude: { type: 'number', minimum: -90, maximum: 90 },
             longitude: { type: 'number', minimum: -180, maximum: 180 },
           },
@@ -122,7 +122,7 @@ export async function registerReportsRoutes(
       const report = await service.create({
         type: request.body.type,
         severity: request.body.severity,
-        description: request.body.description.trim(),
+        description: request.body.description?.trim() ?? '',
         location: {
           latitude: request.body.latitude,
           longitude: request.body.longitude,

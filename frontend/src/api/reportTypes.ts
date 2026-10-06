@@ -24,3 +24,11 @@ export interface ViewportBounds {
   west: number;
   east: number;
 }
+
+export interface CreateReportInput {
+  type: ReportType;
+  severity: ReportSeverity;
+  description?: string;
+  latitude: number;
+  longitude: number;
+}

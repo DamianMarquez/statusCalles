@@ -1,17 +1,13 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReportDto } from '../../api/reportTypes.js';
 import MapView from './MapView.js';
 
-const { getReportsInViewport } = vi.hoisted(() => ({ getReportsInViewport: vi.fn() }));
-
-vi.mock('../../api/reportsApi.js', () => ({ getReportsInViewport }));
-vi.mock('leaflet', () => ({
-  divIcon: (options: unknown) => options,
-}));
-vi.mock('react-leaflet', async () => {
-  const React = await vi.importActual<typeof import('react')>('react');
-  const map = {
+const mocks = vi.hoisted(() => ({
+  getReportsInViewport: vi.fn(),
+  createReport: vi.fn(),
+  mapEvents: {} as Record<string, (event: { latlng: { lat: number; lng: number } }) => void>,
+  map: {
     getBounds: () => ({
       getSouth: () => -34.7,
       getNorth: () => -34.5,
@@ -20,16 +16,37 @@ vi.mock('react-leaflet', async () => {
     }),
     getZoom: () => 13,
     setView: vi.fn(),
-  };
+  },
+}));
+
+vi.mock('../../api/reportsApi.js', () => ({
+  getReportsInViewport: mocks.getReportsInViewport,
+  createReport: mocks.createReport,
+}));
+vi.mock('leaflet', () => ({
+  divIcon: (options: unknown) => options,
+}));
+vi.mock('react-leaflet', async () => {
+  const React = await vi.importActual<typeof import('react')>('react');
   return {
     MapContainer: ({ children }: React.PropsWithChildren) =>
-      React.createElement('div', { 'data-testid': 'map' }, children),
+      React.createElement(
+        'div',
+        {
+          'data-testid': 'map',
+          onClick: () => mocks.mapEvents.click?.({ latlng: { lat: -34.6037, lng: -58.3816 } }),
+        },
+        children,
+      ),
     Marker: ({ children }: React.PropsWithChildren) =>
       React.createElement('div', { 'data-testid': 'marker' }, children),
     Popup: ({ children }: React.PropsWithChildren) => React.createElement('div', null, children),
     TileLayer: () => null,
-    useMap: () => map,
-    useMapEvents: () => map,
+    useMap: () => mocks.map,
+    useMapEvents: (handlers: typeof mocks.mapEvents) => {
+      Object.assign(mocks.mapEvents, handlers);
+      return mocks.map;
+    },
   };
 });
 
@@ -46,42 +63,97 @@ const report: ReportDto = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getReportsInViewport.mockResolvedValue([]);
+  mocks.mapEvents = {};
 });
 
 afterEach(() => cleanup());
 
-describe('MapView reports', () => {
-  it('loads reports for the map viewport and renders their marker popup', async () => {
-    getReportsInViewport.mockResolvedValue([report]);
+async function selectReportLocation() {
+  fireEvent.click(screen.getByRole('button', { name: '+ Reportar problema' }));
+  expect(screen.getByText('Elegí la ubicación del problema')).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId('map'));
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+}
 
+describe('MapView report creation', () => {
+  it('opens the form after choosing a location on the map', async () => {
     render(<MapView />);
+    await selectReportLocation();
 
-    expect(screen.getByText('Cargando reportes…')).toBeInTheDocument();
-    await waitFor(() =>
-      expect(getReportsInViewport).toHaveBeenCalledWith(
-        { south: -34.7, north: -34.5, west: -58.5, east: -58.3 },
-        expect.any(AbortSignal),
-      ),
-    );
-    expect(await screen.findByText('1 reporte en esta zona.')).toBeInTheDocument();
-    const marker = screen.getByTestId('marker');
-    expect(marker).toBeInTheDocument();
-    expect(within(marker).getByText('BACHE')).toBeInTheDocument();
-    expect(marker.querySelector('.report-popup__severity')).toHaveTextContent('🔴 Alta');
-    expect(within(marker).getByText('Bache grande sobre el carril derecho')).toBeInTheDocument();
-    expect(within(marker).getByText('Estado: Activo')).toBeInTheDocument();
-    expect(within(marker).getByText('Reportado: hace 12 minutos')).toBeInTheDocument();
+    expect(screen.getByText('-34.60370, -58.38160')).toBeInTheDocument();
+    expect(screen.getAllByText('Ubicación seleccionada')).toHaveLength(2);
   });
 
-  it('shows a friendly error while keeping the map available', async () => {
-    getReportsInViewport.mockRejectedValue(new Error('offline'));
-
+  it('validates required fields before sending', async () => {
     render(<MapView />);
+    await selectReportLocation();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'No pudimos actualizar los reportes.',
+    const form = screen.getByRole('dialog').querySelector('form');
+    expect(form).not.toBeNull();
+    fireEvent.submit(form!);
+
+    expect(mocks.createReport).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Tipo de problema')).toBeRequired();
+    expect(screen.getByLabelText('Severidad')).toBeRequired();
+  });
+
+  it('creates a report, immediately adds its marker, centers the map, and confirms success', async () => {
+    mocks.createReport.mockResolvedValue(report);
+    render(<MapView />);
+    await selectReportLocation();
+
+    fireEvent.change(screen.getByLabelText('Tipo de problema'), { target: { value: 'POTHOLE' } });
+    fireEvent.change(screen.getByLabelText('Severidad'), { target: { value: 'HIGH' } });
+    fireEvent.change(screen.getByLabelText(/Descripción/), {
+      target: { value: 'Bache grande sobre el carril derecho' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar reporte' }));
+
+    expect(
+      await screen.findByText('Reporte enviado. Gracias por ayudar a mejorar las calles.'),
+    ).toBeInTheDocument();
+    expect(mocks.createReport).toHaveBeenCalledWith({
+      type: 'POTHOLE',
+      severity: 'HIGH',
+      description: 'Bache grande sobre el carril derecho',
+      latitude: -34.6037,
+      longitude: -58.3816,
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    expect(await screen.findByText('1 reporte en esta zona.')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mocks.map.setView).toHaveBeenCalledWith([-34.6037, -58.3816], 16, { animate: true }),
     );
-    expect(screen.getByTestId('map')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+  });
+
+  it('shows a backend error and lets the user keep editing the report', async () => {
+    mocks.createReport.mockRejectedValue(
+      new Error('No pudimos enviar el reporte. Intentá de nuevo.'),
+    );
+    render(<MapView />);
+    await selectReportLocation();
+    fireEvent.change(screen.getByLabelText('Tipo de problema'), { target: { value: 'FLOOD' } });
+    fireEvent.change(screen.getByLabelText('Severidad'), { target: { value: 'MEDIUM' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar reporte' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos enviar el reporte.');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByLabelText('Tipo de problema')).toHaveValue(
+      'FLOOD',
+    );
+  });
+
+  it('shows a loading state while the report is being sent', async () => {
+    mocks.createReport.mockReturnValue(new Promise<ReportDto>(() => {}));
+    render(<MapView />);
+    await selectReportLocation();
+    fireEvent.change(screen.getByLabelText('Tipo de problema'), { target: { value: 'OTHER' } });
+    fireEvent.change(screen.getByLabelText('Severidad'), { target: { value: 'LOW' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar reporte' }));
+
+    expect(await screen.findByRole('button', { name: 'Enviando…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cerrar formulario' })).toBeDisabled();
   });
 });

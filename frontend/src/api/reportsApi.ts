@@ -1,5 +1,6 @@
 import type {
   ReportDto,
+  CreateReportInput,
   ReportSeverity,
   ReportStatus,
   ReportType,
@@ -78,6 +79,39 @@ export async function getReportsInViewport(
 
   if (!Array.isArray(result) || !result.every(isReportDto)) {
     throw new ReportsApiError('El servicio devolvió reportes con un formato inválido.');
+  }
+
+  return result;
+}
+
+export async function createReport(input: CreateReportInput): Promise<ReportDto> {
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}/api/reports`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  } catch {
+    throw new ReportsApiError('No se pudo conectar con el servicio de reportes.');
+  }
+
+  if (!response.ok) {
+    if (response.status === 400) {
+      throw new ReportsApiError('Revisá el tipo, la severidad y la ubicación del reporte.');
+    }
+    throw new ReportsApiError('No pudimos enviar el reporte. Intentá de nuevo.');
+  }
+
+  let result: unknown;
+  try {
+    result = await response.json();
+  } catch {
+    throw new ReportsApiError('El servicio devolvió una respuesta inválida.');
+  }
+
+  if (!isReportDto(result)) {
+    throw new ReportsApiError('El servicio devolvió un reporte con un formato inválido.');
   }
 
   return result;

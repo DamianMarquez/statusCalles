@@ -40,7 +40,7 @@ export function ReportMarkerPopup({ report }: { report: ReportDto }) {
       <span className={`report-popup__severity report-popup__severity--${report.severity}`}>
         <span aria-hidden="true">{severity.icon}</span> {severity.label}
       </span>
-      <p className="report-popup__description">{report.description}</p>
+      {report.description && <p className="report-popup__description">{report.description}</p>}
       <span className="report-popup__meta">
         Estado: {report.status === 'ACTIVE' ? 'Activo' : 'Resuelto'}
       </span>

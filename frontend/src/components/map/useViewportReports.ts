@@ -61,6 +61,11 @@ export function useViewportReports(debounceMs = 300) {
     if (latestBounds.current) requestBounds(latestBounds.current, true);
   }, [requestBounds]);
 
+  const addReport = useCallback((report: ReportDto) => {
+    setReports((current) => [report, ...current.filter((item) => item.id !== report.id)]);
+    setStatus('loaded');
+  }, []);
+
   useEffect(
     () => () => {
       requestId.current += 1;
@@ -70,5 +75,5 @@ export function useViewportReports(debounceMs = 300) {
     [],
   );
 
-  return { reports, status, requestBounds, retry };
+  return { reports, status, requestBounds, retry, addReport };
 }

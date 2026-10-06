@@ -15,6 +15,13 @@
       "when": 1791305858495,
       "tag": "0001_optimal_firebrand",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791314374426,
+      "tag": "0002_needy_queen_noir",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getReportsInViewport, ReportsApiError } from './reportsApi.js';
+import { createReport, getReportsInViewport, ReportsApiError } from './reportsApi.js';
 import type { ReportDto } from './reportTypes.js';
 
 const report: ReportDto = {
@@ -41,5 +41,38 @@ describe('getReportsInViewport', () => {
         new AbortController().signal,
       ),
     ).rejects.toBeInstanceOf(ReportsApiError);
+  });
+});
+
+describe('createReport', () => {
+  it('posts report details and returns the created API DTO', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => report });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      createReport({
+        type: 'POTHOLE',
+        severity: 'HIGH',
+        description: 'Bache grande sobre el carril derecho',
+        latitude: -34.6037,
+        longitude: -58.3816,
+      }),
+    ).resolves.toEqual(report);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/reports'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+      }),
+    );
+  });
+
+  it('exposes backend validation errors as a friendly message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400 }));
+
+    await expect(
+      createReport({ type: 'POTHOLE', severity: 'HIGH', latitude: 91, longitude: 0 }),
+    ).rejects.toThrow('Revisá el tipo, la severidad y la ubicación del reporte.');
   });
 });
