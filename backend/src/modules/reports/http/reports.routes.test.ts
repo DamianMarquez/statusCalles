@@ -77,6 +77,36 @@ describe('reports API with PostgreSQL/PostGIS', () => {
     expect(reports.map((report) => report.id)).not.toContain(farAway.id);
   });
 
+  it('returns reports inside the requested map viewport', async () => {
+    const visibleReport = await createReport();
+    const outsideReport = await createReport({
+      ...validReport,
+      description: 'Reporte fuera del viewport',
+      latitude: -34.7,
+      longitude: -58.3816,
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/reports?south=-34.61&north=-34.59&west=-58.39&east=-58.37',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const reports = response.json<ReportDto[]>();
+    expect(reports.map((report) => report.id)).toContain(visibleReport.id);
+    expect(reports.map((report) => report.id)).not.toContain(outsideReport.id);
+  });
+
+  it('rejects inverted viewport bounds', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/reports?south=-34.59&north=-34.61&west=-58.37&east=-58.39',
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ code: 'INVALID_BOUNDS' });
+  });
+
   it('returns 404 for an unknown report id', async () => {
     const response = await app.inject({
       method: 'GET',

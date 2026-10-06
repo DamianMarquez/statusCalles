@@ -3,6 +3,7 @@ import type { StreetStatusDatabase } from './database.js';
 import type {
   ReportRepository,
   NearbyReportsQuery,
+  ReportViewportQuery,
 } from '../../modules/reports/application/report-repository.js';
 import {
   SEVERITY_LEVELS,
@@ -85,6 +86,19 @@ export class DrizzleReportRepository implements ReportRepository {
         ST_SetSRID(ST_MakePoint(${query.longitude}, ${query.latitude}), 4326)::geography,
         ${query.radiusMeters}
       )
+      ORDER BY created_at DESC
+      LIMIT 200
+    `);
+    return result.rows.map(mapReport);
+  }
+
+  async findInViewport(query: ReportViewportQuery): Promise<StreetReport[]> {
+    const envelope = sql`ST_MakeEnvelope(${query.west}, ${query.south}, ${query.east}, ${query.north}, 4326)`;
+    const result = await this.database.execute<ReportRow>(sql`
+      SELECT ${reportProjection}
+      FROM street_reports
+      WHERE location && (${envelope})::geography
+        AND ST_Intersects(location::geometry, ${envelope})
       ORDER BY created_at DESC
       LIMIT 200
     `);

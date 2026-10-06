@@ -206,6 +206,43 @@ a {
   line-height: 1.45;
 }
 
+.report-status {
+  position: absolute;
+  z-index: 500;
+  top: 84px;
+  left: 18px;
+  display: flex;
+  max-width: min(340px, calc(100% - 36px));
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border: 1px solid #e3e9e4;
+  border-radius: 11px;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 4px 16px rgb(28 54 40 / 12%);
+  color: #52645a;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.report-status:has([role='alert']) {
+  border-color: #f1d3cc;
+  color: #8e3d2c;
+}
+
+.report-status__retry {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: #f5e8e4;
+  color: #8e3d2c;
+  cursor: pointer;
+  font:
+    600 11px 'DM Sans',
+    sans-serif;
+}
+
 .map-legend {
   position: absolute;
   z-index: 500;
@@ -236,7 +273,8 @@ a {
   border-radius: 50%;
 }
 
-.map-legend__dot--pothole {
+.map-legend__dot--pothole,
+.map-legend__dot--road-damage {
   background: #db704d;
 }
 .map-legend__dot--flooding {
@@ -244,6 +282,15 @@ a {
 }
 .map-legend__dot--construction {
   background: #d0a43c;
+}
+.map-legend__dot--road-blocked {
+  background: #ba4b48;
+}
+.map-legend__dot--traffic-light {
+  background: #8467b7;
+}
+.map-legend__dot--other {
+  background: #78877e;
 }
 
 .report-marker-wrapper,
@@ -272,6 +319,18 @@ a {
 }
 .report-marker--construction {
   background: #d0a43c;
+}
+.report-marker--road-damage {
+  background: #cb644d;
+}
+.report-marker--road-blocked {
+  background: #ba4b48;
+}
+.report-marker--traffic-light {
+  background: #8467b7;
+}
+.report-marker--other {
+  background: #78877e;
 }
 
 .user-marker {
@@ -302,30 +361,39 @@ a {
   line-height: 1.4;
 }
 
-.report-popup strong {
-  color: #192a25;
-  font-size: 14px;
+.report-popup__type {
+  color: #578569;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
 }
 
-.report-popup__type {
-  width: fit-content;
-  padding: 3px 7px;
-  border-radius: 999px;
-  font-size: 10px;
+.report-popup__severity {
+  color: #9b5144;
+  font-size: 13px;
   font-weight: 700;
 }
 
-.report-popup__type--pothole {
-  background: #fbece6;
-  color: #a94c30;
+.report-popup__severity--LOW {
+  color: #28764d;
 }
-.report-popup__type--flooding {
-  background: #e7f2fa;
-  color: #286f9f;
+.report-popup__severity--MEDIUM {
+  color: #8a701f;
 }
-.report-popup__type--construction {
-  background: #f8f1df;
-  color: #896817;
+.report-popup__severity--CRITICAL {
+  color: #9d2e36;
+}
+
+.report-popup__description {
+  margin: 2px 0;
+  color: #192a25;
+  font-size: 13px;
+}
+
+.report-popup__meta {
+  color: #66766d;
+  font-size: 11px;
 }
 
 @media (max-width: 540px) {
@@ -354,6 +422,12 @@ a {
   .map-toolbar {
     top: 12px;
     right: 12px;
+    max-width: calc(100% - 24px);
+  }
+
+  .report-status {
+    top: 72px;
+    left: 12px;
     max-width: calc(100% - 24px);
   }
 

@@ -4,13 +4,13 @@ MVP para consultar y reportar problemas de circulación en calles de la Ciudad A
 
 ## Alcance actual
 
-- Mapa interactivo de CABA con Leaflet y OpenStreetMap, marcador de ubicación del usuario y reportes mock de frontend.
+- Mapa interactivo de CABA con Leaflet y OpenStreetMap, marcador de ubicación del usuario y reportes cargados desde la API según el viewport visible.
 - API Fastify con health check y endpoints REST para persistir y consultar reportes.
 - Reportes almacenados en PostgreSQL con `GEOGRAPHY(POINT, 4326)` y consultas de radio ejecutadas por PostGIS.
 - Migraciones versionadas con Drizzle Kit.
 - TypeScript estricto, ESLint, Prettier y tests de integración.
 
-El mapa todavía muestra los marcadores mock; la conexión del frontend con `GET /api/reports` queda para una fase posterior. No hay autenticación, creación de reportes desde el mapa ni moderación avanzada.
+No hay autenticación, creación de reportes desde el mapa ni moderación avanzada.
 
 ## Requisitos
 
@@ -66,7 +66,7 @@ El mapa todavía muestra los marcadores mock; la conexión del frontend con `GET
    npm run dev:backend
    ```
 
-   La API escucha por defecto en `http://localhost:3000`. En otra terminal se puede iniciar el frontend:
+   La API escucha por defecto en `http://localhost:3000`. El backend habilita CORS para `http://localhost:5173` mediante `CORS_ORIGIN`. El frontend usa `VITE_API_URL` para elegir la URL base de la API; por defecto es `http://localhost:3000`. En otra terminal se puede iniciar el frontend:
 
    ```bash
    npm run dev:frontend
@@ -82,13 +82,14 @@ La aplicación usa los tiles estándar de OpenStreetMap y muestra su atribución
 
 La API está bajo `/api`. Los tipos admitidos son `POTHOLE`, `FLOOD`, `ROAD_DAMAGE`, `ROAD_BLOCKED`, `ROAD_WORK`, `TRAFFIC_LIGHT` y `OTHER`. Las severidades aceptan `LOW`, `MEDIUM`, `HIGH` y `CRITICAL`, almacenadas como los niveles numéricos 1 a 4. Los estados son `ACTIVE` y `RESOLVED`.
 
-| Método y ruta                                            | Uso                                     |
-| -------------------------------------------------------- | --------------------------------------- |
-| `GET /api/health`                                        | Health check                            |
-| `GET /api/reports?lat=-34.6037&lng=-58.3816&radius=1000` | Buscar en un radio, expresado en metros |
-| `POST /api/reports`                                      | Crear un reporte                        |
-| `GET /api/reports/:id`                                   | Consultar un reporte                    |
-| `PATCH /api/reports/:id/status`                          | Cambiar entre `ACTIVE` y `RESOLVED`     |
+| Método y ruta                                                    | Uso                                     |
+| ---------------------------------------------------------------- | --------------------------------------- |
+| `GET /api/health`                                                | Health check                            |
+| `GET /api/reports?south=-34.7&north=-34.5&west=-58.5&east=-58.3` | Buscar dentro del viewport visible      |
+| `GET /api/reports?lat=-34.6037&lng=-58.3816&radius=1000`         | Buscar en un radio, expresado en metros |
+| `POST /api/reports`                                              | Crear un reporte                        |
+| `GET /api/reports/:id`                                           | Consultar un reporte                    |
+| `PATCH /api/reports/:id/status`                                  | Cambiar entre `ACTIVE` y `RESOLVED`     |
 
 Ejemplo de creación:
 
@@ -98,7 +99,7 @@ curl -X POST http://localhost:3000/api/reports \
   -d '{"type":"POTHOLE","severity":"HIGH","description":"Bache grande","latitude":-34.6037,"longitude":-58.3816}'
 ```
 
-Las coordenadas se validan dentro de los rangos de latitud y longitud, la descripción se limita a 500 caracteres y los objetos rechazan propiedades adicionales. La búsqueda exige `lat`, `lng` y `radius`, limita el radio a 50 km y devuelve hasta 200 resultados. El filtro espacial usa `ST_DWithin` sobre la columna geography, que mide en metros y puede usar el índice GiST. Las consultas SQL se parametrizan mediante Drizzle.
+Las coordenadas se validan dentro de los rangos de latitud y longitud, la descripción se limita a 500 caracteres y los objetos rechazan propiedades adicionales. La búsqueda acepta un viewport geográfico (`south`, `north`, `west`, `east`) o un radio (`lat`, `lng`, `radius`, máximo 50 km); ambas devuelven hasta 200 resultados. El viewport se filtra con PostGIS contra su bounding box, y el radio usa `ST_DWithin` sobre geography. Las consultas SQL se parametrizan mediante Drizzle. El mapa solicita el viewport al abrirse y al terminar cada movimiento/zoom, con debounce de 300 ms, cancelación de solicitudes anteriores y protección frente a respuestas fuera de orden. Si falla la API, el mapa permanece visible con opción para reintentar; no se usa clustering en esta etapa.
 
 La API devuelve DTOs con `{ latitude, longitude }`, fechas ISO y enums públicos; no serializa filas o tipos internos de la base.
 

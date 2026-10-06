@@ -1,5 +1,9 @@
 import type { CreateStreetReport, ReportStatus, StreetReport } from '../domain/street-report.js';
-import type { NearbyReportsQuery, ReportRepository } from './report-repository.js';
+import type {
+  NearbyReportsQuery,
+  ReportRepository,
+  ReportViewportQuery,
+} from './report-repository.js';
 
 export class ReportService {
   constructor(private readonly repository: ReportRepository) {}
@@ -10,6 +14,10 @@ export class ReportService {
 
   findNearby(query: NearbyReportsQuery): Promise<StreetReport[]> {
     return this.repository.findNearby(query);
+  }
+
+  findInViewport(query: ReportViewportQuery): Promise<StreetReport[]> {
+    return this.repository.findInViewport(query);
   }
 
   findById(id: string): Promise<StreetReport | null> {

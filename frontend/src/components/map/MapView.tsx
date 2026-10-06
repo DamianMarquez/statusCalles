@@ -1,27 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { divIcon } from 'leaflet';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import { GeolocationError, requestUserLocation } from './geolocation.js';
 import { mapConfig } from './mapConfig.js';
-import { mockReports } from './mockReports.js';
-import type { MapReport, ReportCategory, UserLocation } from './types.js';
+import type { ViewportBounds } from '../../api/reportTypes.js';
+import { ReportMarker } from './ReportMarker.js';
+import { reportTypeLabelsForMap } from './ReportMarkerPopup.js';
+import { useViewportReports } from './useViewportReports.js';
+import type { UserLocation } from './types.js';
 import 'leaflet/dist/leaflet.css';
 
-const reportCategoryLabels: Record<ReportCategory, string> = {
-  pothole: 'Bache',
-  flooding: 'Inundación',
-  construction: 'Obra',
+const reportTypeClasses: Record<keyof typeof reportTypeLabelsForMap, string> = {
+  POTHOLE: 'pothole',
+  FLOOD: 'flooding',
+  ROAD_DAMAGE: 'road-damage',
+  ROAD_BLOCKED: 'road-blocked',
+  ROAD_WORK: 'construction',
+  TRAFFIC_LIGHT: 'traffic-light',
+  OTHER: 'other',
 };
-
-function reportIcon(category: ReportCategory) {
-  return divIcon({
-    className: 'report-marker-wrapper',
-    html: `<span class="report-marker report-marker--${category}" aria-hidden="true"></span>`,
-    iconSize: [32, 38],
-    iconAnchor: [16, 34],
-    popupAnchor: [0, -32],
-  });
-}
 
 const currentLocationIcon = divIcon({
   className: 'user-marker-wrapper',
@@ -29,6 +26,32 @@ const currentLocationIcon = divIcon({
   iconSize: [28, 28],
   iconAnchor: [14, 14],
 });
+
+function readViewportBounds(map: ReturnType<typeof useMap>): ViewportBounds {
+  const bounds = map.getBounds();
+  return {
+    south: bounds.getSouth(),
+    north: bounds.getNorth(),
+    west: bounds.getWest(),
+    east: bounds.getEast(),
+  };
+}
+
+function ViewportReports({
+  onViewportChange,
+}: {
+  onViewportChange: (bounds: ViewportBounds) => void;
+}) {
+  const map = useMapEvents({
+    moveend: () => onViewportChange(readViewportBounds(map)),
+  });
+
+  useEffect(() => {
+    onViewportChange(readViewportBounds(map));
+  }, [map, onViewportChange]);
+
+  return null;
+}
 
 function LocationFocus({ location }: { location: UserLocation }) {
   const map = useMap();
@@ -38,22 +61,6 @@ function LocationFocus({ location }: { location: UserLocation }) {
     });
   }, [location.latitude, location.longitude, map]);
   return null;
-}
-
-function ReportMarker({ report }: { report: MapReport }) {
-  return (
-    <Marker position={[report.position[0], report.position[1]]} icon={reportIcon(report.category)}>
-      <Popup>
-        <div className="report-popup">
-          <span className={`report-popup__type report-popup__type--${report.category}`}>
-            {reportCategoryLabels[report.category]}
-          </span>
-          <strong>{report.title}</strong>
-          <span>{report.description}</span>
-        </div>
-      </Popup>
-    </Marker>
-  );
 }
 
 function getGeolocationProvider(): Geolocation | undefined {
@@ -80,6 +87,11 @@ export default function MapView() {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const { reports, status: reportStatus, requestBounds, retry } = useViewportReports();
+  const handleViewportChange = useCallback(
+    (bounds: ViewportBounds) => requestBounds(bounds),
+    [requestBounds],
+  );
 
   async function handleLocateMe() {
     setLocationError(null);
@@ -98,6 +110,18 @@ export default function MapView() {
     }
   }
 
+  const reportCount = reports.length;
+  const statusMessage =
+    reportStatus === 'loading'
+      ? reportCount === 0
+        ? 'Cargando reportes…'
+        : 'Actualizando reportes…'
+      : reportStatus === 'error'
+        ? 'No pudimos actualizar los reportes.'
+        : reportStatus === 'empty'
+          ? 'No hay reportes en esta zona.'
+          : `${reportCount} ${reportCount === 1 ? 'reporte' : 'reportes'} en esta zona.`;
+
   return (
     <section className="map-stage" aria-label="Mapa de calles de Buenos Aires">
       <MapContainer
@@ -111,7 +135,8 @@ export default function MapView() {
         className="street-map"
       >
         <TileLayer url={mapConfig.tileUrl} attribution={mapConfig.tileAttribution} />
-        {mockReports.map((report) => (
+        <ViewportReports onViewportChange={handleViewportChange} />
+        {reports.map((report) => (
           <ReportMarker key={report.id} report={report} />
         ))}
         {userLocation && (
@@ -127,6 +152,14 @@ export default function MapView() {
           </>
         )}
       </MapContainer>
+      <div className="report-status" aria-live="polite">
+        <span role={reportStatus === 'error' ? 'alert' : 'status'}>{statusMessage}</span>
+        {reportStatus === 'error' && (
+          <button type="button" className="report-status__retry" onClick={retry}>
+            Reintentar
+          </button>
+        )}
+      </div>
       <div className="map-toolbar">
         <button
           className="locate-button"
@@ -147,10 +180,12 @@ export default function MapView() {
         )}
       </div>
       <div className="map-legend" aria-label="Tipos de reporte">
-        {(['pothole', 'flooding', 'construction'] as const).map((category) => (
-          <span className="map-legend__item" key={category}>
-            <span className={`map-legend__dot map-legend__dot--${category}`} />
-            {reportCategoryLabels[category]}
+        {Object.entries(reportTypeLabelsForMap).map(([type, label]) => (
+          <span className="map-legend__item" key={type}>
+            <span
+              className={`map-legend__dot map-legend__dot--${reportTypeClasses[type as keyof typeof reportTypeClasses]}`}
+            />
+            {label}
           </span>
         ))}
       </div>

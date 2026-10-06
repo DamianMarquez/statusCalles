@@ -11,11 +11,20 @@ import { toReportDto } from './report.dto.js';
 
 const severityNames = Object.keys(SEVERITY_LEVELS) as ReportSeverity[];
 
-interface ReportQuery {
+interface RadiusReportQuery {
   lat: number;
   lng: number;
   radius: number;
 }
+
+interface ViewportReportQuery {
+  south: number;
+  north: number;
+  west: number;
+  east: number;
+}
+
+type ReportQuery = RadiusReportQuery | ViewportReportQuery;
 
 interface CreateReportBody {
   type: (typeof REPORT_TYPES)[number];
@@ -48,22 +57,45 @@ export async function registerReportsRoutes(
       schema: {
         querystring: {
           type: 'object',
-          required: ['lat', 'lng', 'radius'],
-          additionalProperties: false,
-          properties: {
-            lat: { type: 'number', minimum: -90, maximum: 90 },
-            lng: { type: 'number', minimum: -180, maximum: 180 },
-            radius: { type: 'number', minimum: 1, maximum: 50000 },
-          },
+          oneOf: [
+            {
+              required: ['south', 'north', 'west', 'east'],
+              additionalProperties: false,
+              properties: {
+                south: { type: 'number', minimum: -90, maximum: 90 },
+                north: { type: 'number', minimum: -90, maximum: 90 },
+                west: { type: 'number', minimum: -180, maximum: 180 },
+                east: { type: 'number', minimum: -180, maximum: 180 },
+              },
+            },
+            {
+              required: ['lat', 'lng', 'radius'],
+              additionalProperties: false,
+              properties: {
+                lat: { type: 'number', minimum: -90, maximum: 90 },
+                lng: { type: 'number', minimum: -180, maximum: 180 },
+                radius: { type: 'number', minimum: 1, maximum: 50000 },
+              },
+            },
+          ],
         },
       },
     },
-    async (request) => {
-      const reports = await service.findNearby({
-        latitude: request.query.lat,
-        longitude: request.query.lng,
-        radiusMeters: request.query.radius,
-      });
+    async (request, reply) => {
+      let reports;
+      if ('south' in request.query) {
+        const { south, north, west, east } = request.query;
+        if (south >= north || west >= east) {
+          return reply.code(400).send({ code: 'INVALID_BOUNDS', message: 'Invalid map bounds.' });
+        }
+        reports = await service.findInViewport({ south, north, west, east });
+      } else {
+        reports = await service.findNearby({
+          latitude: request.query.lat,
+          longitude: request.query.lng,
+          radiusMeters: request.query.radius,
+        });
+      }
       return reports.map(toReportDto);
     },
   );

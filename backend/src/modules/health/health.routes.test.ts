@@ -7,6 +7,7 @@ const unusedReportRepository: ReportRepository = {
     throw new Error('Not used in this test.');
   },
   findNearby: async () => [],
+  findInViewport: async () => [],
   findById: async () => null,
   updateStatus: async () => null,
 };
