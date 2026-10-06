@@ -1,0 +1,2 @@
+ALTER TABLE "street_reports" DROP CONSTRAINT "street_reports_severity_range_check";--> statement-breakpoint
+ALTER TABLE "street_reports" ADD CONSTRAINT "street_reports_severity_range_check" CHECK ("street_reports"."severity" BETWEEN 1 AND 4);
