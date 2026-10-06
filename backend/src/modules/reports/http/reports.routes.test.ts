@@ -4,6 +4,7 @@ import { getDatabaseUrl } from '../../../infrastructure/database/config.js';
 import { DrizzleReportRepository } from '../../../infrastructure/database/report-repository.drizzle.js';
 import { DrizzleReportFeedbackRepository } from '../../../infrastructure/database/report-feedback-repository.drizzle.js';
 import { buildApp } from '../../../app/build-app.js';
+import { DrizzleStreetScoreRepository } from '../../../infrastructure/database/street-score-repository.drizzle.js';
 import type { ReportDto } from './report.dto.js';
 import type { ReportFeedbackType } from '../domain/report-feedback.js';
 
@@ -11,7 +12,10 @@ const { database, pool } = createDatabase(getDatabaseUrl());
 const app = buildApp(
   new DrizzleReportRepository(database),
   new DrizzleReportFeedbackRepository(database),
-  { logger: false },
+  {
+    logger: false,
+    streetScoreRepository: new DrizzleStreetScoreRepository(database),
+  },
 );
 const createdIds: string[] = [];
 
@@ -145,6 +149,51 @@ describe('reports API with PostgreSQL/PostGIS', () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json()).toMatchObject({ code: 'INVALID_BOUNDS' });
+  });
+
+  it('returns explained Street Score areas only where enough active reports exist', async () => {
+    const first = await createReport({ ...validReport, severity: 'CRITICAL' });
+    await createReport({ ...validReport, severity: 'HIGH' });
+    await submitFeedback(first.id, '50000000-0000-4000-8000-000000000001', 'CONFIRM');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/streets/score?south=-34.61&north=-34.59&west=-58.39&east=-58.37',
+    });
+
+    expect(response.statusCode).toBe(200);
+    const areas = response.json<
+      Array<{
+        score: number;
+        condition: string;
+        reasons: {
+          activeReports: number;
+          highSeverityReports: number;
+          confirmations: number;
+          latestReportAt: string;
+        };
+      }>
+    >();
+    expect(areas).toHaveLength(1);
+    expect(areas[0]).toMatchObject({
+      score: expect.any(Number),
+      condition: expect.any(String),
+      reasons: {
+        activeReports: expect.any(Number),
+        highSeverityReports: expect.any(Number),
+        confirmations: expect.any(Number),
+        latestReportAt: expect.any(String),
+      },
+    });
+    expect(areas[0]!.reasons.activeReports).toBeGreaterThanOrEqual(2);
+  });
+
+  it('rejects oversized Street Score areas', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/streets/score?south=-34&north=34&west=-58&east=-57',
+    });
+    expect(response.statusCode).toBe(400);
   });
 
   it('returns 404 for an unknown report id', async () => {

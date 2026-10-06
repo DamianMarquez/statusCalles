@@ -7,11 +7,14 @@ import type { ReportFeedbackRepository } from '../modules/reports/application/re
 import { ReportFeedbackService } from '../modules/reports/application/report-feedback-service.js';
 import { registerReportFeedbackRoutes } from '../modules/reports/http/report-feedback.routes.js';
 import { registerReportsRoutes } from '../modules/reports/http/reports.routes.js';
+import type { StreetScoreRepository } from '../modules/streets/application/street-score-repository.js';
+import { StreetScoreService } from '../modules/streets/application/street-score-service.js';
+import { registerStreetScoreRoutes } from '../modules/streets/http/street-score.routes.js';
 
 export function buildApp(
   reportRepository: ReportRepository,
   feedbackRepository: ReportFeedbackRepository,
-  options: { logger?: boolean } = {},
+  options: { logger?: boolean; streetScoreRepository?: StreetScoreRepository } = {},
 ): FastifyInstance {
   const app = Fastify({ logger: options.logger ?? true });
   const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
@@ -32,6 +35,12 @@ export function buildApp(
     feedbackService,
     reportService,
   });
+  if (options.streetScoreRepository) {
+    app.register(registerStreetScoreRoutes, {
+      prefix: '/api',
+      service: new StreetScoreService(options.streetScoreRepository),
+    });
+  }
 
   return app;
 }

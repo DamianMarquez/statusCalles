@@ -7,6 +7,7 @@ MVP para consultar y reportar problemas de circulación en calles de la Ciudad A
 - Mapa interactivo de CABA con Leaflet y OpenStreetMap, marcador de ubicación del usuario y reportes cargados desde la API según el viewport visible.
 - Creación de reportes desde el mapa con selección de ubicación, validación y envío a la API.
 - Confirmaciones comunitarias por reporte; cada sesión puede confirmar o indicar que ya no existe, y cambiar su voto.
+- Street Score estimado por áreas geográficas con reportes suficientes, visible como celdas explicables en el mapa.
 - API Fastify con health check y endpoints REST para persistir y consultar reportes.
 - Reportes almacenados en PostgreSQL con `GEOGRAPHY(POINT, 4326)` y consultas de radio ejecutadas por PostGIS.
 - Migraciones versionadas con Drizzle Kit.
@@ -111,6 +112,20 @@ Para crear un reporte, presionar **Reportar problema**, tocar el mapa para marca
 Cada reporte incluye `feedback.confirmations`, `feedback.resolvedReports` y `feedback.userFeedback`. Para votar, la aplicación envía `POST /api/reports/:id/feedback` con `{ "type": "CONFIRM" | "RESOLVED" }` y un encabezado `X-Voter-Id` UUID. El navegador conserva este identificador anónimo en `localStorage`; la base tiene una restricción única por reporte e identificador, por lo que repetir o cambiar el voto actualiza la misma fila. Este identificador no reemplaza autenticación y puede restablecerse o falsificarse; asociar el campo `voter_id` a un usuario autenticado y agregar rate limiting son evoluciones previstas.
 
 La política central `ReportFreshnessPolicy` calcula los campos `status` y `freshness` al responder la API. Un reporte o confirmación de hasta un día se muestra como `FRESH`; hasta 30 días, como `AGING`; después de 30 días sin confirmaciones recientes, como `STALE`. `RESOLVED` permanece resuelto. La confianza combina una señal de recencia con votos comunitarios ponderados por una vida media de 30 días; los votos viejos pierden peso progresivamente. Los umbrales están centralizados en el dominio. La frescura se deriva al leer: reportes y votos se conservan para el histórico.
+
+## Street Score
+
+`GET /api/streets/score?south=-34.7&north=-34.5&west=-58.5&east=-58.3` calcula estimaciones únicamente en el área solicitada (cada dimensión debe abarcar como máximo un grado). La búsqueda usa PostGIS y consulta hasta 5.000 reportes de ese viewport; no recorre todas las calles de CABA. Como todavía no existe un catálogo de segmentos viales, el resultado se agrupa en celdas geográficas aproximadas de 250 m. Solo se devuelve una celda cuando contiene al menos dos reportes actualmente activos; las demás no reciben un score ni se les asigna nombre de calle.
+
+La primera fórmula está implementada en `StreetScoreCalculator` y es determinista para un instante de evaluación dado:
+
+1. Por cada reporte activo, partir de una penalización según severidad: baja 8, media 16, alta 32 y crítica 50 puntos.
+2. Reducir la penalización por antigüedad con decaimiento exponencial y vida media de 30 días, usando como actividad más reciente una confirmación si existe.
+3. Multiplicar por `1 + 0.08 × confirmaciones ponderadas`, con máximo 1.4. Los votos pierden peso con la misma vida media de 30 días.
+4. Reducir el impacto por votos de resolución: multiplicador `max(0.25, 1 - 0.15 × resoluciones ponderadas)`.
+5. Reflejar concentración con `min(1.5, 1 + 0.1 × (reportes activos - 1))` y calcular `score = clamp(0, 100, redondear(100 - suma(penalizaciones) × concentración))`.
+
+El score se etiqueta como muy malo (0–34), malo (35–59), regular (60–79) o bueno (80–100). La respuesta incluye reportes activos, cantidad de alta severidad, confirmaciones, resoluciones y fecha del último reporte para que la estimación se pueda entender. Los reportes resueltos no reducen el score; sí aparecen como contexto histórico. La interfaz dibuja las celdas disponibles y aclara que son estimaciones, no calles identificadas. La fórmula es una primera aproximación y se puede ajustar cuando haya más datos reales o un modelo de segmentos.
 
 ## Persistencia y decisión de ORM
 

@@ -14,6 +14,7 @@ import { mapConfig } from './mapConfig.js';
 import { ReportForm } from './ReportForm.js';
 import { ReportLocationPicker } from './ReportLocationPicker.js';
 import { ReportMarker } from './ReportMarker.js';
+import { StreetScoreLayer } from './StreetScoreLayer.js';
 import { reportTypeLabelsForMap } from './ReportMarkerPopup.js';
 import { useViewportReports } from './useViewportReports.js';
 import type { UserLocation } from './types.js';
@@ -115,6 +116,7 @@ export default function MapView() {
   const [reportSuccess, setReportSuccess] = useState(false);
   const [votingReportIds, setVotingReportIds] = useState<Set<string>>(() => new Set());
   const [feedbackErrors, setFeedbackErrors] = useState<Record<string, string>>({});
+  const [scoreRefreshKey, setScoreRefreshKey] = useState(0);
   const {
     reports,
     status: reportStatus,
@@ -168,6 +170,7 @@ export default function MapView() {
   async function submitReport(input: CreateReportInput) {
     const createdReport = await createReport(input);
     addReport(createdReport);
+    setScoreRefreshKey((current) => current + 1);
     const createdLocation = createdReport.location;
     setReportFocusLocation(createdLocation);
     setReportLocation(null);
@@ -201,6 +204,7 @@ export default function MapView() {
     try {
       const updatedReport = await submitReportFeedback(reportId, type);
       replaceReport(updatedReport);
+      setScoreRefreshKey((current) => current + 1);
     } catch (error) {
       updateReportFeedback(reportId, previousFeedback);
       setFeedbackErrors((current) => ({
@@ -248,6 +252,7 @@ export default function MapView() {
       >
         <TileLayer url={mapConfig.tileUrl} attribution={mapConfig.tileAttribution} />
         <ViewportReports onViewportChange={handleViewportChange} />
+        <StreetScoreLayer refreshKey={scoreRefreshKey} />
         <ReportFocus location={reportFocusLocation} />
         <ReportLocationPicker
           active={isPickingReportLocation}

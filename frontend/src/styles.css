@@ -872,3 +872,35 @@ a {
     flex: 1;
   }
 }
+.street-score-status {
+  position: absolute;
+  z-index: 500;
+  right: 12px;
+  bottom: 12px;
+  max-width: min(360px, calc(100% - 24px));
+  padding: 9px 12px;
+  border: 1px solid #d5dfd8;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 94%);
+  color: #344b3c;
+  font-size: 0.8rem;
+  box-shadow: 0 3px 12px rgb(20 50 30 / 12%);
+}
+
+.street-score-popup {
+  display: grid;
+  gap: 6px;
+  min-width: 210px;
+  color: #26372c;
+}
+
+.street-score-popup small {
+  margin-top: 4px;
+  color: #5d6b61;
+  line-height: 1.4;
+}
+
+.street-score-status {
+  left: 12px;
+  right: auto;
+}
