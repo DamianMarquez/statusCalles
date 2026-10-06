@@ -4,13 +4,13 @@ MVP para consultar y, en próximas etapas, reportar el estado de las calles de l
 
 ## Alcance actual
 
-- Frontend React + TypeScript + Vite con una pantalla principal responsive y un espacio preparado para el mapa.
+- Frontend React + TypeScript + Vite con mapa interactivo de CABA usando Leaflet y tiles de OpenStreetMap.
 - Backend Node.js + TypeScript + Fastify, organizado como monolito modular.
 - `GET /api/health`, que devuelve `{ "status": "ok" }`.
 - PostgreSQL con PostGIS en Docker Compose.
 - Configuración de TypeScript estricto, ESLint, Prettier y tests básicos.
 
-El mapa real con Leaflet/OpenStreetMap y los módulos de reportes, calles y usuarios se incorporarán en fases posteriores. Las carpetas de esos módulos ya están preparadas para agregar su lógica sin acoplarla al framework o a la infraestructura.
+El mapa está centrado inicialmente en CABA, restringido a límites regionales razonables y muestra reportes de prueba. Los módulos de reportes, calles y usuarios están preparados para agregar su lógica en fases posteriores.
 
 ## Requisitos
 
@@ -57,7 +57,9 @@ El mapa real con Leaflet/OpenStreetMap y los módulos de reportes, calles y usua
    npm run dev:frontend
    ```
 
-   Vite informa la URL local, normalmente `http://localhost:5173`.
+Vite informa la URL local, normalmente `http://localhost:5173`.
+
+La aplicación usa los tiles estándar de OpenStreetMap y muestra su atribución visible en el mapa. El servicio público de tiles tiene capacidad limitada y disponibilidad best-effort; para producción o tráfico importante, revisar la [política de uso de tiles de OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/) y elegir un proveedor de tiles basado en OSM o alojar tiles propios según corresponda.
 
 También se puede iniciar únicamente el backend con `npm run dev` desde la raíz. La variable `VITE_API_URL` queda documentada para la futura conexión frontend/API.
 
@@ -81,7 +83,9 @@ Para detener la base: `docker compose down`. Para eliminar también los datos pe
 
 ```text
 frontend/
-  src/                 # Aplicación React y estilos
+  src/
+    components/map/    # MapView, configuración, tipos, geolocalización y datos mock
+    App.tsx             # Pantalla principal
 backend/
   src/
     app/               # Composición de la aplicación Fastify

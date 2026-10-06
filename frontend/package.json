@@ -10,10 +10,11 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.2.2",
+    "leaflet": "^1.9.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "leaflet": "^1.9.4"
+    "react-leaflet": "^5.0.0",
+    "vite": "^6.2.2"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
