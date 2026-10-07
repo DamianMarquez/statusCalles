@@ -15,15 +15,17 @@ function currentBounds(map: ReturnType<typeof useMap>): ViewportBounds {
 }
 
 const conditionLabels: Record<StreetScoreAreaDto['condition'], string> = {
-  VERY_POOR: 'Muy malo',
-  POOR: 'Malo',
+  IMPASSABLE: 'Intransitable',
+  VERY_BAD: 'Muy malo',
+  BAD: 'Malo',
   FAIR: 'Regular',
   GOOD: 'Bueno',
 };
 
 function scoreColor(score: number): string {
-  if (score < 35) return '#b42318';
-  if (score < 60) return '#e66b18';
+  if (score === 0) return '#7f1d1d';
+  if (score < 30) return '#b42318';
+  if (score < 55) return '#e66b18';
   if (score < 80) return '#d49a00';
   return '#17804a';
 }
@@ -104,11 +106,45 @@ export function StreetScoreLayer({ refreshKey }: { refreshKey: number }) {
               <span>
                 Estado estimado: {area.score}/100 — {conditionLabels[area.condition]}
               </span>
+              <span>
+                Confianza del cálculo:{' '}
+                {area.confidence === 'HIGH'
+                  ? 'alta'
+                  : area.confidence === 'MEDIUM'
+                    ? 'media'
+                    : 'baja'}
+              </span>
+              {(area.sourceStatus.officialIncidents === 'UNAVAILABLE' ||
+                area.sourceStatus.traffic === 'UNAVAILABLE') && (
+                <span>Las señales oficiales de cortes y tráfico no están disponibles.</span>
+              )}
               <span>{area.reasons.activeReports} reportes activos</span>
               <span>{area.reasons.highSeverityReports} de alta severidad</span>
               <span>{area.reasons.confirmations} confirmaciones</span>
               <span>{area.reasons.resolvedReports} resoluciones o votos de resolución</span>
               <span>Último reporte: {relativeReportDate(area.reasons.latestReportAt)}</span>
+              <details>
+                <summary>Por qué tiene este score</summary>
+                <ul>
+                  {area.factors.map((factor) => (
+                    <li key={factor.code}>
+                      <strong>
+                        {factor.label}: {factor.impact > 0 ? '+' : ''}
+                        {factor.impact}
+                      </strong>
+                      <span>{factor.detail}</span>
+                      <small>
+                        Fuente:{' '}
+                        {factor.source === 'COMMUNITY'
+                          ? 'comunidad'
+                          : factor.source === 'OFFICIAL'
+                            ? 'oficial'
+                            : 'sistema'}
+                      </small>
+                    </li>
+                  ))}
+                </ul>
+              </details>
               <small>
                 Estimación en una celda geográfica aproximada de 250 m; no representa una calle
                 identificada.

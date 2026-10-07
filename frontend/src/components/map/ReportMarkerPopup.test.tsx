@@ -1,11 +1,12 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReportDto } from '../../api/reportTypes.js';
-import { getStreetInfrastructure } from '../../api/streetsApi.js';
+import { getStreetInfrastructure, getStreetScore } from '../../api/streetsApi.js';
 import { ReportMarkerPopup } from './ReportMarkerPopup.js';
 
 vi.mock('../../api/streetsApi.js', () => ({
-  getStreetInfrastructure: vi.fn(),
+  getStreetInfrastructure: vi.fn().mockResolvedValue([]),
+  getStreetScore: vi.fn().mockResolvedValue(null),
 }));
 
 const report: ReportDto = {
@@ -128,5 +129,61 @@ describe('ReportMarkerPopup freshness', () => {
     );
     expect(await screen.findByText('Infraestructura · Fuente oficial')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Ciclovía · Av. Corrientes')).toBeInTheDocument());
+  });
+
+  it('shows an explainable street score and source labels when opening a report', async () => {
+    vi.mocked(getStreetScore).mockResolvedValueOnce({
+      id: 'street-1',
+      targetType: 'STREET',
+      officialName: 'Av. Corrientes',
+      score: 62,
+      level: 'FAIR',
+      confidence: 'MEDIUM',
+      sourceStatus: {
+        community: 'AVAILABLE',
+        officialIncidents: 'UNAVAILABLE',
+        traffic: 'UNAVAILABLE',
+      },
+      calculatedAt: '2026-10-06T12:00:00.000Z',
+      metrics: {
+        reports: 2,
+        activeReports: 2,
+        recentReports: 2,
+        highSeverityReports: 1,
+        confirmations: 12,
+        resolvedReports: 0,
+        officialIncidents: 0,
+        trafficLevel: null,
+        latestReportAt: null,
+      },
+      factors: [
+        {
+          code: 'REPORT_SEVERITY',
+          source: 'COMMUNITY',
+          label: 'Severidad de reportes activos',
+          impact: -13,
+          detail: 'Dos reportes recientes.',
+        },
+      ],
+    });
+    render(
+      <ReportMarkerPopup
+        {...defaultProps}
+        popupOpen
+        report={{
+          ...report,
+          street: {
+            id: 'street-1',
+            officialName: 'Av. Corrientes',
+            neighborhoodName: 'Almagro',
+            communeName: 'Comuna 5',
+          },
+        }}
+      />,
+    );
+    expect(await screen.findByText('Estado estimado de la calle')).toBeInTheDocument();
+    expect(screen.getByText(/62 \/ 100 · Regular/)).toBeInTheDocument();
+    expect(screen.getByText(/Severidad de reportes activos: -13/)).toBeInTheDocument();
+    expect(screen.getByText('Fuente: comunidad')).toBeInTheDocument();
   });
 });

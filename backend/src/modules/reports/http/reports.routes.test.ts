@@ -271,6 +271,33 @@ describe('reports API with PostgreSQL/PostGIS', () => {
       neighborhoodName: 'Nuñez',
       communeName: 'Comuna 13',
     });
+    const score = await app.inject({
+      method: 'GET',
+      url: `/api/streets/${report.street!.id}/score`,
+    });
+    const explanation = await app.inject({
+      method: 'GET',
+      url: `/api/streets/${report.street!.id}/score/explanation`,
+    });
+    expect(score.statusCode).toBe(200);
+    expect(score.json()).toMatchObject({
+      id: report.street!.id,
+      targetType: 'STREET',
+      officialName: 'CANTILO, INT.',
+      score: expect.any(Number),
+      level: expect.any(String),
+      confidence: expect.any(String),
+      factors: expect.arrayContaining([
+        expect.objectContaining({ source: 'SYSTEM', code: 'NEUTRAL_BASELINE' }),
+        expect.objectContaining({ source: 'COMMUNITY', code: 'REPORT_SEVERITY' }),
+      ]),
+      segments: expect.any(Array),
+    });
+    expect(explanation.json()).toMatchObject({
+      score: score.json().score,
+      factors: score.json().factors,
+      metrics: score.json().metrics,
+    });
   });
 
   it('keeps valid reports unassociated when there is no nearby official street', async () => {

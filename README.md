@@ -137,17 +137,40 @@ La política central `ReportFreshnessPolicy` calcula los campos `status` y `fres
 
 ## Street Score
 
-`GET /api/streets/score?south=-34.7&north=-34.5&west=-58.5&east=-58.3` calcula estimaciones únicamente en el área solicitada (cada dimensión debe abarcar como máximo un grado). La búsqueda usa PostGIS y consulta hasta 5.000 reportes de ese viewport; no recorre todas las calles de CABA. Como todavía no existe un catálogo de segmentos viales, el resultado se agrupa en celdas geográficas aproximadas de 250 m. Solo se devuelve una celda cuando contiene al menos dos reportes actualmente activos; las demás no reciben un score ni se les asigna nombre de calle.
+`GET /api/streets/score?south=-34.7&north=-34.5&west=-58.5&east=-58.3` calcula estimaciones dentro del viewport (cada dimensión abarca como máximo un grado), consulta hasta 5.000 reportes con PostGIS y conserva celdas aproximadas de 250 m para la capa general del mapa. `GET /api/streets/:id/score` y `/api/streets/:id/score/explanation` calculan bajo demanda el score de una calle a partir de los segmentos oficiales que tienen señales; ambos devuelven el mismo resultado con factores, métricas, confianza y disponibilidad de fuentes. No se persisten resultados ni se agrega Redis: el cálculo es pequeño, determinista para `calculatedAt` y se limita al viewport o calle solicitada.
 
-La primera fórmula está implementada en `StreetScoreCalculator` y es determinista para un instante de evaluación dado:
+La fórmula V2 está centralizada en `StreetScoreCalculator` y sus límites en `streetScoreConfig`:
 
-1. Por cada reporte activo, partir de una penalización según severidad: baja 8, media 16, alta 32 y crítica 50 puntos.
-2. Reducir la penalización por antigüedad con decaimiento exponencial y vida media de 30 días, usando como actividad más reciente una confirmación si existe.
-3. Multiplicar por `1 + 0.08 × confirmaciones ponderadas`, con máximo 1.4. Los votos pierden peso con la misma vida media de 30 días.
-4. Reducir el impacto por votos de resolución: multiplicador `max(0.25, 1 - 0.15 × resoluciones ponderadas)`.
-5. Reflejar concentración con `min(1.5, 1 + 0.1 × (reportes activos - 1))` y calcular `score = clamp(0, 100, redondear(100 - suma(penalizaciones) × concentración))`.
+1. El punto neutral es 75. Sin reportes ni otras señales, el resultado es `75 / 100`, nivel `FAIR`, confianza baja. Expresa falta de evidencia; no afirma que la calle esté perfecta.
+2. Cada reporte activo aporta una penalización por severidad: baja 5, media 10, alta 18 y crítica 30. Se divide en factores explicables de severidad (65%) y frescura (35%), ambos ponderados por `exp(-ln(2) × días / 30)`. Los reportes resueltos o vencidos no reducen el estado actual.
+3. Confirmaciones recientes restan hasta 6 puntos (`0,6 × confirmaciones ponderadas`), porque refuerzan la confianza en un problema activo. Votos de resolución recientes y reportes resueltos de cuentas distintas aportan crédito, limitado a 25 puntos: `min(25, 4 × reportes resueltos + 0,6 × votos de resolución ponderados)`.
+4. Para evitar manipulación, en cada segmento solo cuenta el reporte activo de mayor peso por cuenta. Reportes sin autor conocido comparten un único cupo por segmento. Se excluyen los reportes ocultos por moderación. El factor del sistema explica cuando aplicó el límite.
+5. Las señales oficiales que se conecten se suman por separado: corte activo −8, accidente −10, obra −3, evento/otro −2, con tope acumulado de −30; tráfico moderado −2 y alto −5, con decaimiento de 30 días. Hoy la API realtime de GCBA figura suspendida, por lo que estas señales se marcan como no disponibles y no se cuentan como cero cortes ni cero tráfico. La infraestructura de ciclovías/Metrobus no altera el score de condición vial.
+6. Si hubo evidencia histórica, no hay reporte activo y no hubo actividad por 30 días, se agrega +5. Sin reportes no se concede ese bono.
+7. Se suman factores a la base y se limita el resultado a 0–100. Los niveles son: `GOOD` 80–100, `FAIR` 55–79, `BAD` 30–54, `VERY_BAD` 1–29, `IMPASSABLE` 0.
 
-El score se etiqueta como muy malo (0–34), malo (35–59), regular (60–79) o bueno (80–100). La respuesta incluye reportes activos, cantidad de alta severidad, confirmaciones, resoluciones y fecha del último reporte para que la estimación se pueda entender. Los reportes resueltos no reducen el score; sí aparecen como contexto histórico. La interfaz dibuja las celdas disponibles y aclara que son estimaciones, no calles identificadas. La fórmula es una primera aproximación y se puede ajustar cuando haya más datos reales o un modelo de segmentos.
+Cada factor declara su origen `COMMUNITY`, `OFFICIAL` o `SYSTEM`, su impacto con signo y una explicación. En el score de calle se promedian los segmentos con evidencia; segmentos sin datos no diluyen la estimación. El resultado incluye conteos activos/recientes/resueltos, confirmaciones, último reporte, confianza y estado disponible/no disponible de incidentes y tráfico oficiales. La vista muestra el detalle “Por qué tiene este score” y advierte cuando faltan fuentes. Las pruebas pasan una fecha explícita; la fórmula no lee el reloj del sistema.
+
+## Analytics
+
+El dashboard público está disponible desde la navegación superior y agrega reportes visibles, sin nombres, emails, descripciones ni identificadores de usuarios. El selector temporal filtra métricas de reportes, barrios, comunas, tendencias y heatmap. Los rankings calculan el Street Score vigente con el mismo `StreetScoreCalculator`: la consulta selecciona las calles y segmentos con más reportes visibles y ordena esos candidatos por score. Para mantener acotado el trabajo, el ranking no afirma que revisó cada calle sin reportes. El score representa la evidencia actual completa y no cambia con el selector temporal.
+
+Endpoints públicos:
+
+- `GET /api/analytics/overview`: totales, activos recientes, resueltos, stale, media de resolución y porcentaje con confirmación.
+- `GET /api/analytics/reports`: distribución por tipo y severidad.
+- `GET /api/analytics/neighborhoods` y `/api/analytics/communes`: agregaciones espaciales sobre polígonos oficiales de CABA.
+- `GET /api/analytics/trends?bucket=week`: conteos por día, semana o mes.
+- `GET /api/analytics/streets` y `/api/analytics/segments`: ranking limitado a 20 scores actuales con evidencia.
+- `GET /api/analytics/heatmap?south=-34.72&north=-34.52&west=-58.54&east=-58.33`: conteos por celdas PostGIS, limitado a 2.500 celdas; no devuelve reportes individuales.
+- `GET /api/analytics/proximity?lat=-34.60&lng=-58.38&radius=500`: grupos agregados por tipo y severidad dentro de un radio máximo de 5 km.
+- `GET /api/analytics/official`: cantidad de infraestructura importada, estado de sincronización de fuentes y disponibilidad de tráfico realtime.
+
+Las rutas filtrables aceptan `from`, `to`, `type`, `severity`, `neighborhoodId` y `communeId`; las fechas deben ser ISO-8601 y el rango debe ser ascendente. Los reportes ocultos por moderación no aparecen en analytics públicas. La media de resolución usa `updated_at - created_at` para registros cuyo estado almacenado es `RESOLVED`, porque el modelo actual no conserva un timestamp separado de resolución. `stale` se deriva de la actividad comunitaria reciente, sin borrar ni modificar historia. Las señales de transporte en tiempo real siguen no disponibles; el dashboard muestra el estado conocido de las fuentes oficiales.
+
+Las rutas `/api/analytics/moderation/overview` requieren rol `MODERATOR` o `ADMIN`; `/api/analytics/admin/overview` requiere `ADMIN`. La primera agrega denuncias pendientes por motivo. La segunda expone conteos operativos y sincronizaciones, nunca información de cuentas individuales. Analytics aplica rate limit configurable con `RATE_LIMIT_ANALYTICS_MAX` y `RATE_LIMIT_ANALYTICS_WINDOW_SECONDS` (por defecto 60 solicitudes por minuto).
+
+Las queries limitan resultados en SQL, parametrizan filtros y usan PostGIS para bounding boxes, celdas, radio y asignación a barrios/comunas. Revisé `EXPLAIN (ANALYZE, BUFFERS)` en la base local: el cruce con barrios usa `neighborhoods_geometry_gix`; tendencias y heatmap usaron scan secuencial sobre el conjunto local de 24 reportes por su tamaño, con ejecuciones menores a 1 ms. Los índices existentes `street_reports_created_at_idx`, `street_reports_location_gix`, `neighborhoods_geometry_gix` y `communes_geometry_gix` cubren las consultas probadas; no agregué índices sin evidencia de necesidad.
 
 ## Geografía oficial de CABA
 

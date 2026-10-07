@@ -5,7 +5,7 @@ function positiveInteger(value: string | undefined, fallback: number): number {
 }
 
 export function endpointRateLimit(
-  name: 'REPORTS' | 'FEEDBACK' | 'FLAGS' | 'LOGIN' | 'REGISTER' | 'REPORT_STATUS',
+  name: 'REPORTS' | 'FEEDBACK' | 'FLAGS' | 'LOGIN' | 'REGISTER' | 'REPORT_STATUS' | 'ANALYTICS',
 ) {
   const defaults = {
     REPORTS: 20,
@@ -14,6 +14,7 @@ export function endpointRateLimit(
     LOGIN: 5,
     REGISTER: 5,
     REPORT_STATUS: 10,
+    ANALYTICS: 60,
   };
   return {
     max: positiveInteger(process.env[`RATE_LIMIT_${name}_MAX`], defaults[name]),

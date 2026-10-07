@@ -25,6 +25,9 @@ import { AuthService } from '../modules/users/application/auth-service.js';
 import { sessionCookieName } from '../modules/users/http/auth-context.js';
 import { registerAuthRoutes } from '../modules/users/http/auth.routes.js';
 import type { StreetStatusDatabase } from '../infrastructure/database/database.js';
+import type { AnalyticsRepository } from '../modules/analytics/application/analytics-repository.js';
+import { AnalyticsService } from '../modules/analytics/application/analytics-service.js';
+import { registerAnalyticsRoutes } from '../modules/analytics/http/analytics.routes.js';
 
 export function buildApp(
   reportRepository: ReportRepository,
@@ -36,6 +39,7 @@ export function buildApp(
     moderationDatabase?: StreetStatusDatabase;
     streetCatalogRepository?: StreetCatalogRepository;
     mobilityCatalogRepository?: MobilityCatalogRepository;
+    analyticsRepository?: AnalyticsRepository;
   } = {},
 ): FastifyInstance {
   const trustedProxies = (process.env.TRUST_PROXY ?? '')
@@ -85,10 +89,19 @@ export function buildApp(
       database: options.moderationDatabase,
     });
   }
-  if (options.streetScoreRepository) {
+  const streetScoreService = options.streetScoreRepository
+    ? new StreetScoreService(options.streetScoreRepository)
+    : undefined;
+  if (streetScoreService) {
     app.register(registerStreetScoreRoutes, {
       prefix: '/api',
-      service: new StreetScoreService(options.streetScoreRepository),
+      service: streetScoreService,
+    });
+  }
+  if (options.analyticsRepository) {
+    app.register(registerAnalyticsRoutes, {
+      prefix: '/api',
+      service: new AnalyticsService(options.analyticsRepository, streetScoreService),
     });
   }
   if (streetCatalog) {

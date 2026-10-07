@@ -7,6 +7,7 @@ import { buildApp } from './app/build-app.js';
 import { DrizzleAuthRepository } from './infrastructure/database/auth-repository.drizzle.js';
 import { DrizzleStreetCatalogRepository } from './infrastructure/database/street-catalog-repository.drizzle.js';
 import { DrizzleMobilityCatalogRepository } from './infrastructure/database/mobility-catalog-repository.drizzle.js';
+import { DrizzleAnalyticsRepository } from './infrastructure/database/analytics-repository.drizzle.js';
 
 const { database, pool } = createDatabase(getDatabaseUrl());
 const app = buildApp(
@@ -18,6 +19,7 @@ const app = buildApp(
     moderationDatabase: database,
     streetCatalogRepository: new DrizzleStreetCatalogRepository(database),
     mobilityCatalogRepository: new DrizzleMobilityCatalogRepository(database),
+    analyticsRepository: new DrizzleAnalyticsRepository(database),
   },
 );
 const host = process.env.BACKEND_HOST ?? '0.0.0.0';

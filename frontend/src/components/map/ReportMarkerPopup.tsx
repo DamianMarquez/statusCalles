@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import type { ReportDto, ReportFeedbackType } from '../../api/reportTypes.js';
 import {
   getStreetInfrastructure,
+  getStreetScore,
   type OfficialMobilityInfrastructure,
 } from '../../api/streetsApi.js';
+import type { StreetScoreResultDto } from '../../api/streetScoreTypes.js';
 
 const reportTypeLabels: Record<ReportDto['type'], string> = {
   POTHOLE: 'BACHE',
@@ -64,6 +66,7 @@ export function ReportMarkerPopup({
 }: ReportMarkerPopupProps) {
   const [infrastructure, setInfrastructure] = useState<OfficialMobilityInfrastructure[]>([]);
   const [infrastructureError, setInfrastructureError] = useState(false);
+  const [streetScore, setStreetScore] = useState<StreetScoreResultDto | null>(null);
   useEffect(() => {
     if (!popupOpen || !report.street?.id) return;
     const controller = new AbortController();
@@ -75,6 +78,11 @@ export function ReportMarkerPopup({
       .catch((error: unknown) => {
         if (!(error instanceof DOMException && error.name === 'AbortError'))
           setInfrastructureError(true);
+      });
+    void getStreetScore(report.street.id, controller.signal)
+      .then(setStreetScore)
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) setStreetScore(null);
       });
     return () => controller.abort();
   }, [popupOpen, report.street?.id]);
@@ -113,6 +121,75 @@ export function ReportMarkerPopup({
       )}
       {infrastructureError && (
         <span className="report-popup__meta">No se pudo consultar la infraestructura oficial.</span>
+      )}
+      {popupOpen && report.street && streetScore && (
+        <section className="report-popup__score" aria-label="Estado estimado de la calle">
+          <strong>Estado estimado de la calle</strong>
+          <span className="report-popup__score-value">
+            {streetScore.score} / 100 ·{' '}
+            {streetScore.level === 'GOOD'
+              ? 'Bueno'
+              : streetScore.level === 'FAIR'
+                ? 'Regular'
+                : streetScore.level === 'BAD'
+                  ? 'Malo'
+                  : streetScore.level === 'VERY_BAD'
+                    ? 'Muy malo'
+                    : 'Intransitable'}
+          </span>
+          <span>
+            {streetScore.metrics.activeReports} activos ({streetScore.metrics.recentReports}{' '}
+            recientes) · {streetScore.metrics.highSeverityReports} de alta severidad ·{' '}
+            {streetScore.metrics.confirmations} confirmaciones
+          </span>
+          {streetScore.metrics.officialIncidents > 0 && (
+            <span>{streetScore.metrics.officialIncidents} incidentes oficiales activos</span>
+          )}
+          {streetScore.metrics.trafficLevel && (
+            <span>Tráfico oficial: {streetScore.metrics.trafficLevel.toLowerCase()}</span>
+          )}
+          <span>
+            Confianza{' '}
+            {streetScore.confidence === 'HIGH'
+              ? 'alta'
+              : streetScore.confidence === 'MEDIUM'
+                ? 'media'
+                : 'baja'}
+          </span>
+          {(streetScore.sourceStatus.officialIncidents === 'UNAVAILABLE' ||
+            streetScore.sourceStatus.traffic === 'UNAVAILABLE') && (
+            <span>
+              Las señales oficiales de cortes y tráfico no están disponibles para este cálculo.
+            </span>
+          )}
+          <details>
+            <summary>Por qué tiene este score</summary>
+            <ul>
+              {streetScore.factors.map((factor) => (
+                <li key={factor.code}>
+                  <strong>
+                    {factor.label}: {factor.impact > 0 ? '+' : ''}
+                    {factor.impact}
+                  </strong>
+                  <span>{factor.detail}</span>
+                  <small>
+                    Fuente:{' '}
+                    {factor.source === 'COMMUNITY'
+                      ? 'comunidad'
+                      : factor.source === 'OFFICIAL'
+                        ? 'oficial'
+                        : 'sistema'}
+                  </small>
+                </li>
+              ))}
+            </ul>
+            {streetScore.segments && streetScore.segments.length > 0 && (
+              <small>
+                Promedio basado en {streetScore.segments.length} segmentos con datos disponibles.
+              </small>
+            )}
+          </details>
+        </section>
       )}
       <span
         className={`report-popup__freshness report-popup__freshness--${report.freshness.level}`}

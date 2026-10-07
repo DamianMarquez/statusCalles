@@ -5,6 +5,7 @@ import { StreetScoreCalculator, type StreetScoreInput } from './street-score-cal
 
 const calculator = new StreetScoreCalculator();
 const asOf = new Date('2026-10-06T12:00:00.000Z');
+let idSequence = 0;
 
 function input(
   severity: StreetReport['severity'],
@@ -17,12 +18,13 @@ function input(
     resolvedVotes?: number;
     weightedConfirmations?: number;
     weightedResolvedReports?: number;
+    actorId?: string | null;
   } = {},
 ): StreetScoreInput {
   const createdAt = new Date(asOf.getTime() - (options.ageDays ?? 0) * 86_400_000);
   return {
     report: {
-      id: `${severity}-${options.ageDays ?? 0}-${options.latitude ?? -34.6}-${options.longitude ?? -58.38}`,
+      id: `report-${++idSequence}`,
       type: 'POTHOLE',
       severity,
       description: '',
@@ -34,6 +36,7 @@ function input(
       createdAt,
       updatedAt: createdAt,
     },
+    actorId: options.actorId,
     feedback: {
       ...emptyReportFeedbackSummary,
       confirmations: options.confirmations ?? 0,
@@ -124,5 +127,167 @@ describe('StreetScoreCalculator', () => {
         asOf,
       ),
     ).toHaveLength(1);
+  });
+
+  it('returns a neutral score with low confidence and no data for an unreported segment', () => {
+    const result = calculator.calculateSegment({
+      targetId: 'segment-1',
+      reports: [],
+      calculatedAt: asOf,
+    });
+    expect(result).toMatchObject({ score: 75, level: 'FAIR', confidence: 'LOW' });
+    expect(result.factors[0]).toMatchObject({
+      source: 'SYSTEM',
+      impact: 75,
+      code: 'NEUTRAL_BASELINE',
+    });
+    expect(result.metrics.activeReports).toBe(0);
+    expect(result.sourceStatus).toEqual({
+      community: 'AVAILABLE',
+      officialIncidents: 'UNAVAILABLE',
+      traffic: 'UNAVAILABLE',
+    });
+  });
+
+  it('shows severity and recency as separate deterministic factors', () => {
+    const low = calculator.calculateSegment({
+      targetId: 'segment-low',
+      reports: [input('LOW')],
+      calculatedAt: asOf,
+    });
+    const critical = calculator.calculateSegment({
+      targetId: 'segment-critical',
+      reports: [input('CRITICAL')],
+      calculatedAt: asOf,
+    });
+    expect(critical.score).toBeLessThan(low.score);
+    expect(critical.factors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'REPORT_SEVERITY', source: 'COMMUNITY' }),
+        expect.objectContaining({ code: 'REPORT_FRESHNESS', source: 'COMMUNITY' }),
+      ]),
+    );
+  });
+
+  it('caps a person to one report contribution per segment', () => {
+    const one = calculator.calculateSegment({
+      targetId: 'segment-1',
+      reports: [input('CRITICAL', { actorId: 'same-user' })],
+      calculatedAt: asOf,
+    });
+    const many = calculator.calculateSegment({
+      targetId: 'segment-1',
+      reports: [
+        input('CRITICAL', { actorId: 'same-user' }),
+        input('CRITICAL', { actorId: 'same-user' }),
+        input('HIGH', { actorId: 'same-user' }),
+      ],
+      calculatedAt: asOf,
+    });
+    expect(many.score).toBe(one.score);
+    expect(many.factors).toContainEqual(
+      expect.objectContaining({ code: 'REPORTER_CONTRIBUTION_CAP', source: 'SYSTEM', impact: 0 }),
+    );
+  });
+
+  it('factors an active official road cut and high traffic separately from community signals', () => {
+    const community = calculator.calculateSegment({
+      targetId: 'segment-1',
+      reports: [],
+      calculatedAt: asOf,
+    });
+    const official = calculator.calculateSegment({
+      targetId: 'segment-1',
+      reports: [],
+      calculatedAt: asOf,
+      officialIncidents: [{ id: 'cut-1', type: 'TRAFFIC_CUT', active: true }],
+      traffic: { level: 'HIGH', measuredAt: asOf },
+    });
+    expect(official.score).toBeLessThan(community.score);
+    expect(official.factors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'OFFICIAL_INCIDENTS', source: 'OFFICIAL', impact: -8 }),
+        expect.objectContaining({ code: 'OFFICIAL_TRAFFIC', source: 'OFFICIAL', impact: -5 }),
+      ]),
+    );
+    expect(official.confidence).toBe('MEDIUM');
+    expect(official.sourceStatus).toEqual({
+      community: 'AVAILABLE',
+      officialIncidents: 'AVAILABLE',
+      traffic: 'AVAILABLE',
+    });
+  });
+
+  it('rewards a month without active reports only when historical evidence exists', () => {
+    const noData = calculator.calculateSegment({
+      targetId: 'empty',
+      reports: [],
+      calculatedAt: asOf,
+    });
+    const history = calculator.calculateSegment({
+      targetId: 'old',
+      reports: [input('CRITICAL', { ageDays: 40, status: 'STALE' })],
+      calculatedAt: asOf,
+    });
+    expect(noData.score).toBe(75);
+    expect(history.score).toBe(80);
+    expect(history.factors).toContainEqual(
+      expect.objectContaining({ code: 'NO_RECENT_REPORTS', impact: 5 }),
+    );
+  });
+
+  it('clamps extreme incident/report combinations to the score boundaries', () => {
+    const worst = calculator.calculateSegment({
+      targetId: 'worst',
+      reports: Array.from({ length: 12 }, (_, index) =>
+        input('CRITICAL', { actorId: `user-${index}` }),
+      ),
+      officialIncidents: Array.from({ length: 20 }, (_, index) => ({
+        id: `incident-${index}`,
+        type: 'ACCIDENT' as const,
+        active: true,
+      })),
+      calculatedAt: asOf,
+    });
+    const best = calculator.calculateSegment({
+      targetId: 'best',
+      reports: Array.from({ length: 8 }, (_, index) =>
+        input('LOW', {
+          status: 'RESOLVED',
+          resolvedVotes: 30,
+          weightedResolvedReports: 30,
+          actorId: `resolver-${index}`,
+        }),
+      ),
+      calculatedAt: asOf,
+    });
+    expect(worst.score).toBe(0);
+    expect(worst.level).toBe('IMPASSABLE');
+    expect(best.score).toBe(100);
+    expect(best.level).toBe('GOOD');
+  });
+
+  it('aggregates only segments with evidence and keeps segment explanations', () => {
+    const street = calculator.calculateStreet({
+      targetId: 'street-1',
+      officialName: 'Avenida Ejemplo',
+      calculatedAt: asOf,
+      segments: [
+        { id: 'segment-a', reports: [input('HIGH')] },
+        { id: 'segment-b', reports: [] },
+      ],
+    });
+    expect(street.targetType).toBe('STREET');
+    expect(street.segments).toHaveLength(1);
+    expect(street.score).toBe(street.segments![0]!.score);
+  });
+
+  it('repeats the same result for the same input and evaluation time', () => {
+    const reports = [input('HIGH'), input('MEDIUM', { longitude: -58.379 })];
+    expect(
+      calculator.calculateSegment({ targetId: 'deterministic', reports, calculatedAt: asOf }),
+    ).toEqual(
+      calculator.calculateSegment({ targetId: 'deterministic', reports, calculatedAt: asOf }),
+    );
   });
 });
