@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createReport: vi.fn(),
   submitReportFeedback: vi.fn(),
   calculateRoute: vi.fn(),
+  searchAddresses: vi.fn(),
   mapEvents: {} as Record<string, (event: { latlng: { lat: number; lng: number } }) => void>,
   map: {
     getBounds: () => ({
@@ -29,6 +30,7 @@ vi.mock('../../api/reportsApi.js', () => ({
   submitReportFeedback: mocks.submitReportFeedback,
 }));
 vi.mock('../../api/routingApi.js', () => ({ calculateRoute: mocks.calculateRoute }));
+vi.mock('../../api/addressesApi.js', () => ({ searchAddresses: mocks.searchAddresses }));
 vi.mock('leaflet', () => ({
   divIcon: (options: unknown) => options,
 }));
@@ -80,6 +82,26 @@ const report: ReportDto = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getReportsInViewport.mockResolvedValue({ items: [], hasMore: false });
+  mocks.searchAddresses.mockImplementation(async (query: string) => [
+    {
+      id: query.toLowerCase().includes('corrientes') ? 'origin' : 'destination',
+      type: 'STREET_NUMBER',
+      displayName: query.toLowerCase().includes('corrientes')
+        ? 'Av. Corrientes 1234, CABA'
+        : 'Av. Santa Fe 1500, CABA',
+      street: query.toLowerCase().includes('corrientes') ? 'Av. Corrientes' : 'Av. Santa Fe',
+      streetCode: '3174',
+      streetNumber: 1234,
+      intersectionStreet: null,
+      intersectionStreetCode: null,
+      latitude: query.toLowerCase().includes('corrientes') ? -34.6037 : -34.5895,
+      longitude: query.toLowerCase().includes('corrientes') ? -58.3816 : -58.3974,
+      neighborhood: 'CABA',
+      commune: 'CABA',
+      confidence: null,
+      source: 'USIG',
+    },
+  ]);
   mocks.mapEvents = {};
 });
 
@@ -263,12 +285,14 @@ describe('MapView report creation', () => {
     });
     render(<MapView />);
     fireEvent.click(screen.getByRole('button', { name: /Cómo llegar/ }));
-    fireEvent.change(screen.getByLabelText('Desde'), {
-      target: { value: '-34.6037, -58.3816' },
+    fireEvent.change(screen.getByRole('combobox', { name: 'Desde' }), {
+      target: { value: 'Corrientes 1234' },
     });
-    fireEvent.change(screen.getByLabelText('Hasta'), {
-      target: { value: '-34.5895, -58.3974' },
+    fireEvent.click(await screen.findByRole('option', { name: /Av. Corrientes 1234/ }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Hasta' }), {
+      target: { value: 'Santa Fe 1500' },
     });
+    fireEvent.click(await screen.findByRole('option', { name: /Av. Santa Fe 1500/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Calcular ruta' }));
 
     expect(await screen.findByTestId('route-line')).toBeInTheDocument();

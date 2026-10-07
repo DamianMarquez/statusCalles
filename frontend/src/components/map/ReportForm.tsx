@@ -7,11 +7,14 @@ import type {
 } from '../../api/reportTypes.js';
 import { REPORT_SEVERITY_OPTIONS, REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
 import type { UserLocation } from './types.js';
+import { AddressSearchInput } from './AddressSearchInput.js';
+import type { AddressSearchResult } from '../../api/addressesApi.js';
 
 interface ReportFormProps {
   location: UserLocation;
   currentLocation: UserLocation | null;
   onUseCurrentLocation: () => void;
+  onSelectAddress: (address: AddressSearchResult) => void;
   onCancel: () => void;
   onSubmit: (input: CreateReportInput, allowSimilar?: boolean) => Promise<ReportDto>;
 }
@@ -20,6 +23,7 @@ export function ReportForm({
   location,
   currentLocation,
   onUseCurrentLocation,
+  onSelectAddress,
   onCancel,
   onSubmit,
 }: ReportFormProps) {
@@ -29,6 +33,7 @@ export function ReportForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [similarFound, setSimilarFound] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<AddressSearchResult | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -136,7 +141,8 @@ export function ReportForm({
             <div>
               <span className="report-form__location-label">Ubicación seleccionada</span>
               <strong>
-                {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+                {selectedAddress?.displayName ??
+                  `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`}
               </strong>
             </div>
             {currentLocation && (
@@ -145,6 +151,16 @@ export function ReportForm({
               </button>
             )}
           </div>
+
+          <AddressSearchInput
+            label="Buscar dirección para ubicar el reporte"
+            value={selectedAddress}
+            onSelect={(address) => {
+              setSelectedAddress(address);
+              onSelectAddress(address);
+            }}
+            onClear={() => setSelectedAddress(null)}
+          />
 
           {error && (
             <p className="report-form__error" role="alert">

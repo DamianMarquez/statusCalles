@@ -13,7 +13,8 @@ export function endpointRateLimit(
     | 'REGISTER'
     | 'REPORT_STATUS'
     | 'ANALYTICS'
-    | 'ROUTING',
+    | 'ROUTING'
+    | 'ADDRESS_SEARCH',
 ) {
   const defaults = {
     REPORTS: 20,
@@ -24,6 +25,7 @@ export function endpointRateLimit(
     REPORT_STATUS: 10,
     ANALYTICS: 60,
     ROUTING: 20,
+    ADDRESS_SEARCH: 30,
   };
   return {
     max: positiveInteger(process.env[`RATE_LIMIT_${name}_MAX`], defaults[name]),

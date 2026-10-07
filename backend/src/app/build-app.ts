@@ -32,6 +32,9 @@ import type { RoutingProvider } from '../modules/routing/application/routing-pro
 import type { RoutingRepository } from '../modules/routing/application/routing-repository.js';
 import { RoutingService } from '../modules/routing/application/routing-service.js';
 import { registerRoutingRoutes } from '../modules/routing/http/routing.routes.js';
+import type { AddressSearchProvider } from '../modules/addresses/domain/address-search.js';
+import { AddressSearchService } from '../modules/addresses/application/address-search-service.js';
+import { registerAddressSearchRoutes } from '../modules/addresses/http/address-search.routes.js';
 
 export function buildApp(
   reportRepository: ReportRepository,
@@ -46,6 +49,7 @@ export function buildApp(
     analyticsRepository?: AnalyticsRepository;
     routingProvider?: RoutingProvider;
     routingRepository?: RoutingRepository;
+    addressSearchProvider?: AddressSearchProvider;
   } = {},
 ): FastifyInstance {
   const trustedProxies = (process.env.TRUST_PROXY ?? '')
@@ -65,6 +69,12 @@ export function buildApp(
   app.register(rateLimit, { global: false });
   app.decorateRequest('authUser', null);
   app.register(registerHealthRoutes, { prefix: '/api' });
+  if (options.addressSearchProvider) {
+    app.register(registerAddressSearchRoutes, {
+      prefix: '/api',
+      service: new AddressSearchService(options.addressSearchProvider),
+    });
+  }
   const streetCatalog = options.streetCatalogRepository
     ? new StreetCatalogService(options.streetCatalogRepository)
     : undefined;

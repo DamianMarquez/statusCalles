@@ -10,6 +10,7 @@ import { DrizzleMobilityCatalogRepository } from './infrastructure/database/mobi
 import { DrizzleAnalyticsRepository } from './infrastructure/database/analytics-repository.drizzle.js';
 import { DrizzleRoutingRepository } from './infrastructure/database/routing-repository.drizzle.js';
 import { OsrmRoutingProvider } from './infrastructure/routing/osrm-routing-provider.js';
+import { UsigAddressSearchProvider } from './infrastructure/external/usig/usig-address-search.provider.js';
 
 const { database, pool } = createDatabase(getDatabaseUrl());
 const app = buildApp(
@@ -24,6 +25,7 @@ const app = buildApp(
     analyticsRepository: new DrizzleAnalyticsRepository(database),
     routingProvider: new OsrmRoutingProvider(),
     routingRepository: new DrizzleRoutingRepository(database),
+    addressSearchProvider: new UsigAddressSearchProvider(),
   },
 );
 const host = process.env.BACKEND_HOST ?? '0.0.0.0';

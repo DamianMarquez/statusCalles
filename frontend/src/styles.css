@@ -266,6 +266,166 @@ a {
   gap: 12px;
 }
 
+.route-planner__location-field {
+  display: grid;
+  gap: 5px;
+}
+
+.route-planner__swap {
+  justify-self: end;
+  width: 34px;
+  height: 34px;
+  margin: -7px 8px;
+  border: 1px solid #dce5de;
+  border-radius: 50%;
+  background: #fff;
+  color: #176d4b;
+  font-size: 19px;
+  cursor: pointer;
+}
+
+.route-planner__use-location {
+  justify-self: start;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: #176d4b;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.address-search {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.address-search__label {
+  color: #53645a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.address-search__control {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid #dce5de;
+  border-radius: 9px;
+  background: #fff;
+  color: #47705a;
+}
+
+.address-search__control input {
+  min-width: 0;
+  min-height: 40px;
+  flex: 1;
+  padding: 7px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #26392d;
+  font: inherit;
+  font-size: 13px;
+}
+
+.address-search__control > span {
+  font-size: 19px;
+}
+
+.address-search__control > button {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: #eff4ef;
+  color: #53645a;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.address-search__status {
+  color: #6c7b71;
+  font-size: 11px;
+}
+
+.address-search__results {
+  position: absolute;
+  z-index: 1200;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  display: grid;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid #dce5de;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(27 48 34 / 18%);
+}
+
+.address-search__results > button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px;
+  border: 0;
+  border-bottom: 1px solid #edf1ed;
+  background: #fff;
+  color: #26392d;
+  text-align: left;
+  cursor: pointer;
+}
+
+.address-search__results > button:hover,
+.address-search__results > button:focus-visible {
+  background: #f2f7f2;
+}
+
+.address-search__results > button > span:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.address-search__results strong {
+  font-size: 12px;
+}
+
+.address-search__results small,
+.address-search__results > p {
+  color: #6c7b71;
+  font-size: 11px;
+}
+
+.address-search__results > p {
+  margin: 0;
+  padding: 12px;
+}
+
+.address-marker-wrapper {
+  border: 0;
+  background: transparent;
+}
+
+.address-marker {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  background: #286eb0;
+  box-shadow: 0 2px 9px rgb(0 0 0 / 30%);
+  color: white;
+  font-size: 19px;
+  transform: rotate(-45deg);
+}
+
 .route-planner form label {
   display: grid;
   gap: 5px;
