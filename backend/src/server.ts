@@ -9,10 +9,11 @@ import { DrizzleStreetCatalogRepository } from './infrastructure/database/street
 import { DrizzleMobilityCatalogRepository } from './infrastructure/database/mobility-catalog-repository.drizzle.js';
 import { DrizzleAnalyticsRepository } from './infrastructure/database/analytics-repository.drizzle.js';
 import { DrizzleRoutingRepository } from './infrastructure/database/routing-repository.drizzle.js';
-import { OsrmRoutingProvider } from './infrastructure/routing/osrm-routing-provider.js';
+import { createOsrmRoutingProvider } from './infrastructure/routing/osrm-routing-provider.js';
 import { UsigAddressSearchProvider } from './infrastructure/external/usig/usig-address-search.provider.js';
 
 const { database, pool } = createDatabase(getDatabaseUrl());
+const routingProvider = await createOsrmRoutingProvider();
 const app = buildApp(
   new DrizzleReportRepository(database),
   new DrizzleReportFeedbackRepository(database),
@@ -23,14 +24,14 @@ const app = buildApp(
     streetCatalogRepository: new DrizzleStreetCatalogRepository(database),
     mobilityCatalogRepository: new DrizzleMobilityCatalogRepository(database),
     analyticsRepository: new DrizzleAnalyticsRepository(database),
-    routingProvider: new OsrmRoutingProvider(),
+    routingProvider,
     routingRepository: new DrizzleRoutingRepository(database),
     addressSearchProvider: new UsigAddressSearchProvider(),
     checkDatabase: () => pool.query('SELECT 1'),
   },
 );
 const host = process.env.BACKEND_HOST ?? '0.0.0.0';
-const port = Number(process.env.BACKEND_PORT ?? 3000);
+const port = Number(process.env.PORT ?? process.env.BACKEND_PORT ?? 3000);
 
 app.addHook('onClose', async () => {
   await pool.end();

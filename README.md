@@ -90,9 +90,9 @@ La API está bajo `/api`. Los tipos admitidos son `POTHOLE`, `FLOOD`, `ROAD_DAMA
 
 | Método y ruta                                                    | Uso                                          |
 | ---------------------------------------------------------------- | -------------------------------------------- |
-| `GET /api/health`                                                | Compatibilidad: liveness                    |
-| `GET /api/health/live`                                           | Proceso Fastify activo                      |
-| `GET /api/health/ready`                                          | Verifica conexión a PostgreSQL              |
+| `GET /api/health`                                                | Compatibilidad: liveness                     |
+| `GET /api/health/live`                                           | Proceso Fastify activo                       |
+| `GET /api/health/ready`                                          | Verifica conexión a PostgreSQL               |
 | `GET /api/reports?south=-34.7&north=-34.5&west=-58.5&east=-58.3` | Buscar dentro del viewport visible           |
 | `GET /api/users/me/reports`                                      | Reportes del usuario de la sesión actual     |
 | `GET /api/reports?lat=-34.6037&lng=-58.3816&radius=1000`         | Buscar en un radio, expresado en metros      |
@@ -194,7 +194,7 @@ La interfaz **Cómo llegar** permite buscar calle + altura e intersecciones con 
 
 El dominio de routing sigue recibiendo coordenadas: `RoutePlanner` transforma el resultado de dirección en `latitude`/`longitude` al invocar `calculateRoute`, y el backend y `RoutingProvider` permanecen sin dependencia de USIG. El backend sigue verificando que los puntos queden dentro de las comunas oficiales cargadas. `USIG_ADDRESS_SEARCH_URL` permite cambiar el endpoint sin modificar frontend. No hay fallback automático ni reverse geocoding todavía. La integración usa la documentación vigente de [USIG Normalizador de Direcciones](https://servicios.usig.buenosaires.gob.ar/normalizar) y el [catálogo oficial de APIs de Buenos Aires](https://datosabiertos-apis.buenosaires.gob.ar/BA_Root/Documentacion?schema_name=usig_geocoder).
 
-`RoutingProvider` es el contrato de aplicación y `OsrmRoutingProvider` adapta OSRM, sin exponer sus respuestas o códigos al dominio. Se eligió OSRM porque resuelve rutas en la red OSM existente y devuelve geometría/duración, y puede entregar alternativas para comparar; la integración queda acotada a un endpoint configurable. Valhalla también es una opción OSM válida y ofrece más controles de costo y modos, pero esos controles no se necesitan para este primer flujo. No se llama al servidor público de demostración: `OSRM_BASE_URL` apunta a una instancia local propia o administrada que acepte el perfil `driving` de CABA. El valor local es `http://localhost:5001`, para evitar el conflicto habitual del puerto 5000 en macOS. La petición upstream tiene timeout de 8 segundos; los fallos se traducen a respuestas seguras `502`/`504`.
+`RoutingProvider` es el contrato de aplicación y `OsrmRoutingProvider` adapta el binding oficial de OSRM para Node, sin exponer sus respuestas o códigos al dominio. El motor se carga una sola vez durante el startup de Fastify, en el mismo proceso que atiende `/api/routing`; no hay un servicio HTTP OSRM adicional ni se usa el servidor público de demostración. La versión `@project-osrm/osrm` queda fijada en `26.9.0` y requiere Node 20.17 o posterior dentro de la línea 20. La petición al motor tiene timeout de 8 segundos; los fallos se traducen a respuestas seguras `502`/`504`. Si el addon nativo no es compatible o falta el grafo, el backend falla antes de aceptar tráfico e indica cómo prepararlo.
 
 `POST /api/routing` recibe `{ "origin": { "latitude": -34.6037, "longitude": -58.3816 }, "destination": { "latitude": -34.5895, "longitude": -58.3974 }, "options": "AVOID_BAD_STREETS" }` y responde con `route` (GeoJSON LineString), distancia y duración estimadas por el proveedor, `warnings` y `affectedSegments`. Para preferencias distintas de `FASTEST`, OSRM puede devolver hasta tres alternativas; se comparan las que realmente entrega y, para el modo rápido, se solicita sólo la ruta rápida.
 
@@ -208,7 +208,9 @@ El adaptador PostGIS encuentra segmentos oficiales a hasta 15 m de cada geometr�
 
 Los incidentes/cortes oficiales siguen no disponibles porque la fuente realtime de CABA continúa suspendida; el sistema lo advierte y no interpreta la ausencia como cero cortes. La coincidencia geométrica es aproximada, no una garantía de que proveedor y callejero representen idénticamente cada conexión. La respuesta no representa una recomendación infalible ni una garantía de transitabilidad. El endpoint aplica `RATE_LIMIT_ROUTING_MAX` y `RATE_LIMIT_ROUTING_WINDOW_SECONDS` (20 solicitudes por minuto por defecto).
 
-Para preparar y levantar una instancia local de desarrollo (requiere Docker y descarga el extracto OSM de Buenos Aires), ejecutar `npm run routing:setup`. El script procesa los datos con OSRM MLD y levanta el servicio en el puerto anfitrión 5001. Después configurar `OSRM_BASE_URL=http://localhost:5001` en `.env` y reiniciar el backend. El extracto y los archivos procesados quedan en `data/routing/`, excluidos de Git. El servicio se puede detener con `docker compose -f docker-compose.yml -f docker-compose.routing.yml stop routing`. Para producción se debe apuntar `OSRM_BASE_URL` a una instancia administrada; no se usa el servidor público de demostración. Los datos OSM se distribuyen bajo ODbL y requieren atribución a OpenStreetMap contributors.
+Preparar el grafo una vez por host o release persistente con `npm run routing:setup` (no requiere Docker). El script reutiliza `data/routing/BuenosAires.osm.pbf` si existe; si no, descarga el extracto de Buenos Aires. Luego ejecuta `osrm-extract`, `osrm-partition` y `osrm-customize` del paquete fijado, comprueba una ruta real en CABA y guarda el dataset en `data/routing/osrm-26.9.0/`. La metadata conserva la versión OSRM, algoritmo y hash del extracto: deploys posteriores saltan el procesamiento mientras coincidan. Tanto el PBF como el grafo se excluyen de Git. No borrar `data/routing/` y mantener ese directorio en almacenamiento persistente entre despliegues; puede reubicarse con `OSRM_DATA_DIR` (ruta absoluta). Para una actualización, parar Fastify y volver a ejecutar el preparador; sólo reemplaza el grafo después de validar el nuevo.
+
+Para comprobar el dataset sin iniciar la API, ejecutar `npm run routing:check`. La primera preparación necesita espacio para el PBF, el grafo y temporales, además de CPU/RAM para construir el extracto; `OSRM_PREP_THREADS` permite ajustar los hilos (2 por defecto). La aplicación necesita un host Node 20.17+ con soporte para el addon nativo N-API y acceso de lectura al grafo. Los datos de OpenStreetMap se distribuyen bajo ODbL y la UI conserva la atribución a OpenStreetMap contributors.
 
 ## Geografía oficial de CABA
 
@@ -300,7 +302,7 @@ La base Docker local existente no se modifica ni se vuelca a Supabase automátic
 
 ### Plesk Node.js 20
 
-El repositorio no contiene `deploy.sh`; los pasos usan los scripts npm existentes. Seleccionar Node.js 20 en Plesk, instalar con `npm ci`, configurar entorno, correr `npm run db:migrate` como paso explícito, compilar con `npm run build` y ejecutar el backend con `npm start` (script del workspace `backend`). Configurar el document root estático en `frontend/dist` y el proxy/rewrite de `/api` al puerto interno `BACKEND_PORT` del proceso Node para compartir origen. La publicación de archivos estáticos y el fallback SPA dependen de la configuración web del dominio en Plesk. Configurar `CORS_ORIGIN` con el origen público real y `TRUST_PROXY` sólo con IP/CIDR del proxy confiable, si aplica.
+Seleccionar Node.js 20.17+ en Plesk y configurar las variables de entorno. El archivo de inicio de Plesk puede ser el `app.js` de la raíz del repositorio; importa el backend compilado. Ejecutar las migraciones como paso explícito (`npm run db:migrate`) y preparar el grafo de OSRM en almacenamiento persistente (`npm run routing:setup`). El script `scripts/deploy-plesk.sh` instala dependencias, compila frontend y backend, prepara OSRM si hace falta y copia `frontend/dist` al document root; después se reinicia el proceso desde el panel. Por defecto document root es la raíz del repo; definir `PLESK_DOCUMENT_ROOT` si el dominio publica desde otra carpeta. La publicación de archivos estáticos y el fallback SPA dependen de la configuración web del dominio en Plesk. Configurar `CORS_ORIGIN` con el origen público real y `TRUST_PROXY` sólo con IP/CIDR del proxy confiable, si aplica. El proceso espera el puerto `PORT` que Plesk asigne y usa `BACKEND_PORT` como fallback local.
 
 Variables actuales relevantes para producción:
 
@@ -308,7 +310,7 @@ Variables actuales relevantes para producción:
 NODE_ENV=production
 DATABASE_URL=postgresql://... (URI del Dashboard con SSL)
 BACKEND_HOST=0.0.0.0
-BACKEND_PORT=... (puerto interno asignado por Plesk)
+PORT=... (puerto interno asignado por Plesk; alternativamente BACKEND_PORT)
 CORS_ORIGIN=https://tu-dominio.example
 TRUST_PROXY=... (proxy confiable, si corresponde)
 DB_POOL_MAX=5
@@ -316,10 +318,10 @@ DB_IDLE_TIMEOUT_MS=10000
 DB_CONNECTION_TIMEOUT_MS=10000
 DB_QUERY_TIMEOUT_MS=30000
 USIG_ADDRESS_SEARCH_URL=https://servicios.usig.buenosaires.gob.ar/normalizar/
-OSRM_BASE_URL=https://... (instancia OSRM propia o administrada)
+OSRM_DATA_DIR=/ruta/persistente/data/routing (opcional; default: <repo>/data/routing)
 ```
 
-`SESSION_SECRET` y `ROUTING_PROVIDER` no son variables utilizadas por el código actual. La cookie de sesión usa token aleatorio persistido como hash en PostgreSQL y queda `Secure` cuando `NODE_ENV=production`. Las APIs externas USIG/OSRM son opcionales para readiness: sus fallos no marcan la app como no lista.
+`SESSION_SECRET` y `ROUTING_PROVIDER` no son variables utilizadas por el código actual. La cookie de sesión usa token aleatorio persistido como hash en PostgreSQL y queda `Secure` cuando `NODE_ENV=production`. USIG es opcional para readiness. OSRM se inicializa antes de aceptar tráfico, por lo que su addon y el dataset persistente deben estar disponibles para arrancar el backend.
 
 `GET /api/health/live` indica que Fastify está vivo. `GET /api/health/ready` ejecuta `SELECT 1` y responde `503` sin detalles internos si PostgreSQL no responde. `/api/health` se conserva como alias de liveness.
 
