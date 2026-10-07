@@ -12,6 +12,7 @@
     "dev:backend": "npm run dev --workspace backend",
     "db:generate": "npm run db:generate --workspace backend",
     "db:migrate": "npm run db:migrate --workspace backend",
+    "db:migrate:status": "npm run db:migrate:status --workspace backend",
     "import:caba:streets": "npm run import:caba:streets --workspace backend",
     "import:caba:neighborhoods": "npm run import:caba:neighborhoods --workspace backend",
     "import:caba:communes": "npm run import:caba:communes --workspace backend",

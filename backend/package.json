@@ -10,6 +10,7 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+    "db:migrate:status": "tsx src/infrastructure/database/migration-status-cli.ts",
     "import:caba:streets": "tsx src/infrastructure/external/caba/import-cli.ts streets",
     "import:caba:neighborhoods": "tsx src/infrastructure/external/caba/import-cli.ts neighborhoods",
     "import:caba:communes": "tsx src/infrastructure/external/caba/import-cli.ts communes",

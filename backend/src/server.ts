@@ -26,6 +26,7 @@ const app = buildApp(
     routingProvider: new OsrmRoutingProvider(),
     routingRepository: new DrizzleRoutingRepository(database),
     addressSearchProvider: new UsigAddressSearchProvider(),
+    checkDatabase: () => pool.query('SELECT 1'),
   },
 );
 const host = process.env.BACKEND_HOST ?? '0.0.0.0';

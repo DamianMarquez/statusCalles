@@ -50,6 +50,7 @@ export function buildApp(
     routingProvider?: RoutingProvider;
     routingRepository?: RoutingRepository;
     addressSearchProvider?: AddressSearchProvider;
+    checkDatabase?: () => Promise<unknown>;
   } = {},
 ): FastifyInstance {
   const trustedProxies = (process.env.TRUST_PROXY ?? '')
@@ -68,7 +69,10 @@ export function buildApp(
   app.register(cookie);
   app.register(rateLimit, { global: false });
   app.decorateRequest('authUser', null);
-  app.register(registerHealthRoutes, { prefix: '/api' });
+  app.register(registerHealthRoutes, {
+    prefix: '/api',
+    checkDatabase: options.checkDatabase,
+  });
   if (options.addressSearchProvider) {
     app.register(registerAddressSearchRoutes, {
       prefix: '/api',

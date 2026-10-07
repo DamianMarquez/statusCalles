@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase } from '../../database/database.js';
-import { getDatabaseUrl } from '../../database/config.js';
+import { getTestDatabaseUrl } from '../../database/config.js';
 import { CabaDatasetImporter, cabaDatasets } from './caba-dataset-importer.js';
 
-const { database, pool } = createDatabase(getDatabaseUrl());
+const { database, pool } = createDatabase(getTestDatabaseUrl());
 const source = cabaDatasets.streets;
 const sourceSegmentId = `test-${randomUUID()}`;
 const secondSourceSegmentId = `test-${randomUUID()}`;

@@ -11,7 +11,7 @@ MVP para consultar y reportar problemas de circulación en calles de la Ciudad A
 - Street Score estimado por áreas geográficas con reportes suficientes, visible como celdas explicables en el mapa.
 - Moderación básica con detección de duplicados, marcación de contenido y cola administrativa con auditoría.
 - Filtros combinables por tipo, lifecycle, antigüedad, severidad y reportes propios; navegación “Mis reportes”.
-- API Fastify con health check y endpoints REST para persistir, consultar y moderar reportes.
+- API Fastify con liveness y readiness y endpoints REST para persistir, consultar y moderar reportes.
 - Reportes almacenados en PostgreSQL con `GEOGRAPHY(POINT, 4326)` y consultas de radio ejecutadas por PostGIS.
 - Migraciones versionadas con Drizzle Kit.
 - TypeScript estricto, ESLint, Prettier y tests de integración.
@@ -37,7 +37,7 @@ No hay login social ni dashboard de moderación.
    cp .env.example .env
    ```
 
-   `DATABASE_URL` por defecto conecta con `street_status` en `localhost:5432`.
+   `DATABASE_URL` por defecto conecta con `street_status` en `localhost:5433`. `TEST_DATABASE_URL` debe apuntar a una base separada para tests que escriben y borran registros de prueba.
 
 3. Iniciar PostgreSQL + PostGIS:
 
@@ -90,7 +90,9 @@ La API está bajo `/api`. Los tipos admitidos son `POTHOLE`, `FLOOD`, `ROAD_DAMA
 
 | Método y ruta                                                    | Uso                                          |
 | ---------------------------------------------------------------- | -------------------------------------------- |
-| `GET /api/health`                                                | Health check                                 |
+| `GET /api/health`                                                | Compatibilidad: liveness                    |
+| `GET /api/health/live`                                           | Proceso Fastify activo                      |
+| `GET /api/health/ready`                                          | Verifica conexión a PostgreSQL              |
 | `GET /api/reports?south=-34.7&north=-34.5&west=-58.5&east=-58.3` | Buscar dentro del viewport visible           |
 | `GET /api/users/me/reports`                                      | Reportes del usuario de la sesión actual     |
 | `GET /api/reports?lat=-34.6037&lng=-58.3816&radius=1000`         | Buscar en un radio, expresado en metros      |
@@ -265,6 +267,82 @@ Las URL se configuran con `CABA_CICLOVIAS_URL`, `CABA_METROBUS_URL` y `CABA_METR
 Se eligió **Drizzle ORM + Drizzle Kit** por sus tipos TypeScript y migraciones versionadas para PostgreSQL. Drizzle tiene soporte PostGIS para geometry; para conservar `GEOGRAPHY(POINT, 4326)`, el esquema declara un tipo custom y la migración contiene el SQL específico para crear la extensión y la columna. La creación y lectura geográfica usan las funciones PostGIS necesarias a través del SQL parametrizado de Drizzle.
 
 El módulo `reports` mantiene dominio, aplicación, HTTP/DTO y repositorio separados. `streets` no participa en el almacenamiento ni en las rutas de reportes. El repositorio de persistencia es la implementación concreta de una interfaz usada por el servicio y las rutas.
+
+## Supabase PostgreSQL y despliegue en Plesk
+
+Supabase se utiliza como PostgreSQL/PostGIS administrado. React continúa hablando únicamente con el BFF Fastify (`/api/...`); no se usa `@supabase/supabase-js`, Supabase Auth ni acceso directo desde el navegador. Drizzle y `pg` permanecen como ORM/driver. Las consultas de reportes, calles, segmentos, barrios, comunas, movilidad, routing y analytics siguen ejecutándose en PostgreSQL/PostGIS.
+
+### Preparar Supabase
+
+1. En el Dashboard de Supabase, abrir **Database → Extensions**, habilitar `postgis` y elegir el schema dedicado `extensions`. Hacerlo antes de aplicar migraciones. La primera migración versionada ya ejecuta `CREATE EXTENSION IF NOT EXISTS postgis`; al encontrarla instalada, no vuelve a crearla. El pool fija `search_path=public,extensions` para resolver los tipos y funciones PostGIS no cualificados de las migraciones y SQL existentes. Las columnas usan `geography(Point,4326)` para reportes y `geometry(...,4326)` para datos oficiales.
+2. En **Connect**, copiar la URI completa y reemplazar la contraseña. Usar conexión directa para el backend persistente si Plesk tiene salida IPv6 (o el proyecto tiene IPv4 habilitado). Si Plesk sólo tiene IPv4, usar **Shared Pooler en modo Session**, copiando host, puerto y usuario del Dashboard. Evitar Transaction para este backend persistente por sus limitaciones de estado de sesión; ejecutar migraciones preferentemente con conexión directa.
+3. Exigir SSL en la cadena de conexión (`sslmode=require`). Para validar también el certificado, Supabase permite descargar la CA; configurar `sslmode=verify-full` y el certificado conforme al driver y validar desde el host de Plesk.
+4. En Plesk, establecer `DATABASE_URL` como variable protegida del entorno Node, nunca en Vite ni en un archivo versionado. No configurar credenciales en variables `VITE_*`. No se necesita Docker en producción.
+
+La URI la entrega el botón **Connect**. Como referencia, la directa se parece a `postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require`; el pooler de sesión tiene otro host/usuario y debe copiarse del Dashboard, sin construirlo a mano. Escapar los caracteres reservados de la contraseña según las instrucciones de Supabase.
+
+El pool reutilizado por proceso tiene límites opcionales con defaults conservadores: `DB_POOL_MAX=5`, `DB_IDLE_TIMEOUT_MS=10000`, `DB_CONNECTION_TIMEOUT_MS=10000` y `DB_QUERY_TIMEOUT_MS=30000`. `DB_POOL_MAX` limita conexiones por proceso Node, no por sitio; sumar instancias/procesos y respetar el límite del plan Supabase. `DATABASE_URL` es obligatorio en todos los entornos y la app/CLI falla si falta; no hay credenciales de conexión por defecto en código. El backend no registra la URL ni credenciales.
+
+### Migraciones, datos e importación
+
+Aplicar migraciones explícitamente antes del deploy/restart:
+
+```bash
+npm ci
+npm run db:migrate
+npm run db:migrate:status
+npm run build
+```
+
+`db:migrate` no se ejecuta al arrancar Fastify. `db:migrate:status` lista las pendientes según el journal Drizzle. No agregué usuarios ni reportes ficticios. Los catálogos oficiales se importan explícitamente con `npm run import:caba:all` y `npm run sync:caba:infrastructure`, o sus comandos individuales, luego de configurar las URLs de datos. Las pruebas de integración requieren una base migrada separada y nunca producción.
+
+La base Docker local existente no se modifica ni se vuelca a Supabase automáticamente. Al inspeccionarla había 25 reportes, 5 usuarios, 2.741 calles, 31.961 segmentos, 48 barrios y 15 comunas. Respaldarla antes de cualquier operación de datos. Si se decide conservar los datos, realizar un plan aparte hacia una base destino vacía: backup `pg_dump` de PostgreSQL, migraciones de esquema en destino y restauración de datos compatible con PostGIS, verificando conteos y relaciones antes del corte. No restaurar el esquema encima de tablas creadas por Drizzle ni ejecutar importadores de catálogos antes de decidir si se actualizarán las mismas filas. No se encontró dependencia ni esquema MySQL/MariaDB.
+
+### Plesk Node.js 20
+
+El repositorio no contiene `deploy.sh`; los pasos usan los scripts npm existentes. Seleccionar Node.js 20 en Plesk, instalar con `npm ci`, configurar entorno, correr `npm run db:migrate` como paso explícito, compilar con `npm run build` y ejecutar el backend con `npm start` (script del workspace `backend`). Configurar el document root estático en `frontend/dist` y el proxy/rewrite de `/api` al puerto interno `BACKEND_PORT` del proceso Node para compartir origen. La publicación de archivos estáticos y el fallback SPA dependen de la configuración web del dominio en Plesk. Configurar `CORS_ORIGIN` con el origen público real y `TRUST_PROXY` sólo con IP/CIDR del proxy confiable, si aplica.
+
+Variables actuales relevantes para producción:
+
+```dotenv
+NODE_ENV=production
+DATABASE_URL=postgresql://... (URI del Dashboard con SSL)
+BACKEND_HOST=0.0.0.0
+BACKEND_PORT=... (puerto interno asignado por Plesk)
+CORS_ORIGIN=https://tu-dominio.example
+TRUST_PROXY=... (proxy confiable, si corresponde)
+DB_POOL_MAX=5
+DB_IDLE_TIMEOUT_MS=10000
+DB_CONNECTION_TIMEOUT_MS=10000
+DB_QUERY_TIMEOUT_MS=30000
+USIG_ADDRESS_SEARCH_URL=https://servicios.usig.buenosaires.gob.ar/normalizar/
+OSRM_BASE_URL=https://... (instancia OSRM propia o administrada)
+```
+
+`SESSION_SECRET` y `ROUTING_PROVIDER` no son variables utilizadas por el código actual. La cookie de sesión usa token aleatorio persistido como hash en PostgreSQL y queda `Secure` cuando `NODE_ENV=production`. Las APIs externas USIG/OSRM son opcionales para readiness: sus fallos no marcan la app como no lista.
+
+`GET /api/health/live` indica que Fastify está vivo. `GET /api/health/ready` ejecuta `SELECT 1` y responde `503` sin detalles internos si PostgreSQL no responde. `/api/health` se conserva como alias de liveness.
+
+### Tests con base aislada
+
+Los tests de integración crean usuarios/reportes temporales y los eliminan al finalizar; el import test restaura el catálogo que modifica. Crear una DB exclusiva con PostgreSQL/PostGIS y aplicar el journal antes de correrlos:
+
+```bash
+PGPASSWORD=street_status PGHOST=localhost PGPORT=5433 PGUSER=street_status createdb street_status_test
+DATABASE_URL=postgres://street_status:street_status@localhost:5433/street_status_test npm run db:migrate
+TEST_DATABASE_URL=postgres://street_status:street_status@localhost:5433/street_status_test npm test
+```
+
+También se puede dejar `TEST_DATABASE_URL` en `.env` (excluido de Git). Los tests de persistencia requieren esa variable y no caen silenciosamente en `DATABASE_URL`.
+
+### Diagnóstico
+
+- `ECONNREFUSED` / timeout: verificar host, puerto, firewall/allowlist y soporte IPv4/IPv6 de Plesk. En IPv4-only, copiar la URI Shared Pooler Session.
+- Error de password o role: copiar usuario/contraseña de **Connect**; el pooler puede usar otro username. Codificar caracteres reservados de la contraseña.
+- Error SSL: exigir `sslmode=require`; con `verify-full`, instalar la CA de Supabase y validar hostname.
+- `type geography does not exist` o `function st_* does not exist`: habilitar PostGIS en `extensions` antes de migrar y mantener `search_path=public,extensions`.
+- Schema incompleto: revisar `npm run db:migrate:status`, correr migraciones explícitamente y confirmar que Plesk y Drizzle usan la misma `DATABASE_URL`.
+- Saturación: revisar procesos Node × `DB_POOL_MAX` y límites de Supabase; no crear pools por request.
 
 ## Comandos
 

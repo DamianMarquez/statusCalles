@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase } from '../../../infrastructure/database/database.js';
-import { getDatabaseUrl } from '../../../infrastructure/database/config.js';
+import { getTestDatabaseUrl } from '../../../infrastructure/database/config.js';
 import { DrizzleReportRepository } from '../../../infrastructure/database/report-repository.drizzle.js';
 import { DrizzleReportFeedbackRepository } from '../../../infrastructure/database/report-feedback-repository.drizzle.js';
 import { buildApp } from '../../../app/build-app.js';
@@ -13,7 +13,7 @@ import { randomUUID } from 'node:crypto';
 
 process.env.RATE_LIMIT_REPORTS_MAX = '500';
 
-const { database, pool } = createDatabase(getDatabaseUrl());
+const { database, pool } = createDatabase(getTestDatabaseUrl());
 const app = buildApp(
   new DrizzleReportRepository(database),
   new DrizzleReportFeedbackRepository(database),

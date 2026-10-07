@@ -232,7 +232,7 @@ export class CabaMobilityDatasetImporter {
         const ids = items.map((item) => item.externalId);
         await tx.execute(sql`
           DELETE FROM mobility_infrastructure
-          WHERE source_id = ${sourceId}::uuid AND NOT (external_id = ANY(${ids}))
+          WHERE source_id = ${sourceId}::uuid AND NOT (external_id = ANY(${sql.param(ids)}::text[]))
         `);
         await tx.execute(sql`
           UPDATE geographic_sources SET last_status = 'SUCCEEDED', last_sync_at = NOW(),
