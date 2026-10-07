@@ -1,5 +1,3 @@
-const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-
 export interface AnalyticsFilters {
   from?: string;
   to?: string;
@@ -76,7 +74,7 @@ function query(filters: AnalyticsFilters): string {
 async function get<T>(path: string, signal: AbortSignal): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}${path}`, {
+    response = await fetch(path, {
       headers: { Accept: 'application/json' },
       credentials: 'include',
       signal,

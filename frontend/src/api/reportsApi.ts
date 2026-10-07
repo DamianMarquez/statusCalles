@@ -10,7 +10,7 @@ import type {
   ReportPageDto,
 } from './reportTypes.js';
 
-const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+import { API_BASE_URL } from './apiBaseUrl.js';
 import {
   REPORT_SEVERITY_OPTIONS,
   REPORT_STATUS_OPTIONS,
@@ -100,7 +100,7 @@ export async function getReportsInViewport(
 
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}/api/reports?${query.toString()}`, {
+    response = await fetch(`${API_BASE_URL}/reports?${query.toString()}`, {
       headers: { Accept: 'application/json' },
       credentials: 'include',
       signal,
@@ -143,7 +143,7 @@ export async function getMyReports(
 ): Promise<OwnedReportPageDto> {
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}/api/users/me/reports?limit=${limit}&offset=${offset}`, {
+    response = await fetch(`${API_BASE_URL}/users/me/reports?limit=${limit}&offset=${offset}`, {
       headers: { Accept: 'application/json' },
       credentials: 'include',
       signal,
@@ -175,7 +175,7 @@ export async function createReport(
 ): Promise<ReportDto> {
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}/api/reports`, {
+    response = await fetch(`${API_BASE_URL}/reports`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -221,7 +221,7 @@ export async function submitReportFeedback(
 ): Promise<ReportDto> {
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}/api/reports/${encodeURIComponent(reportId)}/feedback`, {
+    response = await fetch(`${API_BASE_URL}/reports/${encodeURIComponent(reportId)}/feedback`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',

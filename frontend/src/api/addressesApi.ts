@@ -17,7 +17,7 @@ export interface AddressSearchResult {
   source: 'USIG';
 }
 
-const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+import { API_BASE_URL } from './apiBaseUrl.js';
 
 export async function searchAddresses(
   query: string,
@@ -25,7 +25,7 @@ export async function searchAddresses(
 ): Promise<AddressSearchResult[]> {
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}/api/addresses/search?q=${encodeURIComponent(query)}`, {
+    response = await fetch(`${API_BASE_URL}/addresses/search?q=${encodeURIComponent(query)}`, {
       headers: { Accept: 'application/json' },
       signal,
     });

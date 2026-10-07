@@ -25,7 +25,7 @@ export interface CalculatedRoute {
   option: RouteOption;
 }
 
-const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+import { API_BASE_URL } from './apiBaseUrl.js';
 
 export async function calculateRoute(
   origin: RouteCoordinate,
@@ -35,7 +35,7 @@ export async function calculateRoute(
 ): Promise<CalculatedRoute> {
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}/api/routing`, {
+    response = await fetch(`${API_BASE_URL}/routing`, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       credentials: 'include',

@@ -15,12 +15,12 @@ export interface UserProfile extends AuthUser {
   };
 }
 
-const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+import { API_BASE_URL } from './apiBaseUrl.js';
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}/api${path}`, {
+    response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       credentials: 'include',
       headers: { Accept: 'application/json', ...init.headers },

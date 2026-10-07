@@ -72,7 +72,7 @@ No hay login social ni dashboard de moderación.
    npm run dev:backend
    ```
 
-   La API escucha por defecto en `http://localhost:3000`. El backend habilita CORS para `http://localhost:5173` mediante `CORS_ORIGIN`. El frontend usa `VITE_API_URL` para elegir la URL base de la API; por defecto es `http://localhost:3000`. En otra terminal se puede iniciar el frontend:
+   La API escucha por defecto en `http://localhost:3000`. El frontend usa rutas relativas `/api/...`; Vite las reenvía al backend local en `127.0.0.1:3000` y adapta el encabezado `Origin` al origen local permitido. Así el navegador usa el mismo origen, también detrás de un túnel ngrok, y no necesita conocer la dirección interna del backend. En otra terminal se puede iniciar el frontend:
 
    ```bash
    npm run dev:frontend

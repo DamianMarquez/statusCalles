@@ -1,7 +1,6 @@
 import type { ViewportBounds } from './reportTypes.js';
 import type { StreetScoreAreaDto, StreetScoreResultDto } from './streetScoreTypes.js';
-
-const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+import { API_BASE_URL } from './apiBaseUrl.js';
 
 export interface OfficialMobilityInfrastructure {
   id: string;
@@ -18,7 +17,7 @@ export async function getStreetInfrastructure(
   let response: Response;
   try {
     response = await fetch(
-      `${apiBaseUrl}/api/streets/${encodeURIComponent(streetId)}/infrastructure`,
+      `${API_BASE_URL}/streets/${encodeURIComponent(streetId)}/infrastructure`,
       { headers: { Accept: 'application/json' }, signal },
     );
   } catch (error) {
@@ -85,7 +84,7 @@ export async function getStreetScore(
 ): Promise<StreetScoreResultDto> {
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}/api/streets/${encodeURIComponent(streetId)}/score`, {
+    response = await fetch(`${API_BASE_URL}/streets/${encodeURIComponent(streetId)}/score`, {
       headers: { Accept: 'application/json' },
       signal,
     });
@@ -139,7 +138,7 @@ export async function getStreetScoresInViewport(
 
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}/api/streets/score?${query.toString()}`, {
+    response = await fetch(`${API_BASE_URL}/streets/score?${query.toString()}`, {
       headers: { Accept: 'application/json' },
       signal,
     });
