@@ -28,7 +28,23 @@ interface ViewportReportQuery {
   east: number;
 }
 
-type ReportQuery = RadiusReportQuery | ViewportReportQuery;
+interface FilterQuery {
+  types?: string;
+  statuses?: string;
+  fromDate?: string;
+  toDate?: string;
+  period?: '24h' | '3d' | '7d' | '30d' | '90d';
+  minSeverity?: ReportSeverity;
+  onlyMine?: boolean;
+  limit?: number;
+}
+
+interface MyReportsQuery {
+  limit?: number;
+  offset?: number;
+}
+
+type ReportQuery = RadiusReportQuery | (ViewportReportQuery & FilterQuery);
 
 interface CreateReportBody {
   type: (typeof REPORT_TYPES)[number];
@@ -49,6 +65,44 @@ interface UpdateStatusBody {
 
 const reportIdPattern =
   '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+
+const mapFiltersSchema = {
+  types: { type: 'string', maxLength: 128 },
+  statuses: { type: 'string', maxLength: 32 },
+  fromDate: { type: 'string', format: 'date-time', maxLength: 40 },
+  toDate: { type: 'string', format: 'date-time', maxLength: 40 },
+  period: { type: 'string', enum: ['24h', '3d', '7d', '30d', '90d'] },
+  minSeverity: { type: 'string', enum: severityNames },
+  onlyMine: { type: 'boolean' },
+  limit: { type: 'integer', minimum: 1, maximum: 200 },
+} as const;
+
+function parseList<T extends string>(
+  value: string | undefined,
+  accepted: readonly T[],
+  name: string,
+): T[] | undefined {
+  if (value === undefined) return undefined;
+  const entries = [
+    ...new Set(
+      value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (entries.length === 1 && entries[0] === 'NONE') return [];
+  if (entries.length === 0 || entries.some((entry) => !accepted.includes(entry as T))) {
+    throw new Error(`INVALID_${name.toUpperCase()}`);
+  }
+  return entries as T[];
+}
+
+function parseDate(value: string | undefined): Date | undefined {
+  if (value === undefined) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
 
 async function toReportsDto(
   reports: StreetReport[],
@@ -87,6 +141,7 @@ export async function registerReportsRoutes(
                 north: { type: 'number', minimum: -90, maximum: 90 },
                 west: { type: 'number', minimum: -180, maximum: 180 },
                 east: { type: 'number', minimum: -180, maximum: 180 },
+                ...mapFiltersSchema,
               },
             },
             {
@@ -109,7 +164,63 @@ export async function registerReportsRoutes(
         if (south >= north || west >= east) {
           return reply.code(400).send({ code: 'INVALID_BOUNDS', message: 'Invalid map bounds.' });
         }
-        reports = await service.findInViewport({ south, north, west, east });
+        const query = request.query as ViewportReportQuery & FilterQuery;
+        if (query.onlyMine && !request.authUser) {
+          return reply.code(401).send({
+            code: 'AUTHENTICATION_REQUIRED',
+            message: 'Iniciá sesión para ver tus reportes.',
+          });
+        }
+        if ((query.fromDate && query.period) || (query.toDate && query.period)) {
+          return reply
+            .code(400)
+            .send({ code: 'INVALID_DATE_RANGE', message: 'Elegí un período o fechas.' });
+        }
+        const fromDate = parseDate(query.fromDate);
+        const toDate = parseDate(query.toDate);
+        if (
+          (query.fromDate && !fromDate) ||
+          (query.toDate && !toDate) ||
+          (fromDate && toDate && fromDate > toDate)
+        ) {
+          return reply
+            .code(400)
+            .send({ code: 'INVALID_DATE_RANGE', message: 'El rango de fechas no es válido.' });
+        }
+        let types;
+        let statuses;
+        try {
+          types = parseList(query.types, REPORT_TYPES, 'types');
+          statuses = parseList(query.statuses, REPORT_STATUSES, 'statuses');
+        } catch {
+          return reply
+            .code(400)
+            .send({ code: 'INVALID_FILTER', message: 'Uno o más filtros no son válidos.' });
+        }
+        const page = await service.findInViewport({
+          south,
+          north,
+          west,
+          east,
+          types,
+          statuses,
+          fromDate,
+          toDate,
+          period: query.period,
+          minSeverity: query.minSeverity,
+          userId: query.onlyMine ? request.authUser!.id : undefined,
+          limit: query.limit,
+        });
+        const items = await toReportsDto(
+          page.items.map((item) => item.report),
+          request.authUser?.id ?? null,
+          feedbackService,
+        );
+        const mapItems = items.map((item, index) => ({
+          ...item,
+          publiclyVisible: page.items[index]?.publiclyVisible ?? true,
+        }));
+        return { items: mapItems, hasMore: page.hasMore };
       } else {
         reports = await service.findNearby({
           latitude: request.query.lat,
@@ -117,7 +228,58 @@ export async function registerReportsRoutes(
           radiusMeters: request.query.radius,
         });
       }
-      return toReportsDto(reports, request.authUser?.id ?? null, feedbackService);
+      const items = await toReportsDto(reports, request.authUser?.id ?? null, feedbackService);
+      return { items, hasMore: false };
+    },
+  );
+
+  app.get<{ Querystring: MyReportsQuery }>(
+    '/users/me/reports',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            limit: { type: 'integer', minimum: 1, maximum: 100 },
+            offset: { type: 'integer', minimum: 0, maximum: 100000 },
+          },
+        },
+      },
+      preHandler: async (request, reply) => {
+        if (!request.authUser) {
+          return reply.code(401).send({
+            code: 'AUTHENTICATION_REQUIRED',
+            message: 'Iniciá sesión para ver tus reportes.',
+          });
+        }
+      },
+    },
+    async (request) => {
+      const user = request.authUser!;
+      const page = await service.findMine(
+        user.id,
+        request.query.limit ?? 50,
+        request.query.offset ?? 0,
+      );
+      const summaries = await feedbackService.summariesForReports(
+        page.items.map((item) => item.report.id),
+        user.id,
+      );
+      const evaluatedAt = feedbackService.now();
+      return {
+        items: page.items.map((item) => ({
+          ...toReportDto(
+            item.report,
+            summaries.get(item.report.id) ?? emptyReportFeedbackSummary,
+            evaluatedAt,
+          ),
+          publiclyVisible: item.publiclyVisible,
+          feedbackCount: item.feedbackCount,
+          latestActivityAt: (item.latestFeedbackAt ?? item.report.updatedAt).toISOString(),
+        })),
+        hasMore: page.hasMore,
+      };
     },
   );
 

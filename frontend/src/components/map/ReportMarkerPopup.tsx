@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReportDto, ReportFeedbackType } from '../../api/reportTypes.js';
+import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
 import {
   getStreetInfrastructure,
   getStreetScore,
@@ -7,15 +8,9 @@ import {
 } from '../../api/streetsApi.js';
 import type { StreetScoreResultDto } from '../../api/streetScoreTypes.js';
 
-const reportTypeLabels: Record<ReportDto['type'], string> = {
-  POTHOLE: 'BACHE',
-  FLOOD: 'INUNDACIÓN',
-  ROAD_DAMAGE: 'PAVIMENTO DETERIORADO',
-  ROAD_BLOCKED: 'CALLE BLOQUEADA',
-  ROAD_WORK: 'OBRA',
-  TRAFFIC_LIGHT: 'SEMÁFORO',
-  OTHER: 'OTRO PROBLEMA',
-};
+const reportTypeLabels = Object.fromEntries(
+  REPORT_TYPE_OPTIONS.map((option) => [option.value, option.popupLabel]),
+) as Record<ReportDto['type'], string>;
 
 const severityLabels: Record<ReportDto['severity'], { icon: string; label: string }> = {
   LOW: { icon: '🟢', label: 'Baja' },
@@ -97,6 +92,9 @@ export function ReportMarkerPopup({
         <span aria-hidden="true">{severity.icon}</span> {severity.label}
       </span>
       {report.description && <p className="report-popup__description">{report.description}</p>}
+      {report.publiclyVisible === false && (
+        <span className="report-popup__meta">Este reporte no aparece en el mapa público.</span>
+      )}
       {report.street && (
         <div className="report-popup__street" aria-label="Ubicación oficial">
           <strong>{report.street.officialName}</strong>
@@ -211,7 +209,7 @@ export function ReportMarkerPopup({
           type="button"
           className={report.feedback.userFeedback === 'CONFIRM' ? 'is-selected' : ''}
           aria-pressed={report.feedback.userFeedback === 'CONFIRM'}
-          disabled={isVoting || !authenticated}
+          disabled={isVoting || !authenticated || report.publiclyVisible === false}
           onClick={() => onVote('CONFIRM')}
         >
           <span>👍 Sigue existiendo</span>
@@ -221,7 +219,7 @@ export function ReportMarkerPopup({
           type="button"
           className={report.feedback.userFeedback === 'RESOLVED' ? 'is-selected' : ''}
           aria-pressed={report.feedback.userFeedback === 'RESOLVED'}
-          disabled={isVoting || !authenticated}
+          disabled={isVoting || !authenticated || report.publiclyVisible === false}
           onClick={() => onVote('RESOLVED')}
         >
           <span>👎 Ya no existe</span>

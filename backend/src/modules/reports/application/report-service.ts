@@ -1,6 +1,8 @@
 import type { CreateStreetReport, ReportStatus, StreetReport } from '../domain/street-report.js';
 import type {
   NearbyReportsQuery,
+  ReportFilters,
+  ReportPage,
   ReportRepository,
   ReportViewportQuery,
 } from './report-repository.js';
@@ -24,8 +26,12 @@ export class ReportService {
     return this.repository.findNearby(query);
   }
 
-  findInViewport(query: ReportViewportQuery): Promise<StreetReport[]> {
+  findInViewport(query: ReportViewportQuery & ReportFilters): Promise<ReportPage> {
     return this.repository.findInViewport(query);
+  }
+
+  findMine(userId: string, limit: number, offset: number) {
+    return this.repository.findMine(userId, limit, offset);
   }
 
   findSimilar(input: CreateStreetReport) {

@@ -1,4 +1,10 @@
-import type { CreateStreetReport, ReportStatus, StreetReport } from '../domain/street-report.js';
+import type {
+  CreateStreetReport,
+  ReportSeverity,
+  ReportStatus,
+  ReportType,
+  StreetReport,
+} from '../domain/street-report.js';
 import type { StreetLocationResolution } from '../../streets/application/street-location-resolver.js';
 
 export interface NearbyReportsQuery {
@@ -14,6 +20,34 @@ export interface ReportViewportQuery {
   east: number;
 }
 
+export interface ReportFilters {
+  types?: ReportType[];
+  statuses?: ReportStatus[];
+  fromDate?: Date;
+  toDate?: Date;
+  minSeverity?: ReportSeverity;
+  userId?: string;
+  period?: '24h' | '3d' | '7d' | '30d' | '90d';
+  limit?: number;
+}
+
+export interface ReportPage {
+  items: ViewportReport[];
+  hasMore: boolean;
+}
+
+export interface ViewportReport {
+  report: StreetReport;
+  publiclyVisible: boolean;
+}
+
+export interface OwnedReport {
+  report: StreetReport;
+  publiclyVisible: boolean;
+  feedbackCount: number;
+  latestFeedbackAt: Date | null;
+}
+
 export interface ReportRepository {
   create(
     input: CreateStreetReport,
@@ -21,7 +55,12 @@ export interface ReportRepository {
     street?: StreetLocationResolution | null,
   ): Promise<StreetReport>;
   findNearby(query: NearbyReportsQuery): Promise<StreetReport[]>;
-  findInViewport(query: ReportViewportQuery): Promise<StreetReport[]>;
+  findInViewport(query: ReportViewportQuery & ReportFilters): Promise<ReportPage>;
+  findMine(
+    userId: string,
+    limit: number,
+    offset: number,
+  ): Promise<{ items: OwnedReport[]; hasMore: boolean }>;
   findSimilar(
     input: CreateStreetReport,
   ): Promise<{ id: string; distanceMeters: number; createdAt: Date } | null>;

@@ -30,6 +30,13 @@ export interface ReportDto {
     lastActivityAt: string;
     evaluatedAt: string;
   };
+  publiclyVisible?: boolean;
+}
+
+export interface OwnedReportDto extends ReportDto {
+  publiclyVisible: boolean;
+  feedbackCount: number;
+  latestActivityAt: string;
 }
 
 export function toReportDto(

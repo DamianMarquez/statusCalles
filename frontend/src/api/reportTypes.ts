@@ -1,8 +1,5 @@
-export type ReportType =
-  'POTHOLE' | 'FLOOD' | 'ROAD_DAMAGE' | 'ROAD_BLOCKED' | 'ROAD_WORK' | 'TRAFFIC_LIGHT' | 'OTHER';
-
-export type ReportSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-export type ReportStatus = 'ACTIVE' | 'STALE' | 'RESOLVED';
+import type { ReportSeverity, ReportStatus, ReportType } from './reportCatalog.js';
+export type { ReportSeverity, ReportStatus, ReportType } from './reportCatalog.js';
 export type ReportFeedbackType = 'CONFIRM' | 'RESOLVED';
 export type ReportFreshnessLevel = 'FRESH' | 'AGING' | 'STALE' | 'RESOLVED';
 
@@ -31,6 +28,7 @@ export interface ReportDto {
   status: ReportStatus;
   createdAt: string;
   updatedAt: string;
+  publiclyVisible?: boolean;
   street?: {
     id: string;
     officialName: string;
@@ -39,6 +37,34 @@ export interface ReportDto {
   } | null;
   feedback: ReportFeedbackSummary;
   freshness: ReportFreshness;
+}
+
+export interface OwnedReportDto extends ReportDto {
+  publiclyVisible: boolean;
+  feedbackCount: number;
+  latestActivityAt: string;
+}
+
+export interface ReportPageDto {
+  items: ReportDto[];
+  hasMore: boolean;
+}
+
+export interface OwnedReportPageDto {
+  items: OwnedReportDto[];
+  hasMore: boolean;
+}
+
+export type ReportPeriod = '24h' | '3d' | '7d' | '30d' | '90d';
+
+export interface MapReportFilters {
+  types?: ReportType[];
+  statuses?: ReportStatus[];
+  fromDate?: string;
+  toDate?: string;
+  period?: ReportPeriod;
+  minSeverity?: ReportSeverity;
+  onlyMine?: boolean;
 }
 
 export interface ViewportBounds {

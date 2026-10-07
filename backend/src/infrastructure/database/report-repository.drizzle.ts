@@ -1,9 +1,13 @@
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import type { StreetStatusDatabase } from './database.js';
 import type {
   ReportRepository,
   NearbyReportsQuery,
+  OwnedReport,
+  ReportFilters,
+  ReportPage,
   ReportViewportQuery,
+  ViewportReport,
 } from '../../modules/reports/application/report-repository.js';
 import {
   SEVERITY_LEVELS,
@@ -30,6 +34,7 @@ interface ReportRow extends Record<string, unknown> {
     neighborhoodName: string | null;
     communeName: string | null;
   } | null;
+  moderation_status?: 'VISIBLE' | 'HIDDEN';
 }
 
 const severityByLevel = new Map<number, ReportSeverity>(
@@ -118,18 +123,112 @@ export class DrizzleReportRepository implements ReportRepository {
     return result.rows.map(mapReport);
   }
 
-  async findInViewport(query: ReportViewportQuery): Promise<StreetReport[]> {
+  async findInViewport(query: ReportViewportQuery & ReportFilters): Promise<ReportPage> {
     const envelope = sql`ST_MakeEnvelope(${query.west}, ${query.south}, ${query.east}, ${query.north}, 4326)`;
+    const conditions: SQL[] = [
+      sql`location && (${envelope})::geography`,
+      sql`ST_Intersects(location::geometry, ${envelope})`,
+    ];
+    if (query.userId) {
+      conditions.push(sql`(moderation_status = 'VISIBLE' OR user_id = ${query.userId}::uuid)`);
+    } else {
+      conditions.push(sql`moderation_status = 'VISIBLE'`);
+    }
+    if (query.types && query.types.length === 0) conditions.push(sql`FALSE`);
+    if (query.types?.length) {
+      conditions.push(
+        sql`type IN (${sql.join(
+          query.types.map((type) => sql`${type}::report_type`),
+          sql`, `,
+        )})`,
+      );
+    }
+    if (query.statuses && query.statuses.length === 0) conditions.push(sql`FALSE`);
+    if (query.statuses?.length) {
+      const effectiveStatus = sql`CASE
+        WHEN status = 'RESOLVED' THEN 'RESOLVED'
+        WHEN GREATEST(created_at, COALESCE((
+          SELECT MAX(f.updated_at) FROM report_feedback f
+          WHERE f.report_id = street_reports.id AND f.type = 'CONFIRM'
+        ), created_at)) < NOW() - INTERVAL '30 days' THEN 'STALE'
+        ELSE 'ACTIVE' END`;
+      conditions.push(
+        sql`${effectiveStatus} IN (${sql.join(
+          query.statuses.map((status) => sql`${status}`),
+          sql`, `,
+        )})`,
+      );
+    }
+    if (query.fromDate) conditions.push(sql`created_at >= ${query.fromDate}`);
+    if (query.toDate) conditions.push(sql`created_at <= ${query.toDate}`);
+    if (query.period) {
+      const interval = {
+        '24h': sql`INTERVAL '24 hours'`,
+        '3d': sql`INTERVAL '3 days'`,
+        '7d': sql`INTERVAL '7 days'`,
+        '30d': sql`INTERVAL '30 days'`,
+        '90d': sql`INTERVAL '90 days'`,
+      }[query.period];
+      conditions.push(sql`created_at >= NOW() - ${interval}`);
+    }
+    if (query.minSeverity) {
+      conditions.push(sql`severity >= ${SEVERITY_LEVELS[query.minSeverity]}`);
+    }
+    if (query.userId) conditions.push(sql`user_id = ${query.userId}::uuid`);
+    const limit = Math.max(1, Math.min(query.limit ?? 200, 200));
     const result = await this.database.execute<ReportRow>(sql`
-      SELECT ${reportProjection}
+      SELECT ${reportProjection}, moderation_status
       FROM street_reports
-      WHERE location && (${envelope})::geography
-        AND ST_Intersects(location::geometry, ${envelope})
-        AND moderation_status = 'VISIBLE'
+      WHERE ${sql.join(conditions, sql` AND `)}
       ORDER BY created_at DESC
-      LIMIT 200
+      LIMIT ${limit + 1}
     `);
-    return result.rows.map(mapReport);
+    const hasMore = result.rows.length > limit;
+    return {
+      items: result.rows.slice(0, limit).map((row): ViewportReport => ({
+        report: mapReport(row),
+        publiclyVisible: row.moderation_status !== 'HIDDEN',
+      })),
+      hasMore,
+    };
+  }
+
+  async findMine(
+    userId: string,
+    requestedLimit: number,
+    requestedOffset: number,
+  ): Promise<{ items: OwnedReport[]; hasMore: boolean }> {
+    const limit = Math.max(1, Math.min(Math.floor(requestedLimit), 100));
+    const offset = Math.max(0, Math.floor(requestedOffset));
+    const result = await this.database.execute<
+      ReportRow & {
+        moderation_status: 'VISIBLE' | 'HIDDEN';
+        feedback_count: number | string;
+        latest_feedback_at: Date | string | null;
+      }
+    >(sql`
+      SELECT ${reportProjection}, street_reports.moderation_status,
+        COALESCE(f.feedback_count, 0) AS feedback_count,
+        f.latest_feedback_at
+      FROM street_reports
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS feedback_count, MAX(updated_at) AS latest_feedback_at
+        FROM report_feedback WHERE report_id = street_reports.id
+      ) f ON TRUE
+      WHERE street_reports.user_id = ${userId}::uuid
+      ORDER BY street_reports.created_at DESC
+      LIMIT ${limit + 1} OFFSET ${offset}
+    `);
+    const hasMore = result.rows.length > limit;
+    return {
+      items: result.rows.slice(0, limit).map((row) => ({
+        report: mapReport(row),
+        publiclyVisible: row.moderation_status === 'VISIBLE',
+        feedbackCount: Number(row.feedback_count),
+        latestFeedbackAt: row.latest_feedback_at ? new Date(row.latest_feedback_at) : null,
+      })),
+      hasMore,
+    };
   }
 
   async findById(id: string): Promise<StreetReport | null> {

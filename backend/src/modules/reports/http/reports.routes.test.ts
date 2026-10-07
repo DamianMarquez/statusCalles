@@ -226,7 +226,7 @@ describe('reports API with PostgreSQL/PostGIS', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const reports = response.json<ReportDto[]>();
+    const reports = response.json<{ items: ReportDto[]; hasMore: boolean }>().items;
     expect(reports.map((report) => report.id)).toContain(nearby.id);
     expect(reports.map((report) => report.id)).not.toContain(farAway.id);
   });
@@ -249,7 +249,7 @@ describe('reports API with PostgreSQL/PostGIS', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const reports = response.json<ReportDto[]>();
+    const reports = response.json<{ items: ReportDto[]; hasMore: boolean }>().items;
     expect(reports.map((report) => report.id)).toContain(visibleReport.id);
     expect(reports.map((report) => report.id)).not.toContain(outsideReport.id);
     expect(reports.find((report) => report.id === visibleReport.id)?.feedback).toEqual({
@@ -257,6 +257,147 @@ describe('reports API with PostgreSQL/PostGIS', () => {
       resolvedReports: 0,
       userFeedback: 'CONFIRM',
     });
+  });
+
+  it('combines multiple types, lifecycle status, severity, and server-relative time filters', async () => {
+    const pothole = await createReport({ ...validReport, description: 'Filtro bache uno' });
+    const flood = await createReport({
+      ...validReport,
+      type: 'FLOOD',
+      description: 'Filtro inundación',
+      latitude: -34.6039,
+    });
+    await createReport({
+      ...validReport,
+      type: 'ROAD_WORK',
+      description: 'Filtro obra',
+      latitude: -34.6041,
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/reports?south=-34.61&north=-34.59&west=-58.39&east=-58.37&types=POTHOLE,FLOOD&statuses=ACTIVE&fromDate=2026-10-01T00%3A00%3A00.000Z&toDate=2026-10-08T00%3A00%3A00.000Z&minSeverity=HIGH',
+    });
+    expect(response.statusCode).toBe(200);
+    const page = response.json<{ items: ReportDto[]; hasMore: boolean }>();
+    expect(page.items.map((item) => item.id)).toEqual(
+      expect.arrayContaining([pothole.id, flood.id]),
+    );
+    expect(page.items.some((item) => item.type === 'ROAD_WORK')).toBe(false);
+    expect(page.items.every((item) => item.status === 'ACTIVE')).toBe(true);
+    expect(page.hasMore).toBe(false);
+  });
+
+  it('validates report filter enums and date ranges', async () => {
+    const base = '/api/reports?south=-34.61&north=-34.59&west=-58.39&east=-58.37';
+    for (const suffix of [
+      '&types=DROP_TABLE',
+      '&statuses=REJECTED',
+      '&fromDate=not-a-date',
+      '&fromDate=2026-10-05T00%3A00%3A00.000Z&toDate=2026-10-01T00%3A00%3A00.000Z',
+      '&period=7d&fromDate=2026-10-01T00%3A00%3A00.000Z',
+    ]) {
+      const response = await app.inject({ method: 'GET', url: `${base}${suffix}` });
+      expect(response.statusCode).toBe(400);
+    }
+  });
+
+  it('limits map results and returns hasMore without an unbounded marker payload', async () => {
+    await createReport({ ...validReport, description: 'Paginación uno' });
+    await createReport({ ...validReport, description: 'Paginación dos', latitude: -34.6041 });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/reports?south=-34.61&north=-34.59&west=-58.39&east=-58.37&limit=1',
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ items: ReportDto[]; hasMore: boolean }>()).toMatchObject({
+      items: expect.any(Array),
+      hasMore: true,
+    });
+    expect(response.json<{ items: ReportDto[] }>().items).toHaveLength(1);
+  });
+
+  it('restricts onlyMine to the authenticated session and exposes an owner report list', async () => {
+    const owner = testUsers[0]!;
+    const other = testUsers[1]!;
+    const ownReport = await createReport(
+      { ...validReport, description: 'Privado del propietario' },
+      owner.cookie,
+    );
+    const otherReport = await createReport(
+      { ...validReport, description: 'Privado de otra cuenta', latitude: -34.6041 },
+      other.cookie,
+    );
+
+    const unauthenticated = await app.inject({
+      method: 'GET',
+      url: '/api/reports?south=-34.61&north=-34.59&west=-58.39&east=-58.37&onlyMine=true',
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+    const mapPage = await app.inject({
+      method: 'GET',
+      url: '/api/reports?south=-34.61&north=-34.59&west=-58.39&east=-58.37&onlyMine=true',
+      headers: { cookie: owner.cookie },
+    });
+    expect(mapPage.statusCode).toBe(200);
+    const mappedIds = mapPage.json<{ items: ReportDto[] }>().items.map((item) => item.id);
+    expect(mappedIds).toContain(ownReport.id);
+    expect(mappedIds).not.toContain(otherReport.id);
+
+    const mine = await app.inject({
+      method: 'GET',
+      url: '/api/users/me/reports',
+      headers: { cookie: owner.cookie },
+    });
+    expect(mine.statusCode).toBe(200);
+    const ownItems = mine.json<{ items: Array<ReportDto & { feedbackCount: number }> }>().items;
+    expect(ownItems.map((item) => item.id)).toContain(ownReport.id);
+    expect(ownItems.map((item) => item.id)).not.toContain(otherReport.id);
+    expect(ownItems.find((item) => item.id === ownReport.id)).toMatchObject({
+      publiclyVisible: true,
+      feedbackCount: 0,
+    });
+
+    const impersonation = await app.inject({
+      method: 'GET',
+      url: `/api/users/me/reports?userId=${other.id}`,
+      headers: { cookie: owner.cookie },
+    });
+    expect(impersonation.statusCode).toBe(200);
+    expect(impersonation.json<{ items: ReportDto[] }>().items.map((item) => item.id)).toContain(
+      ownReport.id,
+    );
+    expect(impersonation.json<{ items: ReportDto[] }>().items.map((item) => item.id)).not.toContain(
+      otherReport.id,
+    );
+
+    const admin = testUsers[2]!;
+    await pool.query("UPDATE users SET role = 'ADMIN' WHERE id = $1", [admin.id]);
+    const hide = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/reports/${ownReport.id}/moderation`,
+      headers: { cookie: admin.cookie },
+      payload: { status: 'HIDDEN', note: 'Ocultado en prueba de privacidad.' },
+    });
+    expect(hide.statusCode).toBe(200);
+    const publicPage = await app.inject({
+      method: 'GET',
+      url: '/api/reports?south=-34.61&north=-34.59&west=-58.39&east=-58.37',
+    });
+    expect(publicPage.json<{ items: ReportDto[] }>().items.map((item) => item.id)).not.toContain(
+      ownReport.id,
+    );
+    const privateMapPage = await app.inject({
+      method: 'GET',
+      url: '/api/reports?south=-34.61&north=-34.59&west=-58.39&east=-58.37&onlyMine=true',
+      headers: { cookie: owner.cookie },
+    });
+    expect(
+      privateMapPage
+        .json<{ items: Array<ReportDto & { publiclyVisible: boolean }> }>()
+        .items.find((item) => item.id === ownReport.id),
+    ).toMatchObject({ publiclyVisible: false });
+    await pool.query("UPDATE users SET role = 'USER' WHERE id = $1", [admin.id]);
   });
 
   it('associates a report with an official street when a nearby segment is within tolerance', async () => {

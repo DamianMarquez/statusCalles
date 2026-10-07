@@ -6,20 +6,20 @@ import type {
   ReportType,
   ReportFeedbackType,
   ViewportBounds,
+  MapReportFilters,
+  ReportPageDto,
 } from './reportTypes.js';
 
 const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-const reportTypes: ReportType[] = [
-  'POTHOLE',
-  'FLOOD',
-  'ROAD_DAMAGE',
-  'ROAD_BLOCKED',
-  'ROAD_WORK',
-  'TRAFFIC_LIGHT',
-  'OTHER',
-];
-const reportSeverities: ReportSeverity[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-const reportStatuses: ReportStatus[] = ['ACTIVE', 'STALE', 'RESOLVED'];
+import {
+  REPORT_SEVERITY_OPTIONS,
+  REPORT_STATUS_OPTIONS,
+  REPORT_TYPE_OPTIONS,
+} from './reportCatalog.js';
+import type { OwnedReportPageDto } from './reportTypes.js';
+const reportTypes = REPORT_TYPE_OPTIONS.map((item) => item.value) as ReportType[];
+const reportSeverities = REPORT_SEVERITY_OPTIONS.map((item) => item.value) as ReportSeverity[];
+const reportStatuses = REPORT_STATUS_OPTIONS.map((item) => item.value) as ReportStatus[];
 
 export class ReportsApiError extends Error {
   constructor(
@@ -47,6 +47,7 @@ function isReportDto(value: unknown): value is ReportDto {
     reportStatuses.includes(report.status as ReportStatus) &&
     typeof report.createdAt === 'string' &&
     typeof report.updatedAt === 'string' &&
+    (report.publiclyVisible === undefined || typeof report.publiclyVisible === 'boolean') &&
     (report.street === undefined ||
       report.street === null ||
       (typeof report.street.id === 'string' &&
@@ -67,14 +68,35 @@ function isReportDto(value: unknown): value is ReportDto {
   );
 }
 
+function isOwnedReportDto(value: unknown): boolean {
+  return (
+    isReportDto(value) &&
+    'publiclyVisible' in value &&
+    typeof value.publiclyVisible === 'boolean' &&
+    'feedbackCount' in value &&
+    typeof value.feedbackCount === 'number' &&
+    'latestActivityAt' in value &&
+    typeof value.latestActivityAt === 'string'
+  );
+}
+
 export async function getReportsInViewport(
   bounds: ViewportBounds,
+  filters: MapReportFilters,
   signal: AbortSignal,
-): Promise<ReportDto[]> {
+): Promise<ReportPageDto> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(bounds)) {
     query.set(key, value.toFixed(5));
   }
+  if (filters.types) query.set('types', filters.types.length ? filters.types.join(',') : 'NONE');
+  if (filters.statuses)
+    query.set('statuses', filters.statuses.length ? filters.statuses.join(',') : 'NONE');
+  if (filters.period) query.set('period', filters.period);
+  if (filters.fromDate) query.set('fromDate', filters.fromDate);
+  if (filters.toDate) query.set('toDate', filters.toDate);
+  if (filters.minSeverity) query.set('minSeverity', filters.minSeverity);
+  if (filters.onlyMine) query.set('onlyMine', 'true');
 
   let response: Response;
   try {
@@ -99,11 +121,52 @@ export async function getReportsInViewport(
     throw new ReportsApiError('El servicio devolvió una respuesta inválida.');
   }
 
-  if (!Array.isArray(result) || !result.every(isReportDto)) {
+  if (
+    !result ||
+    typeof result !== 'object' ||
+    !('items' in result) ||
+    !Array.isArray(result.items) ||
+    !result.items.every(isReportDto) ||
+    !('hasMore' in result) ||
+    typeof result.hasMore !== 'boolean'
+  ) {
     throw new ReportsApiError('El servicio devolvió reportes con un formato inválido.');
   }
 
-  return result;
+  return result as ReportPageDto;
+}
+
+export async function getMyReports(
+  limit = 50,
+  offset = 0,
+  signal?: AbortSignal,
+): Promise<OwnedReportPageDto> {
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}/api/users/me/reports?limit=${limit}&offset=${offset}`, {
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new ReportsApiError('No se pudo conectar con el servicio de reportes.');
+  }
+  if (response.status === 401) throw new ReportsApiError('Iniciá sesión para ver tus reportes.');
+  if (!response.ok) throw new ReportsApiError('No pudimos cargar tus reportes.');
+  const result: unknown = await response.json().catch(() => null);
+  if (
+    !result ||
+    typeof result !== 'object' ||
+    !('items' in result) ||
+    !Array.isArray(result.items) ||
+    !('hasMore' in result) ||
+    typeof result.hasMore !== 'boolean' ||
+    !result.items.every(isOwnedReportDto)
+  ) {
+    throw new ReportsApiError('El servicio devolvió reportes con un formato inválido.');
+  }
+  return result as OwnedReportPageDto;
 }
 
 export async function createReport(

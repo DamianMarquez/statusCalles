@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getReportsInViewport } from '../../api/reportsApi.js';
-import type { ReportDto, ReportFeedbackSummary, ViewportBounds } from '../../api/reportTypes.js';
+import type {
+  MapReportFilters,
+  ReportDto,
+  ReportFeedbackSummary,
+  ViewportBounds,
+} from '../../api/reportTypes.js';
 
 export type ReportLoadStatus = 'loading' | 'error' | 'empty' | 'loaded';
 
@@ -20,20 +25,28 @@ function boundsKey(bounds: ViewportBounds): string {
 export function useViewportReports(debounceMs = 300) {
   const [reports, setReports] = useState<ReportDto[]>([]);
   const [status, setStatus] = useState<ReportLoadStatus>('loading');
+  const [hasMore, setHasMore] = useState(false);
   const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeController = useRef<AbortController | null>(null);
   const requestId = useRef(0);
   const lastBoundsKey = useRef<string | null>(null);
   const latestBounds = useRef<ViewportBounds | null>(null);
+  const latestFilters = useRef<MapReportFilters>({});
 
   const requestBounds = useCallback(
-    (bounds: ViewportBounds, force = false) => {
+    (bounds: ViewportBounds, filters: MapReportFilters = {}, force = false) => {
       const normalizedBounds = normalizeBounds(bounds);
-      const key = boundsKey(normalizedBounds);
+      const normalizedFilters = {
+        ...filters,
+        types: filters.types ? [...filters.types].sort() : undefined,
+        statuses: filters.statuses ? [...filters.statuses].sort() : undefined,
+      };
+      const key = `${boundsKey(normalizedBounds)}:${JSON.stringify(normalizedFilters)}`;
       if (!force && key === lastBoundsKey.current) return;
 
       lastBoundsKey.current = key;
       latestBounds.current = normalizedBounds;
+      latestFilters.current = normalizedFilters;
       const currentRequestId = ++requestId.current;
       activeController.current?.abort();
       activeController.current = null;
@@ -44,10 +57,15 @@ export function useViewportReports(debounceMs = 300) {
         const controller = new AbortController();
         activeController.current = controller;
         try {
-          const nextReports = await getReportsInViewport(normalizedBounds, controller.signal);
+          const page = await getReportsInViewport(
+            normalizedBounds,
+            normalizedFilters,
+            controller.signal,
+          );
           if (requestId.current !== currentRequestId || controller.signal.aborted) return;
-          setReports(nextReports);
-          setStatus(nextReports.length === 0 ? 'empty' : 'loaded');
+          setReports(page.items);
+          setHasMore(page.hasMore);
+          setStatus(page.items.length === 0 ? 'empty' : 'loaded');
         } catch {
           if (requestId.current !== currentRequestId || controller.signal.aborted) return;
           setStatus('error');
@@ -58,10 +76,14 @@ export function useViewportReports(debounceMs = 300) {
   );
 
   const retry = useCallback(() => {
-    if (latestBounds.current) requestBounds(latestBounds.current, true);
+    if (latestBounds.current) requestBounds(latestBounds.current, latestFilters.current, true);
   }, [requestBounds]);
 
   const addReport = useCallback((report: ReportDto) => {
+    requestId.current += 1;
+    if (pendingTimer.current) clearTimeout(pendingTimer.current);
+    activeController.current?.abort();
+    activeController.current = null;
     setReports((current) => [report, ...current.filter((item) => item.id !== report.id)]);
     setStatus('loaded');
   }, []);
@@ -90,6 +112,7 @@ export function useViewportReports(debounceMs = 300) {
   return {
     reports,
     status,
+    hasMore,
     requestBounds,
     retry,
     addReport,

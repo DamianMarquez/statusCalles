@@ -10,6 +10,7 @@ import {
   type AnalyticsHeatCell,
   type OfficialAnalytics,
 } from '../../api/analyticsApi.js';
+import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
 
 interface DashboardData {
   overview: AnalyticsOverview;
@@ -23,15 +24,9 @@ interface DashboardData {
   official: OfficialAnalytics;
 }
 
-const reportLabels: Record<string, string> = {
-  POTHOLE: 'Baches',
-  FLOOD: 'Inundaciones',
-  ROAD_DAMAGE: 'Pavimento deteriorado',
-  ROAD_BLOCKED: 'Calles bloqueadas',
-  ROAD_WORK: 'Obras',
-  TRAFFIC_LIGHT: 'Semáforos',
-  OTHER: 'Otros',
-};
+const reportLabels: Record<string, string> = Object.fromEntries(
+  REPORT_TYPE_OPTIONS.map((option) => [option.value, option.pluralLabel]),
+);
 const severityLabels: Record<number, string> = { 1: 'Baja', 2: 'Media', 3: 'Alta', 4: 'Crítica' };
 const scoreLabels: Record<string, string> = {
   GOOD: 'Bueno',

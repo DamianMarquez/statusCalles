@@ -10,6 +10,7 @@ MVP para consultar y reportar problemas de circulación en calles de la Ciudad A
 - Registro, ingreso, cierre de sesión y perfil con sesión persistida y cookie protegida.
 - Street Score estimado por áreas geográficas con reportes suficientes, visible como celdas explicables en el mapa.
 - Moderación básica con detección de duplicados, marcación de contenido y cola administrativa con auditoría.
+- Filtros combinables por tipo, lifecycle, antigüedad, severidad y reportes propios; navegación “Mis reportes”.
 - API Fastify con health check y endpoints REST para persistir, consultar y moderar reportes.
 - Reportes almacenados en PostgreSQL con `GEOGRAPHY(POINT, 4326)` y consultas de radio ejecutadas por PostGIS.
 - Migraciones versionadas con Drizzle Kit.
@@ -91,6 +92,7 @@ La API está bajo `/api`. Los tipos admitidos son `POTHOLE`, `FLOOD`, `ROAD_DAMA
 | ---------------------------------------------------------------- | -------------------------------------------- |
 | `GET /api/health`                                                | Health check                                 |
 | `GET /api/reports?south=-34.7&north=-34.5&west=-58.5&east=-58.3` | Buscar dentro del viewport visible           |
+| `GET /api/users/me/reports`                                      | Reportes del usuario de la sesión actual     |
 | `GET /api/reports?lat=-34.6037&lng=-58.3816&radius=1000`         | Buscar en un radio, expresado en metros      |
 | `POST /api/reports`                                              | Crear un reporte                             |
 | `POST /api/reports/:id/feedback`                                 | Crear o cambiar la confirmación comunitaria  |
@@ -116,6 +118,16 @@ curl -X POST http://localhost:3000/api/reports \
 Las coordenadas se validan dentro de los rangos de latitud y longitud, la descripción se limita a 500 caracteres y los objetos rechazan propiedades adicionales. La búsqueda acepta un viewport geográfico (`south`, `north`, `west`, `east`) o un radio (`lat`, `lng`, `radius`, máximo 50 km); ambas devuelven hasta 200 resultados. El viewport se filtra con PostGIS contra su bounding box, y el radio usa `ST_DWithin` sobre geography. Las consultas SQL se parametrizan mediante Drizzle. El mapa solicita el viewport al abrirse y al terminar cada movimiento/zoom, con debounce de 300 ms, cancelación de solicitudes anteriores y protección frente a respuestas fuera de orden. Si falla la API, el mapa permanece visible con opción para reintentar; no se usa clustering en esta etapa.
 
 La API devuelve DTOs con `{ latitude, longitude }`, fechas ISO y enums públicos; no serializa filas o tipos internos de la base.
+
+## Filtros del mapa y Mis reportes
+
+El mapa permite combinar `types` (CSV OR), `statuses` (CSV OR), `period`, `fromDate`, `toDate`, `minSeverity` y `onlyMine=true`. Ejemplo: `GET /api/reports?south=-34.7&north=-34.5&west=-58.5&east=-58.3&types=POTHOLE,FLOOD&statuses=ACTIVE,STALE&period=7d&minSeverity=HIGH`. Las categorías se aplican con AND. `period` acepta `24h`, `3d`, `7d`, `30d` o `90d` y Postgres calcula su corte desde `NOW()`; un rango personalizado recibe ISO-8601 UTC (`fromDate`/`toDate`) y rechaza fechas mal formadas o invertidas. Los inputs de fecha del usuario se interpretan en `America/Argentina/Buenos_Aires`; persistencia y comparación usan instantes UTC. El lifecycle `STALE` sigue la misma regla vigente: un reporte no resuelto queda stale si su creación y última confirmación superan 30 días.
+
+El filtrado ocurre en PostgreSQL/PostGIS antes de mapear DTOs. El viewport conserva su bounding box GiST, y los resultados se limitan a 200 por petición; la respuesta del mapa es `{ items, hasMore }`. Si hay más de 200, se informa que conviene acercar el mapa; no se agregaron clustering ni un endpoint de facetas, porque el límite acota el trabajo y los conteos de tipo no son necesarios para aplicar filtros. Los cambios de filtro se editan en un panel y sólo **Aplicar** dispara una nueva consulta; la URL guarda el filtro, admite back/forward y puede compartirse. Cada consulta aborta la anterior y conserva markers actuales mientras carga.
+
+`onlyMine=true` exige una cookie de sesión y el backend toma el `user_id` exclusivamente de esa sesión; cualquier `userId` enviado por el cliente se ignora. Para mostrar en mapa los reportes propios ocultos, el endpoint los incluye sólo bajo esa sesión y marca `publiclyVisible: false`; el popup informa que no aparece en el mapa público y deshabilita el feedback. Los demás usuarios nunca reciben reportes ocultos.
+
+`GET /api/users/me/reports?limit=50&offset=0` lista reportes de la sesión autenticada, incluso los que ya no son públicos. Devuelve tipo, calle/ubicación, fecha, severidad, estado calculado, resumen de feedback, última actividad y un indicador de visibilidad pública, sin motivo ni datos internos de moderación. El listado pagina hasta 100 elementos por llamada; no acepta identidad de usuario como selector. Desde cada tarjeta se abre el detalle, se accede al reporte en el mapa (con `onlyMine=true` y foco geográfico) o se modifica feedback cuando el reporte sigue visible. Los botones de creación llevan al modo de selección de ubicación del mapa.
 
 Para crear un reporte, presionar **Reportar problema**, tocar el mapa para marcar la ubicación y completar tipo y severidad. La descripción es opcional (máximo 500 caracteres). La API valida tipo, severidad, coordenadas y longitud de descripción; si se omite, persiste una descripción vacía. Una creación correcta devuelve el DTO del reporte, que se agrega al mapa inmediatamente. Antes de crear, el backend busca por PostGIS reportes visibles del mismo tipo a 50 metros o menos, creados en las últimas 24 horas y no resueltos. Ante una coincidencia devuelve `409 SIMILAR_REPORT_EXISTS`; la interfaz avisa y permite reintentar confirmando `allowSimilar: true`. No se elimina ni se fusiona ningún reporte.
 

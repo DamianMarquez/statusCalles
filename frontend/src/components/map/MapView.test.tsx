@@ -79,11 +79,14 @@ const report: ReportDto = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getReportsInViewport.mockResolvedValue([]);
+  mocks.getReportsInViewport.mockResolvedValue({ items: [], hasMore: false });
   mocks.mapEvents = {};
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  window.history.replaceState({}, '', '/');
+});
 
 async function selectReportLocation() {
   fireEvent.click(screen.getByRole('button', { name: '+ Reportar problema' }));
@@ -163,7 +166,9 @@ describe('MapView report creation', () => {
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getAllByTestId('marker')).toHaveLength(1);
-    expect(await screen.findByText('1 reporte en esta zona.')).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Mostrando todos los reportes disponibles · 1 en esta zona/),
+    ).toBeInTheDocument();
     await waitFor(() =>
       expect(mocks.map.setView).toHaveBeenCalledWith([-34.6037, -58.3816], 16, { animate: true }),
     );
@@ -199,7 +204,7 @@ describe('MapView report creation', () => {
   });
 
   it('updates feedback counts immediately after voting on a report', async () => {
-    mocks.getReportsInViewport.mockResolvedValue([report]);
+    mocks.getReportsInViewport.mockResolvedValue({ items: [report], hasMore: false });
     mocks.submitReportFeedback.mockResolvedValue({
       ...report,
       feedback: { confirmations: 4, resolvedReports: 2, userFeedback: 'CONFIRM' },
@@ -218,8 +223,17 @@ describe('MapView report creation', () => {
     expect(mocks.submitReportFeedback).toHaveBeenCalledWith('report-1', 'CONFIRM');
   });
 
+  it('keeps the map visible after report loading fails and retries the same filters', async () => {
+    mocks.getReportsInViewport.mockRejectedValueOnce(new Error('network failure'));
+    render(<MapView />);
+    expect(await screen.findByText('No pudimos actualizar los reportes.')).toBeInTheDocument();
+    expect(screen.getByTestId('map')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByText('No hay reportes en esta zona.')).toBeInTheDocument();
+  });
+
   it('restores the current vote and shows an error if feedback is rejected', async () => {
-    mocks.getReportsInViewport.mockResolvedValue([report]);
+    mocks.getReportsInViewport.mockResolvedValue({ items: [report], hasMore: false });
     mocks.submitReportFeedback.mockRejectedValue(new Error('No pudimos registrar tu respuesta.'));
     renderAuthenticatedMap();
 

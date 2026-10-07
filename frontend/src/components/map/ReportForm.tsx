@@ -5,24 +5,8 @@ import type {
   ReportSeverity,
   ReportType,
 } from '../../api/reportTypes.js';
+import { REPORT_SEVERITY_OPTIONS, REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
 import type { UserLocation } from './types.js';
-
-const reportTypes: { value: ReportType; label: string }[] = [
-  { value: 'POTHOLE', label: 'Bache' },
-  { value: 'FLOOD', label: 'Inundación' },
-  { value: 'ROAD_DAMAGE', label: 'Pavimento deteriorado' },
-  { value: 'ROAD_BLOCKED', label: 'Calle bloqueada' },
-  { value: 'ROAD_WORK', label: 'Obra' },
-  { value: 'TRAFFIC_LIGHT', label: 'Semáforo roto' },
-  { value: 'OTHER', label: 'Otro' },
-];
-
-const severities: { value: ReportSeverity; label: string }[] = [
-  { value: 'LOW', label: 'Baja' },
-  { value: 'MEDIUM', label: 'Media' },
-  { value: 'HIGH', label: 'Alta' },
-  { value: 'CRITICAL', label: 'Crítica' },
-];
 
 interface ReportFormProps {
   location: UserLocation;
@@ -114,7 +98,7 @@ export function ReportForm({
               <option value="" disabled>
                 Elegí una opción
               </option>
-              {reportTypes.map((item) => (
+              {REPORT_TYPE_OPTIONS.map((item) => (
                 <option key={item.value} value={item.value}>
                   {item.label}
                 </option>
@@ -128,7 +112,7 @@ export function ReportForm({
               <option value="" disabled>
                 Elegí una opción
               </option>
-              {severities.map((item) => (
+              {REPORT_SEVERITY_OPTIONS.map((item) => (
                 <option key={item.value} value={item.value}>
                   {item.label}
                 </option>

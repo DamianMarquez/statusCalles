@@ -8,7 +8,8 @@ const unusedReportRepository: ReportRepository = {
     throw new Error('Not used in this test.');
   },
   findNearby: async () => [],
-  findInViewport: async () => [],
+  findInViewport: async () => ({ items: [], hasMore: false }),
+  findMine: async () => ({ items: [], hasMore: false }),
   findSimilar: async () => null,
   findById: async () => null,
   findByStreetId: async () => [],

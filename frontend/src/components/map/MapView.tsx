@@ -30,16 +30,14 @@ import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../../auth/AuthContext.js';
 import { RoutePlanner } from './RoutePlanner.js';
 import type { CalculatedRoute } from '../../api/routingApi.js';
+import { MapFilters } from './MapFilters.js';
+import { useMapReportFilters } from './useMapReportFilters.js';
+import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
+import { filtersActiveCount } from './mapReportFilters.js';
 
-const reportTypeClasses: Record<keyof typeof reportTypeLabelsForMap, string> = {
-  POTHOLE: 'pothole',
-  FLOOD: 'flooding',
-  ROAD_DAMAGE: 'road-damage',
-  ROAD_BLOCKED: 'road-blocked',
-  ROAD_WORK: 'construction',
-  TRAFFIC_LIGHT: 'traffic-light',
-  OTHER: 'other',
-};
+const reportTypeClasses = Object.fromEntries(
+  REPORT_TYPE_OPTIONS.map((option) => [option.value, option.markerClass]),
+) as Record<keyof typeof reportTypeLabelsForMap, string>;
 
 const currentLocationIcon = divIcon({
   className: 'user-marker-wrapper',
@@ -111,6 +109,19 @@ function RouteLayer({ route }: { route: CalculatedRoute | null }) {
   );
 }
 
+function MapQueryFocus() {
+  const map = useMap();
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const latitude = Number(params.get('focusLat'));
+    const longitude = Number(params.get('focusLng'));
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      map.setView([latitude, longitude], Math.max(map.getZoom(), 16), { animate: true });
+    }
+  }, [map]);
+  return null;
+}
+
 function getGeolocationProvider(): Geolocation | undefined {
   return typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
 }
@@ -131,8 +142,15 @@ function getLocationErrorMessage(error: unknown): string {
   }
 }
 
-export default function MapView() {
+export default function MapView({
+  startReportOnOpen = false,
+  onStartReportHandled,
+}: {
+  startReportOnOpen?: boolean;
+  onStartReportHandled?: () => void;
+} = {}) {
   const { user, openAuthDialog, refreshProfile } = useAuth();
+  const { filters, applyFilters } = useMapReportFilters();
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
@@ -148,6 +166,7 @@ export default function MapView() {
   const {
     reports,
     status: reportStatus,
+    hasMore,
     requestBounds,
     retry,
     addReport,
@@ -158,8 +177,14 @@ export default function MapView() {
     retry();
   }, [user?.id, retry]);
   const handleViewportChange = useCallback(
-    (bounds: ViewportBounds) => requestBounds(bounds),
-    [requestBounds],
+    (bounds: ViewportBounds) => {
+      if (filters.onlyMine && !user) {
+        openAuthDialog();
+        return;
+      }
+      requestBounds(bounds, filters);
+    },
+    [filters, openAuthDialog, requestBounds, user],
   );
 
   async function handleLocateMe() {
@@ -185,6 +210,13 @@ export default function MapView() {
     setIsReportFormOpen(false);
     setIsPickingReportLocation(true);
   }
+
+  useEffect(() => {
+    if (startReportOnOpen) {
+      startReport();
+      onStartReportHandled?.();
+    }
+  }, [startReportOnOpen, onStartReportHandled]);
 
   function selectReportLocation(location: UserLocation) {
     setReportLocation(location);
@@ -268,7 +300,9 @@ export default function MapView() {
         ? 'No pudimos actualizar los reportes.'
         : reportStatus === 'empty'
           ? 'No hay reportes en esta zona.'
-          : `${reportCount} ${reportCount === 1 ? 'reporte' : 'reportes'} en esta zona.`;
+          : filtersActiveCount(filters) === 0
+            ? `Mostrando todos los reportes disponibles · ${reportCount} en esta zona.`
+            : `${reportCount} ${reportCount === 1 ? 'reporte' : 'reportes'} en esta zona.`;
 
   return (
     <section
@@ -287,6 +321,7 @@ export default function MapView() {
       >
         <TileLayer url={mapConfig.tileUrl} attribution={mapConfig.tileAttribution} />
         <ViewportReports onViewportChange={handleViewportChange} />
+        <MapQueryFocus />
         <StreetScoreLayer refreshKey={scoreRefreshKey} />
         <RouteLayer route={calculatedRoute} />
         <ReportFocus location={reportFocusLocation} />
@@ -327,6 +362,12 @@ export default function MapView() {
           </button>
         )}
       </div>
+      <MapFilters
+        value={filters}
+        onApply={applyFilters}
+        authenticated={Boolean(user)}
+        onRequestLogin={openAuthDialog}
+      />
       <div className="map-toolbar">
         <button
           className="report-start-button"
@@ -402,6 +443,19 @@ export default function MapView() {
           </span>
         ))}
       </div>
+      {reportStatus === 'empty' && filtersActiveCount(filters) > 0 && (
+        <div className="map-empty-filter" role="status">
+          <span>No encontramos reportes con estos filtros.</span>
+          <button type="button" onClick={() => applyFilters({})}>
+            Limpiar filtros
+          </button>
+        </div>
+      )}
+      {reportStatus === 'loaded' && reports.length > 0 && hasMore && (
+        <div className="map-results-limit" role="status">
+          Hay más reportes en esta zona. Acercá el mapa para ver resultados más específicos.
+        </div>
+      )}
     </section>
   );
 }

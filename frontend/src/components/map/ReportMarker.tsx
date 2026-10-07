@@ -3,16 +3,11 @@ import { divIcon } from 'leaflet';
 import { Marker, Popup } from 'react-leaflet';
 import type { ReportDto, ReportFeedbackType } from '../../api/reportTypes.js';
 import { ReportMarkerPopup } from './ReportMarkerPopup.js';
+import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
 
-const markerClasses: Record<ReportDto['type'], string> = {
-  POTHOLE: 'pothole',
-  FLOOD: 'flooding',
-  ROAD_DAMAGE: 'road-damage',
-  ROAD_BLOCKED: 'road-blocked',
-  ROAD_WORK: 'construction',
-  TRAFFIC_LIGHT: 'traffic-light',
-  OTHER: 'other',
-};
+const markerClasses = Object.fromEntries(
+  REPORT_TYPE_OPTIONS.map((option) => [option.value, option.markerClass]),
+) as Record<ReportDto['type'], string>;
 
 function createReportIcon(type: ReportDto['type']) {
   return divIcon({
