@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { divIcon } from 'leaflet';
-import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import {
+  MapContainer,
+  Marker,
+  Polyline,
+  Popup,
+  TileLayer,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet';
 import { createReport } from '../../api/reportsApi.js';
 import type {
   CreateReportInput,
@@ -20,6 +28,8 @@ import { useViewportReports } from './useViewportReports.js';
 import type { UserLocation } from './types.js';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../../auth/AuthContext.js';
+import { RoutePlanner } from './RoutePlanner.js';
+import type { CalculatedRoute } from '../../api/routingApi.js';
 
 const reportTypeClasses: Record<keyof typeof reportTypeLabelsForMap, string> = {
   POTHOLE: 'pothole',
@@ -86,6 +96,21 @@ function ReportFocus({ location }: { location: UserLocation | null }) {
   return null;
 }
 
+function RouteLayer({ route }: { route: CalculatedRoute | null }) {
+  const map = useMap();
+  const positions =
+    route?.route.coordinates.map(
+      ([longitude, latitude]) => [latitude, longitude] as [number, number],
+    ) ?? [];
+  useEffect(() => {
+    if (positions.length >= 2) map.fitBounds(positions, { padding: [44, 44], maxZoom: 17 });
+  }, [map, route]);
+  if (!route || positions.length < 2) return null;
+  return (
+    <Polyline positions={positions} pathOptions={{ color: '#246fc5', weight: 6, opacity: 0.9 }} />
+  );
+}
+
 function getGeolocationProvider(): Geolocation | undefined {
   return typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
 }
@@ -116,6 +141,7 @@ export default function MapView() {
   const [reportLocation, setReportLocation] = useState<UserLocation | null>(null);
   const [reportFocusLocation, setReportFocusLocation] = useState<UserLocation | null>(null);
   const [reportSuccess, setReportSuccess] = useState(false);
+  const [calculatedRoute, setCalculatedRoute] = useState<CalculatedRoute | null>(null);
   const [votingReportIds, setVotingReportIds] = useState<Set<string>>(() => new Set());
   const [feedbackErrors, setFeedbackErrors] = useState<Record<string, string>>({});
   const [scoreRefreshKey, setScoreRefreshKey] = useState(0);
@@ -262,6 +288,7 @@ export default function MapView() {
         <TileLayer url={mapConfig.tileUrl} attribution={mapConfig.tileAttribution} />
         <ViewportReports onViewportChange={handleViewportChange} />
         <StreetScoreLayer refreshKey={scoreRefreshKey} />
+        <RouteLayer route={calculatedRoute} />
         <ReportFocus location={reportFocusLocation} />
         <ReportLocationPicker
           active={isPickingReportLocation}
@@ -327,6 +354,7 @@ export default function MapView() {
           </p>
         )}
       </div>
+      <RoutePlanner onRoute={setCalculatedRoute} />
       {isPickingReportLocation && (
         <div className="report-pick-prompt" role="status">
           <strong>Elegí la ubicación del problema</strong>

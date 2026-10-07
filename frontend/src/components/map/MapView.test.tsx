@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getReportsInViewport: vi.fn(),
   createReport: vi.fn(),
   submitReportFeedback: vi.fn(),
+  calculateRoute: vi.fn(),
   mapEvents: {} as Record<string, (event: { latlng: { lat: number; lng: number } }) => void>,
   map: {
     getBounds: () => ({
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     }),
     getZoom: () => 13,
     setView: vi.fn(),
+    fitBounds: vi.fn(),
   },
 }));
 
@@ -26,6 +28,7 @@ vi.mock('../../api/reportsApi.js', () => ({
   createReport: mocks.createReport,
   submitReportFeedback: mocks.submitReportFeedback,
 }));
+vi.mock('../../api/routingApi.js', () => ({ calculateRoute: mocks.calculateRoute }));
 vi.mock('leaflet', () => ({
   divIcon: (options: unknown) => options,
 }));
@@ -43,6 +46,7 @@ vi.mock('react-leaflet', async () => {
       ),
     Marker: ({ children }: React.PropsWithChildren) =>
       React.createElement('div', { 'data-testid': 'marker' }, children),
+    Polyline: () => React.createElement('div', { 'data-testid': 'route-line' }),
     Popup: ({ children }: React.PropsWithChildren) => React.createElement('div', null, children),
     Rectangle: ({ children }: React.PropsWithChildren) =>
       React.createElement('div', null, children),
@@ -226,5 +230,43 @@ describe('MapView report creation', () => {
     );
     expect(screen.getByRole('button', { name: /Ya no existe/ })).toHaveTextContent('2');
     expect(screen.getByRole('button', { name: /Sigue existiendo/ })).toHaveTextContent('3');
+  });
+
+  it('renders the calculated route on Leaflet and fits the map to it', async () => {
+    mocks.calculateRoute.mockResolvedValue({
+      route: {
+        type: 'LineString',
+        coordinates: [
+          [-58.3816, -34.6037],
+          [-58.3974, -34.5895],
+        ],
+      },
+      distanceMeters: 2400,
+      durationSeconds: 480,
+      warnings: ['Esta ruta atraviesa 2 tramos con señales de deterioro.'],
+      affectedSegments: [],
+      option: 'FASTEST',
+    });
+    render(<MapView />);
+    fireEvent.click(screen.getByRole('button', { name: /Cómo llegar/ }));
+    fireEvent.change(screen.getByLabelText('Desde'), {
+      target: { value: '-34.6037, -58.3816' },
+    });
+    fireEvent.change(screen.getByLabelText('Hasta'), {
+      target: { value: '-34.5895, -58.3974' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Calcular ruta' }));
+
+    expect(await screen.findByTestId('route-line')).toBeInTheDocument();
+    expect(await screen.findByText(/Esta ruta atraviesa 2 tramos/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mocks.map.fitBounds).toHaveBeenCalledWith(
+        [
+          [-34.6037, -58.3816],
+          [-34.5895, -58.3974],
+        ],
+        { padding: [44, 44], maxZoom: 17 },
+      ),
+    );
   });
 });

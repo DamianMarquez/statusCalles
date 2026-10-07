@@ -8,6 +8,8 @@ import { DrizzleAuthRepository } from './infrastructure/database/auth-repository
 import { DrizzleStreetCatalogRepository } from './infrastructure/database/street-catalog-repository.drizzle.js';
 import { DrizzleMobilityCatalogRepository } from './infrastructure/database/mobility-catalog-repository.drizzle.js';
 import { DrizzleAnalyticsRepository } from './infrastructure/database/analytics-repository.drizzle.js';
+import { DrizzleRoutingRepository } from './infrastructure/database/routing-repository.drizzle.js';
+import { OsrmRoutingProvider } from './infrastructure/routing/osrm-routing-provider.js';
 
 const { database, pool } = createDatabase(getDatabaseUrl());
 const app = buildApp(
@@ -20,6 +22,8 @@ const app = buildApp(
     streetCatalogRepository: new DrizzleStreetCatalogRepository(database),
     mobilityCatalogRepository: new DrizzleMobilityCatalogRepository(database),
     analyticsRepository: new DrizzleAnalyticsRepository(database),
+    routingProvider: new OsrmRoutingProvider(),
+    routingRepository: new DrizzleRoutingRepository(database),
   },
 );
 const host = process.env.BACKEND_HOST ?? '0.0.0.0';

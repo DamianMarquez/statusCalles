@@ -36,4 +36,19 @@ export class StreetScoreService {
       calculatedAt,
     });
   }
+
+  async findForSegments(segmentIds: string[]) {
+    const ids = [...new Set(segmentIds)];
+    if (ids.length === 0) return [];
+    const calculatedAt = this.clock();
+    const inputs = await this.repository.findSegmentScores(ids, calculatedAt);
+    const reportsById = new Map(inputs.map((segment) => [segment.id, segment.reports]));
+    return ids.map((id) =>
+      streetScoreCalculator.calculateSegment({
+        targetId: id,
+        reports: reportsById.get(id) ?? [],
+        calculatedAt,
+      }),
+    );
+  }
 }

@@ -1,0 +1,1 @@
+CREATE INDEX "street_reports_segment_id_idx" ON "street_reports" USING btree ("street_segment_id");

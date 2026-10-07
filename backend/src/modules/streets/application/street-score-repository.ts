@@ -28,4 +28,8 @@ export interface StreetScoreRepository {
     id: string;
     reports: StreetScoreReportInput[];
   } | null>;
+  findSegmentScores(
+    segmentIds: string[],
+    asOf: Date,
+  ): Promise<Array<{ id: string; reports: StreetScoreReportInput[] }>>;
 }

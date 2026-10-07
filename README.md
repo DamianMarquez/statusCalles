@@ -172,6 +172,26 @@ Las rutas `/api/analytics/moderation/overview` requieren rol `MODERATOR` o `ADMI
 
 Las queries limitan resultados en SQL, parametrizan filtros y usan PostGIS para bounding boxes, celdas, radio y asignación a barrios/comunas. Revisé `EXPLAIN (ANALYZE, BUFFERS)` en la base local: el cruce con barrios usa `neighborhoods_geometry_gix`; tendencias y heatmap usaron scan secuencial sobre el conjunto local de 24 reportes por su tamaño, con ejecuciones menores a 1 ms. Los índices existentes `street_reports_created_at_idx`, `street_reports_location_gix`, `neighborhoods_geometry_gix` y `communes_geometry_gix` cubren las consultas probadas; no agregué índices sin evidencia de necesidad.
 
+## Routing inteligente
+
+La interfaz **Cómo llegar** recibe origen y destino como `latitud, longitud` y ofrece `FASTEST`, `AVOID_BAD_STREETS` y `AVOID_BLOCKED_STREETS`. No hay geocoding ni autocompletado en esta fase. El backend valida rangos, tamaño del body y que ambos puntos queden dentro de las comunas oficiales importadas. Si el catálogo de comunas no está cargado, no acepta el pedido. El frontend dibuja la geometría GeoJSON devuelta sobre Leaflet y presenta las advertencias y tramos evaluados; el texto de resultado es “Ruta calculada según los criterios seleccionados”.
+
+`RoutingProvider` es el contrato de aplicación y `OsrmRoutingProvider` adapta OSRM, sin exponer sus respuestas o códigos al dominio. Se eligió OSRM porque resuelve rutas en la red OSM existente y devuelve geometría/duración, y puede entregar alternativas para comparar; la integración queda acotada a un endpoint configurable. Valhalla también es una opción OSM válida y ofrece más controles de costo y modos, pero esos controles no se necesitan para este primer flujo. No se llama al servidor público de demostración: configurar `OSRM_BASE_URL` con una instancia OSRM propia o administrada que acepte el perfil `driving` de CABA. El valor local por defecto es `http://localhost:5000`. La petición upstream tiene timeout de 8 segundos; los fallos se traducen a respuestas seguras `502`/`504`.
+
+`POST /api/routing` recibe `{ "origin": { "latitude": -34.6037, "longitude": -58.3816 }, "destination": { "latitude": -34.5895, "longitude": -58.3974 }, "options": "AVOID_BAD_STREETS" }` y responde con `route` (GeoJSON LineString), distancia y duración estimadas por el proveedor, `warnings` y `affectedSegments`. Para preferencias distintas de `FASTEST`, OSRM puede devolver hasta tres alternativas; se comparan las que realmente entrega y, para el modo rápido, se solicita sólo la ruta rápida.
+
+El adaptador PostGIS encuentra segmentos oficiales a hasta 15 m de cada geometría candidata, calcula la longitud aproximada de cruce y consulta Street Score con el mismo `StreetScoreCalculator` ya usado por la plataforma. La comparación no retuerce una geometría: calcula una duración efectiva para cada alternativa y elige la de menor duración penalizada. Política v1, centralizada en `calculateRoutePenalty`:
+
+1. Velocidad de referencia fija: 13,89 m/s (50 km/h); tiempo de cruce aproximado = longitud del tramo / 13,89.
+2. Para score menor a 55, demora = tiempo de cruce × ((55 − score) / 55) × 2 × multiplicador de severidad (baja 1, media 1,15, alta 1,4, crítica 1,8).
+3. Severidad alta agrega 25% del tiempo de cruce; crítica agrega 50%.
+4. Un corte oficial activo agregaría cinco veces el tiempo de cruce en `AVOID_BAD_STREETS`; en `AVOID_BLOCKED_STREETS`, score cero/estado `IMPASSABLE` o corte activo bloquea esa alternativa si hay otra transitable. Si todas están bloqueadas, se devuelve la alternativa con menor penalización y se avisa.
+5. Las advertencias también listan segmentos con score bajo o severidad alta/crítica en FASTEST, pero FASTEST no altera el tiempo ni la selección. Empates se resuelven por distancia.
+
+Los incidentes/cortes oficiales siguen no disponibles porque la fuente realtime de CABA continúa suspendida; el sistema lo advierte y no interpreta la ausencia como cero cortes. La coincidencia geométrica es aproximada, no una garantía de que proveedor y callejero representen idénticamente cada conexión. La respuesta no representa una recomendación infalible ni una garantía de transitabilidad. El endpoint aplica `RATE_LIMIT_ROUTING_MAX` y `RATE_LIMIT_ROUTING_WINDOW_SECONDS` (20 solicitudes por minuto por defecto).
+
+Antes de iniciar backend, configurar `OSRM_BASE_URL` en `.env`. Para probar la UI sin servicio de rutas no alcanza con arrancar la aplicación: el backend debe poder conectarse a un servidor OSRM.
+
 ## Geografía oficial de CABA
 
 La app mantiene su base cartográfica propia en PostgreSQL/PostGIS y conserva Leaflet/OpenStreetMap para renderizar los tiles. La fuente oficial es Buenos Aires Data, bajo licencia CC-BY-2.5-AR: [Calles](https://data.buenosaires.gob.ar/dataset/calles), [Barrios](https://data.buenosaires.gob.ar/dataset/barrios) y [Comunas](https://data.buenosaires.gob.ar/dataset/comunas).

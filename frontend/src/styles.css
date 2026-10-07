@@ -180,6 +180,187 @@ a {
   gap: 8px;
 }
 
+.route-planner {
+  position: absolute;
+  z-index: 600;
+  top: 16px;
+  left: 60px;
+}
+
+.route-planner__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border: 1px solid #dce6de;
+  border-radius: 11px;
+  background: #fff;
+  color: #244936;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgb(28 54 40 / 14%);
+  cursor: pointer;
+}
+
+.route-planner__toggle span {
+  color: #2675c7;
+  font-size: 17px;
+}
+
+.route-planner__panel {
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(72dvh, 650px);
+  overflow: auto;
+  margin-top: 9px;
+  padding: 19px;
+  border: 1px solid #e1e9e2;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 12px 36px rgb(27 48 34 / 19%);
+}
+
+.route-planner__heading,
+.route-planner__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.route-planner__heading > div > span {
+  color: #6e8978;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.route-planner__heading h2 {
+  margin: 4px 0 0;
+  color: #1d3528;
+  font:
+    700 17px 'Manrope',
+    sans-serif;
+}
+
+.route-planner__heading > button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: #f1f5f1;
+  color: #496151;
+  font-size: 21px;
+  cursor: pointer;
+}
+
+.route-planner__hint {
+  margin: 11px 0 14px;
+  color: #6c7b71;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.route-planner form {
+  display: grid;
+  gap: 12px;
+}
+
+.route-planner form label {
+  display: grid;
+  gap: 5px;
+  color: #53645a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.route-planner input,
+.route-planner select {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 10px;
+  border: 1px solid #dce5de;
+  border-radius: 8px;
+  background: #fff;
+  color: #26392d;
+  font: inherit;
+  font-size: 13px;
+}
+
+.route-planner__actions button {
+  min-height: 40px;
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 8px;
+  background: #176d4b;
+  color: white;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.route-planner__actions button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.route-planner__actions .route-planner__clear {
+  border: 1px solid #dce5de;
+  background: white;
+  color: #526257;
+}
+
+.route-planner__error,
+.route-planner__warning {
+  margin: 0;
+  color: #9b432f;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.route-planner__result {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #e8ede8;
+  color: #53645a;
+  font-size: 12px;
+}
+
+.route-planner__result > strong {
+  color: #203b2b;
+  font-size: 12px;
+}
+
+.route-planner__result details summary {
+  color: #334f3d;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.route-planner__result details ul {
+  display: grid;
+  gap: 9px;
+  margin: 9px 0 0;
+  padding-left: 18px;
+}
+
+.route-planner__result details li {
+  display: grid;
+  gap: 3px;
+}
+
+.route-planner__result details small {
+  color: #78867d;
+}
+
+.leaflet-interactive.route-line {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .locate-button {
   display: inline-flex;
   min-height: 44px;
@@ -905,6 +1086,17 @@ a {
     top: 12px;
     right: 12px;
     max-width: calc(100% - 24px);
+  }
+
+  .route-planner {
+    top: 12px;
+    left: 56px;
+  }
+
+  .route-planner__panel {
+    width: calc(100vw - 68px);
+    max-height: 65dvh;
+    padding: 14px;
   }
 
   .report-start-button {

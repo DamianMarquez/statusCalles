@@ -225,6 +225,7 @@ export const streetReports = pgTable(
     index('street_reports_created_at_idx').on(table.createdAt),
     index('street_reports_user_id_idx').on(table.userId),
     index('street_reports_street_id_idx').on(table.streetId),
+    index('street_reports_segment_id_idx').on(table.streetSegmentId),
   ],
 );
 

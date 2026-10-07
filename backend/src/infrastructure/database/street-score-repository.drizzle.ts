@@ -203,4 +203,46 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
     `);
     return { id: segmentId, reports: result.rows.map(mapInput) };
   }
+
+  async findSegmentScores(segmentIds: string[], asOf: Date) {
+    if (segmentIds.length === 0) return [];
+    const segmentIdArray = sql`ARRAY[${sql.join(
+      segmentIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )}]::uuid[]`;
+    const result = await this.database.execute<ScoreReportRow>(sql`
+      SELECT r.id::text AS id, r.user_id::text AS actor_id, r.street_segment_id::text AS segment_id,
+        r.type, r.severity, r.description,
+        ST_Y(r.location::geometry) AS latitude, ST_X(r.location::geometry) AS longitude,
+        r.status, r.created_at, r.updated_at,
+        COALESCE(f.confirmations, 0) AS confirmations,
+        COALESCE(f.resolved_reports, 0) AS resolved_reports,
+        COALESCE(f.weighted_confirmations, 0) AS weighted_confirmations,
+        COALESCE(f.weighted_resolved_reports, 0) AS weighted_resolved_reports,
+        f.latest_confirmation_at
+      FROM street_reports r
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) FILTER (WHERE type = 'CONFIRM') AS confirmations,
+          COUNT(*) FILTER (WHERE type = 'RESOLVED') AS resolved_reports,
+          SUM(EXP(-LN(2) * GREATEST(EXTRACT(EPOCH FROM (${asOf}::timestamptz - updated_at)) / 86400.0, 0) / ${reportFreshnessThresholds.confirmationHalfLifeDays}))
+            FILTER (WHERE type = 'CONFIRM') AS weighted_confirmations,
+          SUM(EXP(-LN(2) * GREATEST(EXTRACT(EPOCH FROM (${asOf}::timestamptz - updated_at)) / 86400.0, 0) / ${reportFreshnessThresholds.confirmationHalfLifeDays}))
+            FILTER (WHERE type = 'RESOLVED') AS weighted_resolved_reports,
+          MAX(updated_at) FILTER (WHERE type = 'CONFIRM') AS latest_confirmation_at
+        FROM report_feedback WHERE report_id = r.id
+      ) f ON TRUE
+      WHERE r.street_segment_id = ANY(${segmentIdArray})
+        AND r.moderation_status = 'VISIBLE'
+      ORDER BY r.created_at DESC
+      LIMIT 5000
+    `);
+    const grouped = new Map<string, StreetScoreReportInput[]>();
+    for (const row of result.rows) {
+      if (!row.segment_id) continue;
+      const values = grouped.get(row.segment_id) ?? [];
+      values.push(mapInput(row));
+      grouped.set(row.segment_id, values);
+    }
+    return [...grouped.entries()].map(([id, reports]) => ({ id, reports }));
+  }
 }
