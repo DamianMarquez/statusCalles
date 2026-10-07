@@ -1,0 +1,9 @@
+services:
+  routing:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    restart: unless-stopped
+    ports:
+      - '5001:5000'
+    volumes:
+      - ./data/routing:/data:ro
+    command: ['osrm-routed', '--algorithm', 'mld', '/data/BuenosAires.osrm']

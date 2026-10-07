@@ -20,6 +20,7 @@
     "sync:caba:metrobus": "npm run sync:caba:metrobus --workspace backend",
     "sync:caba:metrobus-stops": "npm run sync:caba:metrobus-stops --workspace backend",
     "sync:caba:infrastructure": "npm run sync:caba:infrastructure --workspace backend",
+    "routing:setup": "bash scripts/setup-routing.sh",
     "build": "npm run build --workspace backend && npm run build --workspace frontend",
     "test": "npm run test --workspace backend && npm run test --workspace frontend",
     "lint": "eslint .",
