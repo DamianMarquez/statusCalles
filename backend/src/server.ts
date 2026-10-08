@@ -11,6 +11,7 @@ import { DrizzleAnalyticsRepository } from './infrastructure/database/analytics-
 import { DrizzleRoutingRepository } from './infrastructure/database/routing-repository.drizzle.js';
 import { createOsrmRoutingProvider } from './infrastructure/routing/osrm-routing-provider.js';
 import { UsigAddressSearchProvider } from './infrastructure/external/usig/usig-address-search.provider.js';
+import { DrizzleRoadInformationRepository } from './infrastructure/database/road-information-repository.drizzle.js';
 
 const { database, pool } = createDatabase(getDatabaseUrl());
 const routingProvider = await createOsrmRoutingProvider();
@@ -19,6 +20,7 @@ const app = buildApp(
   new DrizzleReportFeedbackRepository(database),
   {
     streetScoreRepository: new DrizzleStreetScoreRepository(database),
+    roadInformationRepository: new DrizzleRoadInformationRepository(database),
     authRepository: new DrizzleAuthRepository(database),
     moderationDatabase: database,
     streetCatalogRepository: new DrizzleStreetCatalogRepository(database),

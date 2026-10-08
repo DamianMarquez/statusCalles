@@ -1,0 +1,1 @@
+ALTER TABLE "street_segment_information" ADD CONSTRAINT "street_segment_information_updated_by_proposal_id_street_segment_information_proposals_id_fk" FOREIGN KEY ("updated_by_proposal_id") REFERENCES "public"."street_segment_information_proposals"("id") ON DELETE no action ON UPDATE no action;

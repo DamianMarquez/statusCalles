@@ -11,6 +11,13 @@ import type { ViewportBounds } from '../../api/reportTypes.js';
 import { streetConditionLevel } from './streetConditionCatalog.js';
 import { streetConditionLineStyle } from './streetConditionStyle.js';
 import { STREET_ROAD_CLASS_OPTIONS } from './streetRoadClassCatalog.js';
+import { roadSurfaceLineStyle } from './roadSurfaceStyle.js';
+import { RoadInformationPanel } from './RoadInformationPanel.js';
+import type {
+  SurfaceCondition,
+  SurfaceType,
+  SpecialTreatment,
+} from '../../api/roadInformationTypes.js';
 
 const vehicleInterpretations = {
   'Auto común':
@@ -44,11 +51,31 @@ export function StreetScoreLayer({
   refreshKey,
   levels = null,
   roadClasses = ['PRIMARY', 'SECONDARY', 'LOCAL'],
+  conditionVisible = true,
+  surfaceVisible = false,
+  surfaceTypes = null,
+  surfaceConditions = null,
+  surfaceTreatments = null,
+  authenticated = false,
+  onRequestLogin,
+  onInformationChanged,
+  selectingRoadSegment = false,
+  onRoadSegmentSelected,
   onViewStreetReports,
 }: {
   refreshKey: number;
   levels?: string[] | null;
   roadClasses?: StreetRoadClass[];
+  conditionVisible?: boolean;
+  surfaceVisible?: boolean;
+  surfaceTypes?: SurfaceType[] | null;
+  surfaceConditions?: SurfaceCondition[] | null;
+  surfaceTreatments?: SpecialTreatment[] | null;
+  authenticated?: boolean;
+  onRequestLogin: () => void;
+  onInformationChanged: () => void;
+  selectingRoadSegment?: boolean;
+  onRoadSegmentSelected: (segmentId: string) => void;
   onViewStreetReports: (streetId: string, streetName: string) => void;
 }) {
   const map = useMap();
@@ -69,6 +96,9 @@ export function StreetScoreLayer({
   const sequence = useRef(0);
   const levelKey = levels?.join(',') ?? '';
   const roadClassKey = roadClasses.join(',');
+  const surfaceTypeKey = surfaceTypes?.join(',') ?? '';
+  const surfaceConditionKey = surfaceConditions?.join(',') ?? '';
+  const surfaceTreatmentKey = surfaceTreatments?.join(',') ?? '';
 
   const request = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -82,7 +112,7 @@ export function StreetScoreLayer({
         const result = await getStreetConditionInViewport(
           currentBounds(map),
           map.getZoom(),
-          levels,
+          surfaceVisible ? null : levels,
           roadClasses,
           controller.signal,
         );
@@ -99,9 +129,12 @@ export function StreetScoreLayer({
         if (requestNumber === sequence.current && !controller.signal.aborted) setLoading(false);
       }
     }, 280);
-  }, [levelKey, levels, map, roadClassKey, roadClasses]);
+  }, [levelKey, levels, map, roadClassKey, roadClasses, surfaceVisible]);
 
   useMapEvents({ moveend: request, zoomend: request });
+  useEffect(() => {
+    if (selectingRoadSegment && map.getZoom() < 16) map.setZoom(16);
+  }, [map, selectingRoadSegment]);
   useEffect(() => {
     request();
     return () => {
@@ -113,26 +146,84 @@ export function StreetScoreLayer({
 
   return (
     <>
-      <GeoJSON
-        key={`${refreshKey}:${levelKey}:${roadClassKey}:${dataRevision}`}
-        data={data as never}
-        style={(feature) => {
-          const level = (feature?.properties?.condition as string | null) ?? null;
-          return streetConditionLineStyle(
-            level,
-            map.getZoom(),
-            feature?.properties?.availability?.status ?? 'UNKNOWN',
-          );
-        }}
-        eventHandlers={{
-          click: (event) => {
-            const feature = (
-              event.layer as typeof event.layer & { feature?: StreetConditionFeature }
-            ).feature;
-            if (feature?.properties) setSelected({ feature, position: event.latlng });
-          },
-        }}
-      />
+      {conditionVisible && (
+        <GeoJSON
+          key={`${refreshKey}:${levelKey}:${roadClassKey}:${dataRevision}`}
+          data={data as never}
+          filter={(feature) =>
+            levels === null ||
+            levels === undefined ||
+            levels.includes(feature?.properties?.condition)
+          }
+          style={(feature) => {
+            const level = (feature?.properties?.condition as string | null) ?? null;
+            return streetConditionLineStyle(
+              level,
+              map.getZoom(),
+              feature?.properties?.availability?.status ?? 'UNKNOWN',
+            );
+          }}
+          eventHandlers={{
+            click: (event) => {
+              const feature = (
+                event.layer as typeof event.layer & { feature?: StreetConditionFeature }
+              ).feature;
+              if (feature?.properties) {
+                setSelected({ feature, position: event.latlng });
+                if (selectingRoadSegment && feature.properties.targetType === 'SEGMENT')
+                  onRoadSegmentSelected(feature.properties.id);
+              }
+            },
+          }}
+        />
+      )}
+      {surfaceVisible && (
+        <GeoJSON
+          key={`surface:${refreshKey}:${surfaceTypeKey}:${surfaceConditionKey}:${surfaceTreatmentKey}:${dataRevision}`}
+          data={data as never}
+          filter={(feature) => {
+            const properties = feature?.properties;
+            const info = properties?.roadInformation;
+            if (properties?.targetType !== 'SEGMENT' || !info?.surfaceType) return false;
+            if (surfaceTypes && !surfaceTypes.includes(info.surfaceType as SurfaceType))
+              return false;
+            if (
+              surfaceConditions &&
+              (!info.surfaceCondition ||
+                !surfaceConditions.includes(info.surfaceCondition as SurfaceCondition))
+            )
+              return false;
+            if (
+              surfaceTreatments &&
+              (!info.specialTreatments ||
+                !info.specialTreatments.some((item: string) =>
+                  surfaceTreatments.includes(item as SpecialTreatment),
+                ))
+            )
+              return false;
+            return true;
+          }}
+          style={(feature) =>
+            roadSurfaceLineStyle(
+              feature?.properties?.roadInformation?.surfaceType as SurfaceType,
+              map.getZoom(),
+              feature?.properties?.roadInformation?.surfaceCondition ?? null,
+            )
+          }
+          eventHandlers={{
+            click: (event) => {
+              const feature = (
+                event.layer as typeof event.layer & { feature?: StreetConditionFeature }
+              ).feature;
+              if (feature?.properties) {
+                setSelected({ feature, position: event.latlng });
+                if (selectingRoadSegment && feature.properties.targetType === 'SEGMENT')
+                  onRoadSegmentSelected(feature.properties.id);
+              }
+            },
+          }}
+        />
+      )}
       {selected && (
         <Popup position={selected.position} eventHandlers={{ remove: () => setSelected(null) }}>
           <div className="street-score-popup">
@@ -143,6 +234,15 @@ export function StreetScoreLayer({
                 (item) => item.value === selected.feature.properties.roadClass,
               )?.label ?? 'Sin clasificar'}
             </span>
+            {selected.feature.properties.targetType === 'SEGMENT' && (
+              <RoadInformationPanel
+                key={selected.feature.properties.id}
+                segmentId={selected.feature.properties.id}
+                authenticated={authenticated}
+                onRequestLogin={onRequestLogin}
+                onChanged={onInformationChanged}
+              />
+            )}
             {selected.feature.properties.hasEvidence ? (
               <>
                 <span>

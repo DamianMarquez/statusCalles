@@ -1,16 +1,32 @@
 import { STREET_CONDITION_LEVELS } from './streetConditionCatalog.js';
 import { STREET_ROAD_CLASS_OPTIONS } from './streetRoadClassCatalog.js';
 import type { StreetRoadClass } from '../../api/streetScoreTypes.js';
+import {
+  SPECIAL_TREATMENT_OPTIONS,
+  SURFACE_CONDITION_OPTIONS,
+  SURFACE_TYPE_OPTIONS,
+  type SpecialTreatment,
+  type SurfaceCondition,
+  type SurfaceType,
+} from '../../api/roadInformationTypes.js';
 
 interface Props {
   reports: boolean;
   condition: boolean;
+  surface?: boolean;
   levels: string[] | null;
   roadClasses: StreetRoadClass[];
+  surfaceTypes?: SurfaceType[] | null;
+  surfaceConditions?: SurfaceCondition[] | null;
+  surfaceTreatments?: SpecialTreatment[] | null;
   onReportsChange: (value: boolean) => void;
   onConditionChange: (value: boolean) => void;
+  onSurfaceChange?: (value: boolean) => void;
   onLevelsChange: (value: string[] | null) => void;
   onRoadClassesChange: (value: StreetRoadClass[]) => void;
+  onSurfaceTypesChange?: (value: SurfaceType[] | null) => void;
+  onSurfaceConditionsChange?: (value: SurfaceCondition[] | null) => void;
+  onSurfaceTreatmentsChange?: (value: SpecialTreatment[] | null) => void;
 }
 
 export function MapLayerControls(props: Props) {
@@ -21,6 +37,19 @@ export function MapLayerControls(props: Props) {
       ? selected.filter((item) => item !== value)
       : [...selected, value];
     props.onLevelsChange(next.length === STREET_CONDITION_LEVELS.length ? null : next);
+  }
+
+  function toggleFilter<T extends string>(
+    value: T,
+    selected: T[] | null,
+    options: readonly { value: T }[],
+    onChange: (next: T[] | null) => void,
+  ) {
+    const current = selected ?? options.map((item) => item.value);
+    const next = current.includes(value)
+      ? current.filter((item) => item !== value)
+      : [...current, value];
+    onChange(next.length === options.length ? null : next);
   }
 
   return (
@@ -34,6 +63,81 @@ export function MapLayerControls(props: Props) {
         />{' '}
         Reportes
       </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={props.surface ?? false}
+          onChange={(event) => props.onSurfaceChange?.(event.target.checked)}
+        />{' '}
+        Tipo de pavimento
+      </label>
+      <fieldset disabled={!props.surface}>
+        <legend>Pavimento</legend>
+        {SURFACE_TYPE_OPTIONS.map((item) => (
+          <label key={item.value}>
+            <input
+              type="checkbox"
+              checked={props.surfaceTypes == null || props.surfaceTypes.includes(item.value)}
+              onChange={() =>
+                props.onSurfaceTypesChange &&
+                toggleFilter(
+                  item.value,
+                  props.surfaceTypes ?? null,
+                  SURFACE_TYPE_OPTIONS,
+                  props.onSurfaceTypesChange,
+                )
+              }
+            />{' '}
+            {item.label}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset disabled={!props.surface}>
+        <legend>Estado de calzada</legend>
+        {SURFACE_CONDITION_OPTIONS.map((item) => (
+          <label key={item.value}>
+            <input
+              type="checkbox"
+              checked={
+                props.surfaceConditions == null || props.surfaceConditions.includes(item.value)
+              }
+              onChange={() =>
+                props.onSurfaceConditionsChange &&
+                toggleFilter(
+                  item.value,
+                  props.surfaceConditions ?? null,
+                  SURFACE_CONDITION_OPTIONS,
+                  props.onSurfaceConditionsChange,
+                )
+              }
+            />{' '}
+            {item.label}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset disabled={!props.surface}>
+        <legend>Tratamientos</legend>
+        {SPECIAL_TREATMENT_OPTIONS.map((item) => (
+          <label key={item.value}>
+            <input
+              type="checkbox"
+              checked={
+                props.surfaceTreatments == null || props.surfaceTreatments.includes(item.value)
+              }
+              onChange={() =>
+                props.onSurfaceTreatmentsChange &&
+                toggleFilter(
+                  item.value,
+                  props.surfaceTreatments ?? null,
+                  SPECIAL_TREATMENT_OPTIONS,
+                  props.onSurfaceTreatmentsChange,
+                )
+              }
+            />{' '}
+            {item.label}
+          </label>
+        ))}
+      </fieldset>
       <label>
         <input
           type="checkbox"

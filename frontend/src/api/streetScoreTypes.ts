@@ -1,4 +1,10 @@
 import type { StreetScoreLevel } from '../components/map/streetConditionCatalog.js';
+import type {
+  RoadType,
+  SpecialTreatment,
+  SurfaceCondition,
+  SurfaceType,
+} from './roadInformationTypes.js';
 
 export type { StreetScoreLevel };
 export type StreetScoreConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -52,6 +58,13 @@ export interface StreetConditionProperties extends Omit<
   streetId: string;
   streetName: string;
   roadClass: StreetRoadClass;
+  roadInformation: {
+    roadType: RoadType | null;
+    surfaceType: SurfaceType | null;
+    surfaceCondition: SurfaceCondition | null;
+    specialTreatments: SpecialTreatment[] | null;
+    updatedAt: string | null;
+  } | null;
   targetType: 'SEGMENT' | 'STREET';
   score: number | null;
   level: StreetScoreLevel | null;

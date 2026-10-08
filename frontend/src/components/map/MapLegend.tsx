@@ -5,6 +5,7 @@ import {
   REPORT_TYPE_OPTIONS,
 } from '../../api/reportCatalog.js';
 import { STREET_CONDITION_LEVELS, streetConditionColor } from './streetConditionCatalog.js';
+import { SURFACE_TYPE_OPTIONS } from '../../api/roadInformationTypes.js';
 
 export function MapLegend({ open, onClose }: { open: boolean; onClose: () => void }) {
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -80,6 +81,28 @@ export function MapLegend({ open, onClose }: { open: boolean; onClose: () => voi
         Es una estimación comunitaria basada en reportes disponibles; no es una medición profesional
         ni una evaluación oficial.
       </p>
+      <h3>Tipo de pavimento</h3>
+      <div className="map-legend__grid">
+        {SURFACE_TYPE_OPTIONS.map((surface) => (
+          <span className="map-legend__item" key={surface.value}>
+            <span
+              className="map-legend__surface-line"
+              style={{
+                borderColor: surface.color,
+                borderStyle: surface.dashArray ? 'dashed' : 'solid',
+              }}
+              aria-hidden="true"
+            />
+            {surface.label}
+          </span>
+        ))}
+        <span className="map-legend__item">Sin pavimento informado: sin color de superficie</span>
+      </div>
+      <p className="map-legend__note">
+        Son aportes de la comunidad asociados a un segmento oficial. Las propuestas requieren tres
+        confirmaciones independientes; la falta de información no indica un tipo de pavimento.
+      </p>
+      <h3>Score estimado</h3>
       <div className="map-legend__grid">
         {STREET_CONDITION_LEVELS.map((item) => (
           <span className="map-legend__item" key={item.value}>

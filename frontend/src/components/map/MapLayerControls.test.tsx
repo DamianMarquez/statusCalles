@@ -67,5 +67,41 @@ describe('MapLayerControls', () => {
     expect(onRoadClassesChange).toHaveBeenCalledWith(['SECONDARY', 'LOCAL']);
     expect(onLevelsChange).not.toHaveBeenCalled();
   });
+
+  it('toggles the surface overlay and its filters without changing report filters', () => {
+    const onSurfaceChange = vi.fn();
+    const onSurfaceTypesChange = vi.fn();
+    const onLevelsChange = vi.fn();
+    const onReportsChange = vi.fn();
+    render(
+      <MapLayerControls
+        reports
+        condition
+        surface
+        levels={null}
+        roadClasses={['PRIMARY', 'SECONDARY', 'LOCAL']}
+        surfaceTypes={null}
+        surfaceConditions={null}
+        surfaceTreatments={null}
+        onReportsChange={onReportsChange}
+        onConditionChange={vi.fn()}
+        onSurfaceChange={onSurfaceChange}
+        onLevelsChange={onLevelsChange}
+        onRoadClassesChange={vi.fn()}
+        onSurfaceTypesChange={onSurfaceTypesChange}
+        onSurfaceConditionsChange={vi.fn()}
+        onSurfaceTreatmentsChange={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText('Capas del mapa'));
+    fireEvent.click(screen.getByLabelText('Tipo de pavimento'));
+    expect(onSurfaceChange).toHaveBeenCalledWith(false);
+    fireEvent.click(screen.getByLabelText('Adoquín de granito'));
+    expect(onSurfaceTypesChange).toHaveBeenCalledWith(
+      expect.not.arrayContaining(['GRANITE_COBBLESTONE']),
+    );
+    expect(onLevelsChange).not.toHaveBeenCalled();
+    expect(onReportsChange).not.toHaveBeenCalled();
+  });
 });
 afterEach(() => cleanup());

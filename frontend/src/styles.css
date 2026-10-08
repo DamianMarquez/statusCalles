@@ -1341,6 +1341,147 @@ a {
   cursor: pointer;
 }
 
+.map-legend__surface-line {
+  width: 27px;
+  height: 0;
+  flex: 0 0 27px;
+  border-top: 4px solid;
+  border-radius: 4px;
+}
+
+.road-information-panel {
+  display: grid;
+  gap: 8px;
+  max-width: min(360px, 80vw);
+  max-height: 62vh;
+  overflow: auto;
+  color: #30473a;
+  font-size: 12px;
+}
+
+.road-information-panel h3,
+.road-information-panel h4 {
+  margin: 3px 0;
+}
+
+.road-information-panel dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.road-information-panel dl > div {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 8px;
+}
+
+.road-information-panel dt {
+  color: #68786e;
+}
+
+.road-information-panel dd {
+  margin: 0;
+  font-weight: 650;
+}
+
+.road-information-panel button {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid #cddbd0;
+  border-radius: 8px;
+  background: #f5faf6;
+  color: #176b51;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.road-information-panel button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.road-information-panel details,
+.road-information-proposals article {
+  padding: 8px;
+  border: 1px solid #e0e8e1;
+  border-radius: 8px;
+}
+
+.road-information-panel summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.road-information-proposals {
+  display: grid;
+  gap: 6px;
+}
+
+.road-information-proposals article {
+  display: grid;
+  gap: 5px;
+}
+
+.road-information-proposals ul,
+.road-information-panel details ul {
+  margin: 0;
+  padding-left: 17px;
+}
+
+.road-information-form {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #dce6de;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.road-information-form > label {
+  display: grid;
+  gap: 4px;
+}
+
+.road-information-form select {
+  min-height: 38px;
+  padding: 6px;
+  border: 1px solid #cddbd0;
+  border-radius: 7px;
+  color: #30473a;
+  background: white;
+  font: inherit;
+}
+
+.road-information-form fieldset {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #e0e8e1;
+  border-radius: 8px;
+}
+
+.road-information-form fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.road-information-form > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.road-information-error {
+  margin: 0;
+  color: #a53632;
+}
+
 .street-score-popup {
   display: grid;
   gap: 6px;
@@ -1395,7 +1536,7 @@ a {
 .map-layer-controls {
   position: absolute;
   z-index: 760;
-  top: 112px;
+  top: 190px;
   right: 14px;
   display: grid;
   width: min(250px, calc(100vw - 28px));
@@ -1486,7 +1627,7 @@ a {
 }
 @media (max-width: 600px) {
   .map-layer-controls {
-    top: 122px;
+    top: 170px;
     right: 8px;
     width: min(224px, calc(100vw - 16px));
   }

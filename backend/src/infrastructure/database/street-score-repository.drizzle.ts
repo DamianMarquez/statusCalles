@@ -91,13 +91,20 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
         street_id: string;
         street_name: string;
         road_class: StreetRoadClass;
+        road_type: 'STREET' | 'AVENUE' | 'PASSAGE' | 'BOULEVARD' | 'HIGHWAY' | 'ACCESS' | null;
+        surface_type: string | null;
+        surface_condition: string | null;
+        special_treatments: string[] | null;
+        information_updated_at: Date | string | null;
         geometry: string;
       }>(sql`
         SELECT ss.id::text AS id, ss.street_id::text AS street_id, st.official_name AS street_name,
-          ss.road_class AS road_class,
+          ss.road_class AS road_class, info.road_type, info.surface_type, info.surface_condition,
+          info.special_treatments, info.updated_at AS information_updated_at,
           ST_AsGeoJSON(ST_SimplifyPreserveTopology(ss.geometry, ${tolerance})) AS geometry
         FROM street_segments ss
         JOIN streets st ON st.id = ss.street_id
+        LEFT JOIN street_segment_information info ON info.segment_id = ss.id
         WHERE ss.geometry && ${envelope}
           AND ST_Intersects(ss.geometry, ${envelope})
           AND ss.road_class IN (${classesSql})
@@ -109,6 +116,15 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
         streetId: row.street_id,
         streetName: row.street_name,
         roadClass: row.road_class,
+        roadInformation: {
+          roadType: row.road_type,
+          surfaceType: row.surface_type as never,
+          surfaceCondition: row.surface_condition as never,
+          specialTreatments: row.special_treatments as never,
+          updatedAt: row.information_updated_at
+            ? new Date(row.information_updated_at).toISOString()
+            : null,
+        },
         geometry: JSON.parse(row.geometry) as {
           type: 'MultiLineString' | 'LineString';
           coordinates: number[][][] | number[][];
@@ -141,6 +157,7 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
       streetId: row.street_id,
       streetName: row.street_name,
       roadClass: row.road_class,
+      roadInformation: null,
       geometry: JSON.parse(row.geometry) as {
         type: 'MultiLineString' | 'LineString';
         coordinates: number[][][] | number[][];

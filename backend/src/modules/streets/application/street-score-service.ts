@@ -49,6 +49,7 @@ export class StreetScoreService {
           streetId: item.streetId,
           streetName: item.streetName,
           roadClass: item.roadClass,
+          roadInformation: item.roadInformation,
           targetType:
             zoom >= STREET_LAYER_ZOOM_CONFIG.detailedSegmentMinZoom
               ? ('SEGMENT' as const)

@@ -38,6 +38,11 @@ import { filtersActiveCount } from './mapReportFilters.js';
 import { MapLegend } from './MapLegend.js';
 import { MapLayerControls } from './MapLayerControls.js';
 import type { StreetRoadClass } from '../../api/streetScoreTypes.js';
+import type {
+  SpecialTreatment,
+  SurfaceCondition,
+  SurfaceType,
+} from '../../api/roadInformationTypes.js';
 
 const currentLocationIcon = divIcon({
   className: 'user-marker-wrapper',
@@ -174,6 +179,7 @@ export default function MapView({
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [isPickingReportLocation, setIsPickingReportLocation] = useState(false);
+  const [isSelectingRoadSegment, setIsSelectingRoadSegment] = useState(false);
   const [isReportFormOpen, setIsReportFormOpen] = useState(false);
   const [reportLocation, setReportLocation] = useState<UserLocation | null>(null);
   const [reportFocusLocation, setReportFocusLocation] = useState<UserLocation | null>(null);
@@ -197,6 +203,10 @@ export default function MapView({
   const [scoreRefreshKey, setScoreRefreshKey] = useState(0);
   const [reportsLayerVisible, setReportsLayerVisible] = useState(true);
   const [conditionLayerVisible, setConditionLayerVisible] = useState(true);
+  const [surfaceLayerVisible, setSurfaceLayerVisible] = useState(false);
+  const [surfaceTypes, setSurfaceTypes] = useState<SurfaceType[] | null>(null);
+  const [surfaceConditions, setSurfaceConditions] = useState<SurfaceCondition[] | null>(null);
+  const [surfaceTreatments, setSurfaceTreatments] = useState<SpecialTreatment[] | null>(null);
   const [conditionLevels, setConditionLevels] = useState<string[] | null>(null);
   const [roadClasses, setRoadClasses] = useState<StreetRoadClass[]>([
     'PRIMARY',
@@ -250,10 +260,22 @@ export default function MapView({
   }
 
   function startReport() {
+    setIsSelectingRoadSegment(false);
     setReportSuccess(false);
     setReportLocation(null);
     setIsReportFormOpen(false);
     setIsPickingReportLocation(true);
+  }
+
+  function startRoadInformation() {
+    if (!user) {
+      openAuthDialog();
+      return;
+    }
+    setIsPickingReportLocation(false);
+    setIsReportFormOpen(false);
+    setIsSelectingRoadSegment(true);
+    setConditionLayerVisible(true);
   }
 
   useEffect(() => {
@@ -393,11 +415,21 @@ export default function MapView({
         <TileLayer url={mapConfig.tileUrl} attribution={mapConfig.tileAttribution} />
         <ViewportReports onViewportChange={handleViewportChange} />
         <MapQueryFocus />
-        {conditionLayerVisible && (
+        {(conditionLayerVisible || surfaceLayerVisible) && (
           <StreetScoreLayer
             refreshKey={scoreRefreshKey}
             levels={conditionLevels}
             roadClasses={roadClasses}
+            conditionVisible={conditionLayerVisible}
+            surfaceVisible={surfaceLayerVisible}
+            surfaceTypes={surfaceTypes}
+            surfaceConditions={surfaceConditions}
+            surfaceTreatments={surfaceTreatments}
+            authenticated={Boolean(user)}
+            onRequestLogin={openAuthDialog}
+            onInformationChanged={() => setScoreRefreshKey((current) => current + 1)}
+            selectingRoadSegment={isSelectingRoadSegment}
+            onRoadSegmentSelected={() => setIsSelectingRoadSegment(false)}
             onViewStreetReports={(id, name) => {
               setStreetReportTarget({ id, name });
               setReportsLayerVisible(true);
@@ -478,12 +510,20 @@ export default function MapView({
       <MapLayerControls
         reports={reportsLayerVisible}
         condition={conditionLayerVisible}
+        surface={surfaceLayerVisible}
         levels={conditionLevels}
         roadClasses={roadClasses}
+        surfaceTypes={surfaceTypes}
+        surfaceConditions={surfaceConditions}
+        surfaceTreatments={surfaceTreatments}
         onReportsChange={setReportsLayerVisible}
         onConditionChange={setConditionLayerVisible}
+        onSurfaceChange={setSurfaceLayerVisible}
         onLevelsChange={setConditionLevels}
         onRoadClassesChange={setRoadClasses}
+        onSurfaceTypesChange={setSurfaceTypes}
+        onSurfaceConditionsChange={setSurfaceConditions}
+        onSurfaceTreatmentsChange={setSurfaceTreatments}
       />
       {streetReportTarget && reportsLayerVisible && (
         <div className="street-report-focus" role="status">
@@ -509,9 +549,17 @@ export default function MapView({
           className="report-start-button"
           type="button"
           onClick={startReport}
-          disabled={isPickingReportLocation || isReportFormOpen}
+          disabled={isPickingReportLocation || isReportFormOpen || isSelectingRoadSegment}
         >
           + Reportar problema
+        </button>
+        <button
+          className="report-start-button road-information-start-button"
+          type="button"
+          onClick={startRoadInformation}
+          disabled={isPickingReportLocation || isReportFormOpen || isSelectingRoadSegment}
+        >
+          + Informar calle
         </button>
         <button
           className="locate-button"
@@ -553,6 +601,15 @@ export default function MapView({
               Cancelar
             </button>
           </div>
+        </div>
+      )}
+      {isSelectingRoadSegment && (
+        <div className="report-pick-prompt" role="status">
+          <strong>Elegí el tramo de calle</strong>
+          <span>Tocá una línea del mapa para proponer información de ese segmento.</span>
+          <button type="button" onClick={() => setIsSelectingRoadSegment(false)}>
+            Cancelar
+          </button>
         </div>
       )}
       {reportSuccess && (

@@ -17,6 +17,9 @@ import { StreetLocationResolverService } from '../modules/streets/application/st
 import { registerStreetCatalogRoutes } from '../modules/streets/http/street-catalog.routes.js';
 import { StreetScoreService } from '../modules/streets/application/street-score-service.js';
 import { registerStreetScoreRoutes } from '../modules/streets/http/street-score.routes.js';
+import type { RoadInformationRepository } from '../modules/streets/application/road-information-service.js';
+import { RoadInformationService } from '../modules/streets/application/road-information-service.js';
+import { registerRoadInformationRoutes } from '../modules/streets/http/road-information.routes.js';
 import type { MobilityCatalogRepository } from '../modules/mobility/application/mobility-catalog.js';
 import { MobilityCatalogService } from '../modules/mobility/application/mobility-catalog.js';
 import { registerMobilityRoutes } from '../modules/mobility/http/mobility.routes.js';
@@ -42,6 +45,7 @@ export function buildApp(
   options: {
     logger?: boolean;
     streetScoreRepository?: StreetScoreRepository;
+    roadInformationRepository?: RoadInformationRepository;
     authRepository?: AuthRepository;
     moderationDatabase?: StreetStatusDatabase;
     streetCatalogRepository?: StreetCatalogRepository;
@@ -116,6 +120,12 @@ export function buildApp(
     app.register(registerStreetScoreRoutes, {
       prefix: '/api',
       service: streetScoreService,
+    });
+  }
+  if (options.roadInformationRepository) {
+    app.register(registerRoadInformationRoutes, {
+      prefix: '/api',
+      service: new RoadInformationService(options.roadInformationRepository),
     });
   }
   if (options.analyticsRepository) {

@@ -18,6 +18,12 @@ import { REPORT_STATUSES, REPORT_TYPES } from '../../modules/reports/domain/stre
 import { REPORT_FEEDBACK_TYPES } from '../../modules/reports/domain/report-feedback.js';
 import { USER_ROLES } from '../../modules/users/domain/user.js';
 import { STREET_ROAD_CLASSES } from '../../modules/streets/domain/street-road-class.js';
+import {
+  ROAD_TYPES,
+  SURFACE_TYPES,
+  SURFACE_CONDITIONS,
+  SPECIAL_TREATMENTS,
+} from '../../modules/streets/domain/road-information.js';
 
 const geographyPoint = customType<{ data: string; driverData: string }>({
   dataType: () => 'geography(Point,4326)',
@@ -35,6 +41,14 @@ export const reportFlagReasonEnum = pgEnum('report_flag_reason', [
   'OTHER',
 ]);
 export const streetRoadClassEnum = pgEnum('street_road_class', STREET_ROAD_CLASSES);
+export const roadTypeEnum = pgEnum('road_type', ROAD_TYPES);
+export const surfaceTypeEnum = pgEnum('surface_type', SURFACE_TYPES);
+export const surfaceConditionEnum = pgEnum('surface_condition', SURFACE_CONDITIONS);
+export const specialTreatmentEnum = pgEnum('special_treatment', SPECIAL_TREATMENTS);
+export const roadInformationProposalStatusEnum = pgEnum('road_information_proposal_status', [
+  'PROPOSED',
+  'CONFIRMED',
+]);
 
 const geometryMultiLineString = customType<{ data: string; driverData: string }>({
   dataType: () => 'geometry(MultiLineString,4326)',
@@ -173,6 +187,79 @@ export const streetSegments = pgTable(
     index('street_segments_geometry_gix').using('gist', table.geometry),
   ],
 );
+
+export const streetSegmentInformation = pgTable('street_segment_information', {
+  segmentId: uuid('segment_id')
+    .primaryKey()
+    .references(() => streetSegments.id, { onDelete: 'cascade' }),
+  roadType: roadTypeEnum('road_type'),
+  surfaceType: surfaceTypeEnum('surface_type'),
+  surfaceCondition: surfaceConditionEnum('surface_condition'),
+  specialTreatments: specialTreatmentEnum('special_treatments').array(),
+  updatedByProposalId: uuid('updated_by_proposal_id').references(
+    () => streetSegmentInformationProposals.id,
+  ),
+  updatedAt: timestamp('updated_at', { withTimezone: true }),
+});
+
+export const streetSegmentInformationProposals = pgTable(
+  'street_segment_information_proposals',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    segmentId: uuid('segment_id')
+      .notNull()
+      .references(() => streetSegments.id, { onDelete: 'cascade' }),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    roadType: roadTypeEnum('road_type'),
+    surfaceType: surfaceTypeEnum('surface_type'),
+    surfaceCondition: surfaceConditionEnum('surface_condition'),
+    specialTreatments: specialTreatmentEnum('special_treatments').array(),
+    status: roadInformationProposalStatusEnum('status').notNull().default('PROPOSED'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('street_segment_info_proposals_segment_created_idx').on(table.segmentId, table.createdAt),
+    index('street_segment_info_proposals_status_idx').on(table.status),
+    check(
+      'street_segment_info_proposals_has_attribute_check',
+      sql`${table.roadType} IS NOT NULL OR ${table.surfaceType} IS NOT NULL OR ${table.surfaceCondition} IS NOT NULL OR ${table.specialTreatments} IS NOT NULL`,
+    ),
+  ],
+);
+
+export const streetSegmentInformationConfirmations = pgTable(
+  'street_segment_information_confirmations',
+  {
+    proposalId: uuid('proposal_id')
+      .notNull()
+      .references(() => streetSegmentInformationProposals.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('street_segment_info_confirmation_user_unique').on(table.proposalId, table.userId),
+  ],
+);
+
+export const streetSegmentInformationHistory = pgTable('street_segment_information_history', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  segmentId: uuid('segment_id')
+    .notNull()
+    .references(() => streetSegments.id, { onDelete: 'cascade' }),
+  proposalId: uuid('proposal_id')
+    .notNull()
+    .references(() => streetSegmentInformationProposals.id),
+  roadType: roadTypeEnum('road_type'),
+  surfaceType: surfaceTypeEnum('surface_type'),
+  surfaceCondition: surfaceConditionEnum('surface_condition'),
+  specialTreatments: specialTreatmentEnum('special_treatments').array(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const users = pgTable(
   'users',

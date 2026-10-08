@@ -2,6 +2,12 @@ import type { ReportViewportQuery } from '../../reports/application/report-repos
 import type { ReportFeedbackSummary } from '../../reports/domain/report-feedback.js';
 import type { StreetReport } from '../../reports/domain/street-report.js';
 import type { StreetRoadClass } from '../domain/street-road-class.js';
+import type {
+  RoadType,
+  SpecialTreatment,
+  SurfaceCondition,
+  SurfaceType,
+} from '../domain/road-information.js';
 
 export interface StreetScoreReportInput {
   report: StreetReport;
@@ -30,6 +36,13 @@ export interface StreetScoreRepository {
       streetId: string;
       streetName: string;
       roadClass: StreetRoadClass;
+      roadInformation: {
+        roadType: RoadType | null;
+        surfaceType: SurfaceType | null;
+        surfaceCondition: SurfaceCondition | null;
+        specialTreatments: SpecialTreatment[] | null;
+        updatedAt: string | null;
+      } | null;
       geometry: { type: 'MultiLineString' | 'LineString'; coordinates: number[][][] | number[][] };
       segmentIds: string[];
     }>
