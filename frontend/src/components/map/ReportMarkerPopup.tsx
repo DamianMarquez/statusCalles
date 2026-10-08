@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReportDto, ReportFeedbackType } from '../../api/reportTypes.js';
+import type { ReportFlagReason } from '../../api/reportsApi.js';
 import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
 import {
   getStreetInfrastructure,
@@ -48,6 +49,10 @@ interface ReportMarkerPopupProps {
   authenticated: boolean;
   onRequestLogin: () => void;
   popupOpen?: boolean;
+  onFlag: (reason: ReportFlagReason) => void;
+  flagBusy: boolean;
+  flagError: string | null;
+  flagSuccess: boolean;
 }
 
 export function ReportMarkerPopup({
@@ -58,7 +63,13 @@ export function ReportMarkerPopup({
   authenticated,
   onRequestLogin,
   popupOpen = true,
+  onFlag,
+  flagBusy,
+  flagError,
+  flagSuccess,
 }: ReportMarkerPopupProps) {
+  const [flagFormOpen, setFlagFormOpen] = useState(false);
+  const [flagReason, setFlagReason] = useState<ReportFlagReason>('SPAM');
   const [infrastructure, setInfrastructure] = useState<OfficialMobilityInfrastructure[]>([]);
   const [infrastructureError, setInfrastructureError] = useState(false);
   const [streetScore, setStreetScore] = useState<StreetScoreResultDto | null>(null);
@@ -234,6 +245,58 @@ export function ReportMarkerPopup({
       {feedbackError && (
         <span className="report-popup__feedback-error" role="alert">
           {feedbackError}
+        </span>
+      )}
+      {authenticated && report.publiclyVisible !== false && !flagSuccess && (
+        <div className="report-flag">
+          {!flagFormOpen ? (
+            <button
+              type="button"
+              className="report-flag__open"
+              onClick={() => setFlagFormOpen(true)}
+            >
+              Denunciar reporte
+            </button>
+          ) : (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                onFlag(flagReason);
+              }}
+            >
+              <label>
+                Motivo
+                <select
+                  value={flagReason}
+                  onChange={(event) => setFlagReason(event.target.value as ReportFlagReason)}
+                >
+                  <option value="SPAM">Spam</option>
+                  <option value="INAPPROPRIATE">Contenido inapropiado</option>
+                  <option value="FALSE_INFORMATION">Información falsa</option>
+                  <option value="OTHER">Otro</option>
+                </select>
+              </label>
+              <div>
+                <button type="button" onClick={() => setFlagFormOpen(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" disabled={flagBusy}>
+                  {flagBusy ? 'Enviando…' : 'Enviar denuncia'}
+                </button>
+              </div>
+            </form>
+          )}
+          {flagError && <span role="alert">{flagError}</span>}
+        </div>
+      )}
+      {!authenticated && report.publiclyVisible !== false && (
+        <button type="button" className="report-flag__open" onClick={onRequestLogin}>
+          Iniciá sesión para denunciar este reporte
+        </button>
+      )}
+      {flagSuccess && (
+        <span className="report-popup__meta" role="status">
+          Gracias. Enviamos el reporte a revisión.
         </span>
       )}
     </div>

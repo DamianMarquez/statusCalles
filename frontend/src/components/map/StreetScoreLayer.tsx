@@ -3,6 +3,7 @@ import { Popup, Rectangle, useMap, useMapEvents } from 'react-leaflet';
 import { getStreetScoresInViewport } from '../../api/streetsApi.js';
 import type { StreetScoreAreaDto } from '../../api/streetScoreTypes.js';
 import type { ViewportBounds } from '../../api/reportTypes.js';
+import { streetScoreColor } from './streetScorePalette.js';
 
 function currentBounds(map: ReturnType<typeof useMap>): ViewportBounds {
   const bounds = map.getBounds();
@@ -21,14 +22,6 @@ const conditionLabels: Record<StreetScoreAreaDto['condition'], string> = {
   FAIR: 'Regular',
   GOOD: 'Bueno',
 };
-
-function scoreColor(score: number): string {
-  if (score === 0) return '#7f1d1d';
-  if (score < 30) return '#b42318';
-  if (score < 55) return '#e66b18';
-  if (score < 80) return '#d49a00';
-  return '#17804a';
-}
 
 function relativeReportDate(dateValue: string): string {
   const elapsedMinutes = Math.max(
@@ -94,8 +87,8 @@ export function StreetScoreLayer({ refreshKey }: { refreshKey: number }) {
             [area.bounds.north, area.bounds.east],
           ]}
           pathOptions={{
-            color: scoreColor(area.score),
-            fillColor: scoreColor(area.score),
+            color: streetScoreColor(area.score),
+            fillColor: streetScoreColor(area.score),
             fillOpacity: 0.22,
             weight: 2,
           }}

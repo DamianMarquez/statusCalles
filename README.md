@@ -270,6 +270,10 @@ Se eligió **Drizzle ORM + Drizzle Kit** por sus tipos TypeScript y migraciones 
 
 El módulo `reports` mantiene dominio, aplicación, HTTP/DTO y repositorio separados. `streets` no participa en el almacenamiento ni en las rutas de reportes. El repositorio de persistencia es la implementación concreta de una interfaz usada por el servicio y las rutas.
 
+## Navegación y tutorial
+
+La aplicación sirve el tutorial en `/como-usar` con navegación del navegador. En Plesk, `frontend/public/.htaccess` se incluye en `frontend/dist` y permite abrir o recargar esa ruta directamente sin afectar el proxy de `/api`. El tutorial utiliza ejemplos locales ilustrativos: sus filtros y botones no escriben en el backend. El mapa base usa OpenStreetMap y la UI mantiene su atribución visible.
+
 ## Supabase PostgreSQL y despliegue en Plesk
 
 Supabase se utiliza como PostgreSQL/PostGIS administrado. React continúa hablando únicamente con el BFF Fastify (`/api/...`); no se usa `@supabase/supabase-js`, Supabase Auth ni acceso directo desde el navegador. Drizzle y `pg` permanecen como ORM/driver. Las consultas de reportes, calles, segmentos, barrios, comunas, movilidad, routing y analytics siguen ejecutándose en PostgreSQL/PostGIS.
@@ -302,7 +306,7 @@ La base Docker local existente no se modifica ni se vuelca a Supabase automátic
 
 ### Plesk Node.js 20
 
-Seleccionar Node.js 20.17+ en Plesk y configurar las variables de entorno. El archivo de inicio de Plesk puede ser el `app.js` de la raíz del repositorio; importa el backend compilado. Ejecutar las migraciones como paso explícito (`npm run db:migrate`) y preparar el grafo de OSRM en almacenamiento persistente (`npm run routing:setup`). El script `scripts/deploy-plesk.sh` instala dependencias, compila frontend y backend, prepara OSRM si hace falta y copia `frontend/dist` al document root; después se reinicia el proceso desde el panel. Por defecto document root es la raíz del repo; definir `PLESK_DOCUMENT_ROOT` si el dominio publica desde otra carpeta. La publicación de archivos estáticos y el fallback SPA dependen de la configuración web del dominio en Plesk. Configurar `CORS_ORIGIN` con el origen público real y `TRUST_PROXY` sólo con IP/CIDR del proxy confiable, si aplica. El proceso espera el puerto `PORT` que Plesk asigne y usa `BACKEND_PORT` como fallback local.
+Seleccionar Node.js 20.17+ en Plesk y configurar las variables de entorno. El archivo de inicio de Plesk puede ser el `app.js` de la raíz del repositorio; importa el backend compilado. Ejecutar las migraciones como paso explícito (`npm run db:migrate`) y preparar el grafo de OSRM en almacenamiento persistente (`npm run routing:setup`). El script `scripts/deploy-plesk.sh` instala dependencias, compila frontend y backend, prepara OSRM si hace falta y copia `frontend/dist` al document root; después se reinicia el proceso desde el panel. Por defecto document root es la raíz del repo; definir `PLESK_DOCUMENT_ROOT` si el dominio publica desde otra carpeta. El deploy copia `frontend/public/.htaccess` al document root para que Apache/Plesk reescriba las rutas del cliente (por ejemplo `/como-usar`) a `index.html`, conservando `/api` para el proxy y los archivos estáticos existentes. Verificá que `mod_rewrite` y `.htaccess` estén habilitados para el dominio. Configurar `CORS_ORIGIN` con el origen público real y `TRUST_PROXY` sólo con IP/CIDR del proxy confiable, si aplica. El proceso espera el puerto `PORT` que Plesk asigne y usa `BACKEND_PORT` como fallback local.
 
 Variables actuales relevantes para producción:
 

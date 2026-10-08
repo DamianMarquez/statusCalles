@@ -1,0 +1,8 @@
+Options -MultiViews
+RewriteEngine On
+
+# Preserve API proxying and real static assets; route client-side pages to the SPA.
+RewriteCond %{REQUEST_URI} !^/api(?:/|$) [NC]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]

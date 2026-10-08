@@ -79,4 +79,21 @@ describe('home page and navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Crear reporte' }));
     expect(mockMap.mock.lastCall?.[0]).toMatchObject({ startReportOnOpen: true });
   });
+
+  it('serves the tutorial at a direct public path and follows back/forward navigation', async () => {
+    window.history.replaceState({}, '', '/como-usar');
+    const { unmount } = render(<App />);
+    expect(screen.getByRole('heading', { name: 'Cómo usar Street Status' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mapa' }));
+    expect(window.location.pathname).toBe('/');
+    expect(
+      screen.getByRole('region', { name: 'Mapa de calles de Buenos Aires' }),
+    ).toBeInTheDocument();
+    window.history.pushState({}, '', '/como-usar');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(
+      await screen.findByRole('heading', { name: 'Cómo usar Street Status' }),
+    ).toBeInTheDocument();
+    unmount();
+  });
 });

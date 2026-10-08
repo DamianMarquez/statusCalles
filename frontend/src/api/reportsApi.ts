@@ -252,3 +252,50 @@ export async function submitReportFeedback(
   }
   return result;
 }
+
+export type ReportFlagReason = 'SPAM' | 'INAPPROPRIATE' | 'FALSE_INFORMATION' | 'OTHER';
+
+export async function flagReport(reportId: string, reason: ReportFlagReason): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/reports/${encodeURIComponent(reportId)}/flags`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ reason }),
+    });
+  } catch {
+    throw new ReportsApiError('No se pudo conectar con el servicio de reportes.');
+  }
+  if (response.status === 401) throw new ReportsApiError('Iniciá sesión para denunciar reportes.');
+  if (response.status === 404) throw new ReportsApiError('Este reporte ya no está disponible.');
+  if (response.status === 409)
+    throw new ReportsApiError('Ya marcaste este reporte para revisión.', 'ALREADY_REPORTED');
+  if (!response.ok) throw new ReportsApiError('No pudimos enviar la denuncia. Intentá de nuevo.');
+}
+
+export async function updateReportStatus(
+  reportId: string,
+  status: ReportStatus,
+): Promise<ReportDto> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/reports/${encodeURIComponent(reportId)}/status`, {
+      method: 'PATCH',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ status }),
+    });
+  } catch {
+    throw new ReportsApiError('No se pudo conectar con el servicio de reportes.');
+  }
+  if (response.status === 401) throw new ReportsApiError('Iniciá sesión para cambiar el estado.');
+  if (response.status === 403)
+    throw new ReportsApiError('Solo quien creó el reporte puede cambiar su estado.');
+  if (response.status === 404) throw new ReportsApiError('Este reporte ya no está disponible.');
+  if (!response.ok) throw new ReportsApiError('No pudimos cambiar el estado del reporte.');
+  const result: unknown = await response.json().catch(() => null);
+  if (!isReportDto(result))
+    throw new ReportsApiError('El servicio devolvió una respuesta inválida.');
+  return result;
+}

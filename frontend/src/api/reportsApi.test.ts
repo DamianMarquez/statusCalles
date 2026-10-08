@@ -5,6 +5,8 @@ import {
   getReportsInViewport,
   ReportsApiError,
   submitReportFeedback,
+  flagReport,
+  updateReportStatus,
 } from './reportsApi.js';
 import type { ReportDto } from './reportTypes.js';
 
@@ -174,6 +176,30 @@ describe('createReport', () => {
         method: 'POST',
         credentials: 'include',
       }),
+    );
+  });
+
+  it('submits a report flag and translates duplicate submissions', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false, status: 409 });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(flagReport('report-1', 'SPAM')).resolves.toBeUndefined();
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toEqual({ reason: 'SPAM' });
+    await expect(flagReport('report-1', 'SPAM')).rejects.toMatchObject({
+      code: 'ALREADY_REPORTED',
+    });
+  });
+
+  it('updates the status of an owned report through the API', async () => {
+    const updated = { ...report, status: 'RESOLVED' as const };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => updated });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(updateReportStatus('report-1', 'RESOLVED')).resolves.toEqual(updated);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/reports/report-1/status'),
+      expect.objectContaining({ method: 'PATCH' }),
     );
   });
 });

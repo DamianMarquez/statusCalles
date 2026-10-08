@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { divIcon } from 'leaflet';
 import { Marker, Popup } from 'react-leaflet';
 import type { ReportDto, ReportFeedbackType } from '../../api/reportTypes.js';
+import type { ReportFlagReason } from '../../api/reportsApi.js';
 import { ReportMarkerPopup } from './ReportMarkerPopup.js';
 import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
 
@@ -26,6 +27,10 @@ export function ReportMarker({
   feedbackError,
   authenticated,
   onRequestLogin,
+  onFlag,
+  flagBusy,
+  flagError,
+  flagSuccess,
 }: {
   report: ReportDto;
   onVote: (type: ReportFeedbackType) => void;
@@ -33,6 +38,10 @@ export function ReportMarker({
   feedbackError: string | null;
   authenticated: boolean;
   onRequestLogin: () => void;
+  onFlag: (reason: ReportFlagReason) => void;
+  flagBusy: boolean;
+  flagError: string | null;
+  flagSuccess: boolean;
 }) {
   const [popupOpen, setPopupOpen] = useState(false);
   return (
@@ -52,6 +61,10 @@ export function ReportMarker({
           authenticated={authenticated}
           onRequestLogin={onRequestLogin}
           popupOpen={popupOpen}
+          onFlag={onFlag}
+          flagBusy={flagBusy}
+          flagError={flagError}
+          flagSuccess={flagSuccess}
         />
       </Popup>
     </Marker>

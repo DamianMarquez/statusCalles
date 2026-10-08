@@ -72,6 +72,7 @@ export function AnalyticsDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -91,14 +92,14 @@ export function AnalyticsDashboard() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [period]);
+  }, [period, retryKey]);
 
   return (
     <main className="analytics-page">
       <div className="analytics-heading">
         <div>
           <span className="analytics-eyebrow">CABA · DATOS COMUNITARIOS</span>
-          <h1>Analytics</h1>
+          <h1>Estadísticas</h1>
           <p>Una mirada agregada al estado de las calles y los reportes de la comunidad.</p>
         </div>
         <label>
@@ -117,7 +118,10 @@ export function AnalyticsDashboard() {
       </div>
       {error && (
         <div className="analytics-alert" role="alert">
-          {error}
+          <span>{error}</span>
+          <button type="button" onClick={() => setRetryKey((current) => current + 1)}>
+            Reintentar
+          </button>
         </div>
       )}
       {loading && (

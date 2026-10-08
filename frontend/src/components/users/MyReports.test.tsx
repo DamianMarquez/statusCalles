@@ -1,12 +1,13 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getMyReports } from '../../api/reportsApi.js';
+import { getMyReports, updateReportStatus } from '../../api/reportsApi.js';
 import type { OwnedReportDto } from '../../api/reportTypes.js';
 import { MyReports } from './MyReports.js';
 
 vi.mock('../../api/reportsApi.js', () => ({
   getMyReports: vi.fn(),
   submitReportFeedback: vi.fn(),
+  updateReportStatus: vi.fn(),
 }));
 
 const ownedReport: OwnedReportDto = {
@@ -73,5 +74,14 @@ describe('MyReports', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar tus reportes.');
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(await screen.findByText('Av. Corrientes')).toBeInTheDocument();
+  });
+
+  it('lets an owner resolve and reopen a report with optimistic server state refresh', async () => {
+    vi.mocked(updateReportStatus).mockResolvedValueOnce({ ...ownedReport, status: 'RESOLVED' });
+    render(<MyReports onViewMap={vi.fn()} onCreateReport={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Marcar resuelto' }));
+    expect(await screen.findByRole('button', { name: 'Reabrir reporte' })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Reporte marcado como resuelto.');
+    expect(updateReportStatus).toHaveBeenCalledWith('report-1', 'RESOLVED');
   });
 });

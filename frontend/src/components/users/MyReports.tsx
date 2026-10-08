@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getMyReports, submitReportFeedback } from '../../api/reportsApi.js';
+import { getMyReports, submitReportFeedback, updateReportStatus } from '../../api/reportsApi.js';
 import type { OwnedReportDto } from '../../api/reportTypes.js';
 import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
 
@@ -32,6 +32,8 @@ export function MyReports({
   const [error, setError] = useState('');
   const [voteBusy, setVoteBusy] = useState<string | null>(null);
   const [voteError, setVoteError] = useState('');
+  const [statusBusy, setStatusBusy] = useState<string | null>(null);
+  const [statusSuccess, setStatusSuccess] = useState<Record<string, string>>({});
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -81,6 +83,30 @@ export function MyReports({
       setVoteError(cause instanceof Error ? cause.message : 'No pudimos actualizar la respuesta.');
     } finally {
       setVoteBusy(null);
+    }
+  }
+
+  async function changeStatus(report: OwnedReportDto) {
+    const status = report.status === 'RESOLVED' ? 'ACTIVE' : 'RESOLVED';
+    setStatusBusy(report.id);
+    setVoteError('');
+    setStatusSuccess((current) => ({ ...current, [report.id]: '' }));
+    try {
+      const updated = await updateReportStatus(report.id, status);
+      setItems((current) =>
+        current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+      );
+      setStatusSuccess((current) => ({
+        ...current,
+        [report.id]:
+          status === 'RESOLVED' ? 'Reporte marcado como resuelto.' : 'Reporte reabierto.',
+      }));
+    } catch (cause) {
+      setVoteError(
+        cause instanceof Error ? cause.message : 'No pudimos cambiar el estado del reporte.',
+      );
+    } finally {
+      setStatusBusy(null);
     }
   }
 
@@ -147,6 +173,11 @@ export function MyReports({
                   Este reporte no aparece en el mapa público.
                 </p>
               )}
+              {statusSuccess[report.id] && (
+                <p className="my-report-card__success" role="status">
+                  {statusSuccess[report.id]}
+                </p>
+              )}
               <details>
                 <summary>Ver detalle</summary>
                 <div>
@@ -177,6 +208,18 @@ export function MyReports({
                   onClick={() => void vote(report, 'RESOLVED')}
                 >
                   👎 {report.feedback.resolvedReports}
+                </button>
+                <button
+                  type="button"
+                  className="my-report-card__status-action"
+                  disabled={statusBusy === report.id}
+                  onClick={() => void changeStatus(report)}
+                >
+                  {statusBusy === report.id
+                    ? 'Actualizando…'
+                    : report.status === 'RESOLVED'
+                      ? 'Reabrir reporte'
+                      : 'Marcar resuelto'}
                 </button>
               </footer>
             </article>

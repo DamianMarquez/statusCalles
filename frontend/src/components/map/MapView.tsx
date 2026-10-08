@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { divIcon } from 'leaflet';
 import {
   MapContainer,
@@ -9,7 +9,8 @@ import {
   useMap,
   useMapEvents,
 } from 'react-leaflet';
-import { createReport } from '../../api/reportsApi.js';
+import { createReport, flagReport } from '../../api/reportsApi.js';
+import type { ReportFlagReason } from '../../api/reportsApi.js';
 import type {
   CreateReportInput,
   ReportFeedbackSummary,
@@ -23,7 +24,6 @@ import { ReportForm } from './ReportForm.js';
 import { ReportLocationPicker } from './ReportLocationPicker.js';
 import { ReportMarker } from './ReportMarker.js';
 import { StreetScoreLayer } from './StreetScoreLayer.js';
-import { reportTypeLabelsForMap } from './ReportMarkerPopup.js';
 import { useViewportReports } from './useViewportReports.js';
 import type { UserLocation } from './types.js';
 import 'leaflet/dist/leaflet.css';
@@ -34,12 +34,8 @@ import type { RouteLocation } from './RoutePlanner.js';
 import type { AddressSearchResult } from '../../api/addressesApi.js';
 import { MapFilters } from './MapFilters.js';
 import { useMapReportFilters } from './useMapReportFilters.js';
-import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
 import { filtersActiveCount } from './mapReportFilters.js';
-
-const reportTypeClasses = Object.fromEntries(
-  REPORT_TYPE_OPTIONS.map((option) => [option.value, option.markerClass]),
-) as Record<keyof typeof reportTypeLabelsForMap, string>;
+import { MapLegend } from './MapLegend.js';
 
 const currentLocationIcon = divIcon({
   className: 'user-marker-wrapper',
@@ -187,6 +183,15 @@ export default function MapView({
   }>({ origin: null, destination: null });
   const [votingReportIds, setVotingReportIds] = useState<Set<string>>(() => new Set());
   const [feedbackErrors, setFeedbackErrors] = useState<Record<string, string>>({});
+  const [flagBusyIds, setFlagBusyIds] = useState<Set<string>>(() => new Set());
+  const [flagErrors, setFlagErrors] = useState<Record<string, string>>({});
+  const [flaggedIds, setFlaggedIds] = useState<Set<string>>(() => new Set());
+  const [legendOpen, setLegendOpen] = useState(false);
+  const legendToggleRef = useRef<HTMLButtonElement>(null);
+  const closeLegend = useCallback(() => {
+    setLegendOpen(false);
+    legendToggleRef.current?.focus();
+  }, []);
   const [scoreRefreshKey, setScoreRefreshKey] = useState(0);
   const {
     reports,
@@ -318,6 +323,31 @@ export default function MapView({
     }
   }
 
+  async function flagReportFromMap(reportId: string, reason: ReportFlagReason) {
+    if (!user) {
+      openAuthDialog();
+      return;
+    }
+    if (flagBusyIds.has(reportId)) return;
+    setFlagErrors((current) => ({ ...current, [reportId]: '' }));
+    setFlagBusyIds((current) => new Set(current).add(reportId));
+    try {
+      await flagReport(reportId, reason);
+      setFlaggedIds((current) => new Set(current).add(reportId));
+    } catch (error) {
+      setFlagErrors((current) => ({
+        ...current,
+        [reportId]: error instanceof Error ? error.message : 'No pudimos enviar la denuncia.',
+      }));
+    } finally {
+      setFlagBusyIds((current) => {
+        const next = new Set(current);
+        next.delete(reportId);
+        return next;
+      });
+    }
+  }
+
   const reportCount = reports.length;
   const statusMessage =
     reportStatus === 'loading'
@@ -386,6 +416,10 @@ export default function MapView({
             feedbackError={feedbackErrors[report.id] || null}
             authenticated={Boolean(user)}
             onRequestLogin={openAuthDialog}
+            onFlag={(reason) => void flagReportFromMap(report.id, reason)}
+            flagBusy={flagBusyIds.has(report.id)}
+            flagError={flagErrors[report.id] || null}
+            flagSuccess={flaggedIds.has(report.id)}
           />
         ))}
         {userLocation && (
@@ -415,6 +449,17 @@ export default function MapView({
         authenticated={Boolean(user)}
         onRequestLogin={openAuthDialog}
       />
+      <button
+        className="map-legend-toggle"
+        ref={legendToggleRef}
+        type="button"
+        aria-expanded={legendOpen}
+        aria-controls="map-legend-panel"
+        onClick={() => setLegendOpen((current) => !current)}
+      >
+        <span aria-hidden="true">ⓘ</span> Referencias
+      </button>
+      <MapLegend open={legendOpen} onClose={closeLegend} />
       <div className="map-toolbar">
         <button
           className="report-start-button"
@@ -492,16 +537,6 @@ export default function MapView({
           onSubmit={submitReport}
         />
       )}
-      <div className="map-legend" aria-label="Tipos de reporte">
-        {Object.entries(reportTypeLabelsForMap).map(([type, label]) => (
-          <span className="map-legend__item" key={type}>
-            <span
-              className={`map-legend__dot map-legend__dot--${reportTypeClasses[type as keyof typeof reportTypeClasses]}`}
-            />
-            {label}
-          </span>
-        ))}
-      </div>
       {reportStatus === 'empty' && filtersActiveCount(filters) > 0 && (
         <div className="map-empty-filter" role="status">
           <span>No encontramos reportes con estos filtros.</span>

@@ -40,4 +40,8 @@ describe('map report filter URL state', () => {
     expect(params.get('onlyMine')).toBe('true');
     expect(filtersActiveCount(filters)).toBe(4);
   });
+
+  it('preserves intentionally empty type and status selections after a reload', () => {
+    expect(readMapReportFilters('?types=NONE&statuses=NONE')).toEqual({ types: [], statuses: [] });
+  });
 });

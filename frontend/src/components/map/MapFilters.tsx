@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   REPORT_SEVERITY_OPTIONS,
   REPORT_STATUS_OPTIONS,
@@ -54,6 +54,8 @@ export function MapFilters({
   onRequestLogin: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const [draft, setDraft] = useState(value);
   const [period, setPeriod] = useState<ReportPeriod | 'all' | 'custom'>(
     value.period ?? (value.fromDate || value.toDate ? 'custom' : 'all'),
@@ -61,12 +63,42 @@ export function MapFilters({
   const [fromDate, setFromDate] = useState(localDate(value.fromDate));
   const [toDate, setToDate] = useState(localDate(value.toDate));
   const [dateError, setDateError] = useState('');
+  const closePanel = useCallback(() => {
+    setOpen(false);
+    toggleRef.current?.focus();
+  }, []);
   useEffect(() => {
     setDraft(value);
     setPeriod(value.period ?? (value.fromDate || value.toDate ? 'custom' : 'all'));
     setFromDate(localDate(value.fromDate));
     setToDate(localDate(value.toDate));
   }, [value]);
+
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current?.querySelector<HTMLElement>('button, input, select')?.focus();
+    const handleKeys = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closePanel();
+      }
+      if (event.key === 'Tab' && panelRef.current) {
+        const items = [
+          ...panelRef.current.querySelectorAll<HTMLElement>('button, input, select'),
+        ].filter((item) => !item.hasAttribute('disabled'));
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeys);
+    return () => window.removeEventListener('keydown', handleKeys);
+  }, [closePanel, open]);
 
   const selectedTypes = draft.types ?? REPORT_TYPE_OPTIONS.map((item) => item.value);
   const selectedStatuses = draft.statuses ?? REPORT_STATUS_OPTIONS.map((item) => item.value);
@@ -93,7 +125,7 @@ export function MapFilters({
       next.toDate = isoBoundary(toDate, true);
     }
     onApply(next);
-    setOpen(false);
+    closePanel();
   }
 
   function clear() {
@@ -104,7 +136,7 @@ export function MapFilters({
     setToDate('');
     setDateError('');
     onApply(next);
-    setOpen(false);
+    closePanel();
   }
 
   function toggleType(type: ReportType) {
@@ -128,16 +160,22 @@ export function MapFilters({
       <button
         type="button"
         className="map-filters__toggle"
+        ref={toggleRef}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
         ☷ Filtros{filtersActiveCount(value) > 0 ? ` (${filtersActiveCount(value)})` : ''}
       </button>
       {open && (
-        <section className="map-filters__panel" role="dialog" aria-label="Filtros del mapa">
+        <section
+          ref={panelRef}
+          className="map-filters__panel"
+          role="dialog"
+          aria-label="Filtros del mapa"
+        >
           <header>
             <h2>Filtros</h2>
-            <button type="button" aria-label="Cerrar filtros" onClick={() => setOpen(false)}>
+            <button type="button" aria-label="Cerrar filtros" onClick={closePanel}>
               ×
             </button>
           </header>

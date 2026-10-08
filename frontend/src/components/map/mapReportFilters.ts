@@ -32,8 +32,8 @@ export function readMapReportFilters(search: string): MapReportFilters {
   const date = (value: string | null) =>
     value && !Number.isNaN(Date.parse(value)) ? value : undefined;
   return {
-    ...(types?.length ? { types: types as MapReportFilters['types'] } : {}),
-    ...(statuses?.length ? { statuses: statuses as MapReportFilters['statuses'] } : {}),
+    ...(types !== undefined ? { types: types as MapReportFilters['types'] } : {}),
+    ...(statuses !== undefined ? { statuses: statuses as MapReportFilters['statuses'] } : {}),
     ...(period && ['24h', '3d', '7d', '30d', '90d'].includes(period)
       ? { period: period as ReportPeriod }
       : {}),

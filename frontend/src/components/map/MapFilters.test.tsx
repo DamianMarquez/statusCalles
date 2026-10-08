@@ -83,4 +83,16 @@ describe('MapFilters', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
     expect(onApply).toHaveBeenCalledWith({});
   });
+
+  it('shows how many filter categories are active', () => {
+    render(
+      <MapFilters
+        value={{ types: ['POTHOLE'], statuses: ['ACTIVE'], minSeverity: 'HIGH' }}
+        onApply={vi.fn()}
+        authenticated
+        onRequestLogin={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '☷ Filtros (3)' })).toBeInTheDocument();
+  });
 });

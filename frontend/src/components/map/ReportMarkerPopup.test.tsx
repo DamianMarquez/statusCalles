@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReportDto } from '../../api/reportTypes.js';
 import { getStreetInfrastructure, getStreetScore } from '../../api/streetsApi.js';
@@ -35,6 +35,10 @@ const defaultProps = {
   authenticated: true,
   onRequestLogin: vi.fn(),
   popupOpen: false,
+  onFlag: vi.fn(),
+  flagBusy: false,
+  flagError: null,
+  flagSuccess: false,
 };
 
 afterEach(() => cleanup());
@@ -74,8 +78,25 @@ describe('ReportMarkerPopup freshness', () => {
       screen.getByRole('button', { name: /Iniciá sesión para confirmar/ }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Sigue existiendo/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /denunciar este reporte/ })).toBeInTheDocument();
     screen.getByRole('button', { name: /Iniciá sesión para confirmar/ }).click();
     expect(onRequestLogin).toHaveBeenCalledOnce();
+  });
+
+  it('submits the selected report flag reason and displays a duplicate error', () => {
+    const onFlag = vi.fn();
+    render(
+      <ReportMarkerPopup
+        {...defaultProps}
+        onFlag={onFlag}
+        flagError="Ya marcaste este reporte para revisión."
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Denunciar reporte' }));
+    fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'FALSE_INFORMATION' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar denuncia' }));
+    expect(onFlag).toHaveBeenCalledWith('FALSE_INFORMATION');
+    expect(screen.getByRole('alert')).toHaveTextContent('Ya marcaste este reporte para revisión.');
   });
 
   it('shows the official street, neighborhood, and commune when a report is associated', () => {
