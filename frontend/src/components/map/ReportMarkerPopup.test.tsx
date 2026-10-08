@@ -158,7 +158,9 @@ describe('ReportMarkerPopup freshness', () => {
       targetType: 'STREET',
       officialName: 'Av. Corrientes',
       score: 62,
-      level: 'FAIR',
+      level: 'ACCEPTABLE',
+      hasEvidence: true,
+      availability: { status: 'UNKNOWN', signals: [] },
       confidence: 'MEDIUM',
       sourceStatus: {
         community: 'AVAILABLE',
@@ -203,7 +205,7 @@ describe('ReportMarkerPopup freshness', () => {
       />,
     );
     expect(await screen.findByText('Estado estimado de la calle')).toBeInTheDocument();
-    expect(screen.getByText(/62 \/ 100 · Regular/)).toBeInTheDocument();
+    expect(screen.getByText(/62 \/ 100 · Aceptable/)).toBeInTheDocument();
     expect(screen.getByText(/Severidad de reportes activos: -13/)).toBeInTheDocument();
     expect(screen.getByText('Fuente: comunidad')).toBeInTheDocument();
   });

@@ -74,6 +74,7 @@ export class RoutingService {
             ...segment,
             score: score?.score ?? null,
             level: score?.level ?? null,
+            availabilitySignals: score?.availability?.signals ?? [],
           };
         });
         const penalties = segments.map((segment) =>

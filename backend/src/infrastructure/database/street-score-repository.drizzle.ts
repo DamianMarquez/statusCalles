@@ -71,49 +71,66 @@ function mapInput(row: ScoreReportRow): StreetScoreReportInput {
 export class DrizzleStreetScoreRepository implements StreetScoreRepository {
   constructor(private readonly database: StreetStatusDatabase) {}
 
-  async findReportsInViewport(
-    query: ReportViewportQuery,
-    asOf: Date,
-  ): Promise<StreetScoreReportInput[]> {
+  async findConditionGeometry(query: ReportViewportQuery, zoom: number) {
     const envelope = sql`ST_MakeEnvelope(${query.west}, ${query.south}, ${query.east}, ${query.north}, 4326)`;
-    const result = await this.database.execute<ScoreReportRow>(sql`
-      SELECT
-        r.id::text AS id,
-        r.type,
-        r.severity,
-        r.description,
-        ST_Y(r.location::geometry) AS latitude,
-        ST_X(r.location::geometry) AS longitude,
-        r.status,
-        r.created_at,
-        r.updated_at,
-        r.user_id::text AS actor_id,
-        r.street_segment_id::text AS segment_id,
-        COALESCE(f.confirmations, 0) AS confirmations,
-        COALESCE(f.resolved_reports, 0) AS resolved_reports,
-        COALESCE(f.weighted_confirmations, 0) AS weighted_confirmations,
-        COALESCE(f.weighted_resolved_reports, 0) AS weighted_resolved_reports,
-        f.latest_confirmation_at
-      FROM street_reports r
-      LEFT JOIN LATERAL (
-        SELECT
-          COUNT(*) FILTER (WHERE type = 'CONFIRM') AS confirmations,
-          COUNT(*) FILTER (WHERE type = 'RESOLVED') AS resolved_reports,
-          SUM(EXP(-LN(2) * GREATEST(EXTRACT(EPOCH FROM (${asOf}::timestamptz - updated_at)) / 86400.0, 0) / ${reportFreshnessThresholds.confirmationHalfLifeDays}))
-            FILTER (WHERE type = 'CONFIRM') AS weighted_confirmations,
-          SUM(EXP(-LN(2) * GREATEST(EXTRACT(EPOCH FROM (${asOf}::timestamptz - updated_at)) / 86400.0, 0) / ${reportFreshnessThresholds.confirmationHalfLifeDays}))
-            FILTER (WHERE type = 'RESOLVED') AS weighted_resolved_reports,
-          MAX(updated_at) FILTER (WHERE type = 'CONFIRM') AS latest_confirmation_at
-        FROM report_feedback
-        WHERE report_id = r.id
-      ) f ON TRUE
-      WHERE r.location && (${envelope})::geography
-        AND ST_Intersects(r.location::geometry, ${envelope})
-        AND r.moderation_status = 'VISIBLE'
-      ORDER BY r.created_at DESC
-      LIMIT 5000
+    const tolerance = Math.max(0.00001, Math.min(0.001, 0.08 / 2 ** Math.max(0, zoom - 12)));
+    if (zoom >= 15) {
+      const result = await this.database.execute<{
+        id: string;
+        street_id: string;
+        street_name: string;
+        geometry: string;
+      }>(sql`
+        SELECT ss.id::text AS id, ss.street_id::text AS street_id, st.official_name AS street_name,
+          ST_AsGeoJSON(ST_SimplifyPreserveTopology(ss.geometry, ${tolerance})) AS geometry
+        FROM street_segments ss
+        JOIN streets st ON st.id = ss.street_id
+        WHERE ss.geometry && ${envelope}
+          AND ST_Intersects(ss.geometry, ${envelope})
+        ORDER BY ss.street_id, ss.id
+        LIMIT 1200
+      `);
+      return result.rows.map((row) => ({
+        id: row.id,
+        streetId: row.street_id,
+        streetName: row.street_name,
+        geometry: JSON.parse(row.geometry) as {
+          type: 'MultiLineString' | 'LineString';
+          coordinates: number[][][] | number[][];
+        },
+        segmentIds: [row.id],
+      }));
+    }
+    const result = await this.database.execute<{
+      street_id: string;
+      street_name: string;
+      geometry: string;
+      segment_ids: string[];
+    }>(sql`
+      SELECT ss.street_id::text AS street_id, st.official_name AS street_name,
+        ST_AsGeoJSON(ST_Multi(ST_SimplifyPreserveTopology(ST_CollectionExtract(ST_LineMerge(ST_Collect(ss.geometry)), 2), ${tolerance}))) AS geometry,
+        array_agg(ss.id::text ORDER BY ss.id) AS segment_ids
+      FROM street_segments ss
+      JOIN streets st ON st.id = ss.street_id
+      WHERE ss.geometry && ${envelope} AND ST_Intersects(ss.geometry, ${envelope})
+        AND EXISTS (
+          SELECT 1 FROM street_reports r
+          WHERE r.street_segment_id = ss.id AND r.moderation_status = 'VISIBLE'
+        )
+      GROUP BY ss.street_id, st.official_name
+      ORDER BY st.official_name
+      LIMIT 600
     `);
-    return result.rows.map(mapInput);
+    return result.rows.map((row) => ({
+      id: row.street_id,
+      streetId: row.street_id,
+      streetName: row.street_name,
+      geometry: JSON.parse(row.geometry) as {
+        type: 'MultiLineString' | 'LineString';
+        coordinates: number[][][] | number[][];
+      },
+      segmentIds: row.segment_ids,
+    }));
   }
 
   async findStreetScore(streetId: string, asOf: Date): Promise<StreetScoreStreetInput | null> {

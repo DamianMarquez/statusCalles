@@ -3,9 +3,6 @@ import { reportFreshnessPolicy } from '../../reports/domain/report-freshness-pol
 import type { StreetReport } from '../../reports/domain/street-report.js';
 
 export const streetScoreConfig = {
-  cellLatitudeDegrees: 0.00225,
-  cellLongitudeDegrees: 0.00275,
-  minimumActiveReports: 2,
   neutralScore: 75,
   severityPenalty: { LOW: 5, MEDIUM: 10, HIGH: 18, CRITICAL: 30 },
   severityFactorShare: 0.65,
@@ -15,12 +12,22 @@ export const streetScoreConfig = {
   resolutionCreditPerVote: 0.6,
   maximumResolutionCredit: 25,
   stabilityBonus: 5,
-  maximumOfficialIncidentPenalty: 30,
   reporterContributionLimit: 1,
 } as const;
 
+export const STREET_SCORE_BANDS = [
+  { level: 'EXCELLENT', label: 'Excelente', minimum: 90, maximum: 100 },
+  { level: 'GOOD', label: 'Buena', minimum: 75, maximum: 89 },
+  { level: 'ACCEPTABLE', label: 'Aceptable', minimum: 60, maximum: 74 },
+  { level: 'UNCOMFORTABLE', label: 'Incómoda', minimum: 45, maximum: 59 },
+  { level: 'BAD', label: 'Mala', minimum: 30, maximum: 44 },
+  { level: 'VERY_BAD', label: 'Muy mala', minimum: 15, maximum: 29 },
+  { level: 'CRITICAL', label: 'Crítica', minimum: 0, maximum: 14 },
+] as const;
+
 export type StreetScoreSource = 'COMMUNITY' | 'OFFICIAL' | 'SYSTEM';
-export type StreetScoreLevel = 'GOOD' | 'FAIR' | 'BAD' | 'VERY_BAD' | 'IMPASSABLE';
+export type StreetScoreLevel =
+  'EXCELLENT' | 'GOOD' | 'ACCEPTABLE' | 'UNCOMFORTABLE' | 'BAD' | 'VERY_BAD' | 'CRITICAL';
 export type StreetScoreConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
 export type StreetScoreSourceStatus = 'AVAILABLE' | 'UNAVAILABLE';
 
@@ -52,7 +59,7 @@ export interface TrafficEvidence {
 
 export interface ScoreInput {
   targetId: string;
-  targetType: 'SEGMENT' | 'STREET' | 'AREA';
+  targetType: 'SEGMENT' | 'STREET';
   reports: ScoreReportEvidence[];
   officialIncidents?: OfficialIncidentEvidence[];
   traffic?: TrafficEvidence | null;
@@ -75,6 +82,7 @@ export interface ScoreResult {
   id: string;
   targetType: ScoreInput['targetType'];
   score: number;
+  hasEvidence: boolean;
   level: StreetScoreLevel;
   confidence: StreetScoreConfidence;
   sourceStatus: {
@@ -84,33 +92,9 @@ export interface ScoreResult {
   };
   factors: ScoreFactor[];
   metrics: ScoreMetrics;
+  availability: { status: 'OPEN' | 'RESTRICTED' | 'BLOCKED' | 'UNKNOWN'; signals: string[] };
   calculatedAt: Date;
   segments?: ScoreResult[];
-}
-
-export interface StreetScoreInput {
-  report: StreetReport;
-  feedback: ReportFeedbackSummary;
-  actorId?: string | null;
-}
-
-export interface StreetScoreArea {
-  id: string;
-  bounds: { south: number; north: number; west: number; east: number };
-  center: { latitude: number; longitude: number };
-  score: number;
-  condition: StreetScoreLevel;
-  confidence: StreetScoreConfidence;
-  sourceStatus: ScoreResult['sourceStatus'];
-  factors: ScoreFactor[];
-  calculatedAt: Date;
-  reasons: {
-    activeReports: number;
-    highSeverityReports: number;
-    confirmations: number;
-    resolvedReports: number;
-    latestReportAt: Date;
-  };
 }
 
 export interface StreetSegmentScoreInput {
@@ -120,12 +104,6 @@ export interface StreetSegmentScoreInput {
   traffic?: TrafficEvidence | null;
 }
 
-interface Cell {
-  south: number;
-  west: number;
-  reports: StreetScoreInput[];
-}
-
 const millisecondsPerDay = 86_400_000;
 
 function roundOne(value: number): number {
@@ -133,12 +111,16 @@ function roundOne(value: number): number {
 }
 
 function scoreLevel(score: number): StreetScoreLevel {
-  if (score === 0) return 'IMPASSABLE';
-  if (score < 30) return 'VERY_BAD';
-  if (score < 55) return 'BAD';
-  if (score < 80) return 'FAIR';
-  return 'GOOD';
+  return STREET_SCORE_BANDS.find((band) => score >= band.minimum && score <= band.maximum)!.level;
 }
+
+const physicalReportTypes = new Set([
+  'POTHOLE',
+  'ROAD_DAMAGE',
+  'ROAD_IRREGULARITY',
+  'ROAD_ELEVATION',
+  'ROAD_SUBSIDENCE',
+]);
 
 function addFactor(factors: ScoreFactor[], factor: ScoreFactor): void {
   if (factor.impact !== 0) factors.push({ ...factor, impact: roundOne(factor.impact) });
@@ -184,63 +166,6 @@ function capSameReporter(
 }
 
 export class StreetScoreCalculator {
-  /** Compatibility adapter for the map overlay; it applies the same V2 factors per 250 m cell. */
-  calculate(inputs: StreetScoreInput[], asOf: Date): StreetScoreArea[] {
-    const cells = new Map<string, Cell>();
-    for (const input of inputs) {
-      const { latitude, longitude } = input.report.location;
-      const row = Math.floor((latitude + 90) / streetScoreConfig.cellLatitudeDegrees);
-      const column = Math.floor((longitude + 180) / streetScoreConfig.cellLongitudeDegrees);
-      const id = `${row}:${column}`;
-      const south = row * streetScoreConfig.cellLatitudeDegrees - 90;
-      const west = column * streetScoreConfig.cellLongitudeDegrees - 180;
-      const cell = cells.get(id) ?? { south, west, reports: [] };
-      cell.reports.push(input);
-      cells.set(id, cell);
-    }
-    return [...cells.entries()]
-      .map(([id, cell]) => {
-        const active = cell.reports.filter((item) => this.isActive(item, asOf));
-        if (active.length < streetScoreConfig.minimumActiveReports) return null;
-        const result = this.calculateScore({
-          targetId: id,
-          targetType: 'AREA',
-          reports: cell.reports,
-          calculatedAt: asOf,
-        });
-        const latestReportAt = result.metrics.latestReportAt;
-        if (!latestReportAt) return null;
-        return {
-          id,
-          bounds: {
-            south: cell.south,
-            north: cell.south + streetScoreConfig.cellLatitudeDegrees,
-            west: cell.west,
-            east: cell.west + streetScoreConfig.cellLongitudeDegrees,
-          },
-          center: {
-            latitude: cell.south + streetScoreConfig.cellLatitudeDegrees / 2,
-            longitude: cell.west + streetScoreConfig.cellLongitudeDegrees / 2,
-          },
-          score: result.score,
-          condition: result.level,
-          confidence: result.confidence,
-          sourceStatus: result.sourceStatus,
-          factors: result.factors,
-          calculatedAt: result.calculatedAt,
-          reasons: {
-            activeReports: result.metrics.activeReports,
-            highSeverityReports: result.metrics.highSeverityReports,
-            confirmations: result.metrics.confirmations,
-            resolvedReports: result.metrics.resolvedReports,
-            latestReportAt,
-          },
-        } satisfies StreetScoreArea;
-      })
-      .filter((area): area is StreetScoreArea => area !== null)
-      .sort((left, right) => left.score - right.score || left.id.localeCompare(right.id));
-  }
-
   calculateSegment(input: Omit<ScoreInput, 'targetType'>): ScoreResult {
     return this.calculateScore({ ...input, targetType: 'SEGMENT' });
   }
@@ -260,12 +185,7 @@ export class StreetScoreCalculator {
         calculatedAt: input.calculatedAt,
       }),
     );
-    const evidenced = segments.filter(
-      (segment) =>
-        segment.metrics.reports > 0 ||
-        segment.metrics.officialIncidents > 0 ||
-        segment.metrics.trafficLevel !== null,
-    );
+    const evidenced = segments.filter((segment) => segment.hasEvidence);
     if (evidenced.length === 0) {
       const neutral = this.calculateScore({
         targetId: input.targetId,
@@ -273,7 +193,20 @@ export class StreetScoreCalculator {
         reports: [],
         calculatedAt: input.calculatedAt,
       });
-      return { ...neutral, officialName: input.officialName, segments: [] };
+      const signals = [...new Set(segments.flatMap((segment) => segment.availability.signals))];
+      return {
+        ...neutral,
+        officialName: input.officialName,
+        availability: {
+          status: signals.some((signal) => signal === 'ROAD_BLOCKED' || signal === 'TRAFFIC_CUT')
+            ? 'BLOCKED'
+            : signals.length
+              ? 'RESTRICTED'
+              : 'UNKNOWN',
+          signals,
+        },
+        segments: [],
+      };
     }
 
     const score = Math.round(
@@ -312,11 +245,13 @@ export class StreetScoreCalculator {
       impact: 0,
       detail: `${evidenced.length} segmentos con señales; los tramos sin datos no alteran el promedio.`,
     });
+    const allSignals = [...new Set(segments.flatMap((segment) => segment.availability.signals))];
     return {
       id: input.targetId,
       targetType: 'STREET',
       officialName: input.officialName,
       score,
+      hasEvidence: true,
       level: scoreLevel(score),
       confidence,
       factors: [...groupedFactors.values()].map((factor) => ({
@@ -325,6 +260,14 @@ export class StreetScoreCalculator {
       })),
       metrics,
       sourceStatus,
+      availability: {
+        status: allSignals.some((signal) => signal === 'ROAD_BLOCKED' || signal === 'TRAFFIC_CUT')
+          ? 'BLOCKED'
+          : allSignals.length
+            ? 'RESTRICTED'
+            : 'UNKNOWN',
+        signals: allSignals,
+      },
       calculatedAt: input.calculatedAt,
       segments: evidenced,
     };
@@ -341,7 +284,10 @@ export class StreetScoreCalculator {
           'El score comienza en 75; sin datos disponibles se interpreta como falta de evidencia, no como estado perfecto.',
       },
     ];
-    const reportEvaluations = input.reports.map((evidence) => ({
+    const physicalReports = input.reports.filter(({ report }) =>
+      physicalReportTypes.has(report.type),
+    );
+    const reportEvaluations = physicalReports.map((evidence) => ({
       evidence,
       freshness: reportFreshnessPolicy.evaluate(
         evidence.report,
@@ -411,7 +357,7 @@ export class StreetScoreCalculator {
     });
 
     const resolvedEvidence = capSameReporter(
-      input.reports.filter(({ report }) => report.status === 'RESOLVED'),
+      physicalReports.filter(({ report }) => report.status === 'RESOLVED'),
       input.calculatedAt,
     );
     const weightedResolutions = selected.reduce(
@@ -442,42 +388,27 @@ export class StreetScoreCalculator {
     }
 
     const activeIncidents = (input.officialIncidents ?? []).filter((incident) => incident.active);
-    const incidentPenalty = activeIncidents.reduce((sum, incident) => {
-      const penalty =
-        incident.type === 'TRAFFIC_CUT'
-          ? 8
-          : incident.type === 'ACCIDENT'
-            ? 10
-            : incident.type === 'ROAD_WORK'
-              ? 3
-              : 2;
-      return sum + penalty;
-    }, 0);
-    addFactor(factors, {
-      code: 'OFFICIAL_INCIDENTS',
-      source: 'OFFICIAL',
-      label: 'Cortes e incidentes oficiales',
-      impact: -Math.min(streetScoreConfig.maximumOfficialIncidentPenalty, incidentPenalty),
-      detail: activeIncidents.length
-        ? `${activeIncidents.length} incidentes oficiales activos reducen el score.`
-        : 'No hay incidentes oficiales activos disponibles para esta calle.',
-    });
-
-    if (input.traffic) {
-      const weight = reportFreshnessPolicy.confirmationWeight(
-        input.traffic.measuredAt,
-        input.calculatedAt,
-      );
-      const penalty =
-        (input.traffic.level === 'HIGH' ? 5 : input.traffic.level === 'MODERATE' ? 2 : 0) * weight;
-      addFactor(factors, {
-        code: 'OFFICIAL_TRAFFIC',
-        source: 'OFFICIAL',
-        label: 'Volumen de tráfico',
-        impact: -penalty,
-        detail: `Nivel ${input.traffic.level.toLowerCase()} medido en ${input.traffic.measuredAt.toISOString()}; la señal pierde peso con el tiempo.`,
-      });
-    }
+    const availabilitySignals = [
+      ...input.reports
+        .filter(
+          (evidence) =>
+            this.isActive(evidence, input.calculatedAt) &&
+            ['ROAD_BLOCKED', 'ROAD_WORK', 'FLOOD'].includes(evidence.report.type),
+        )
+        .map(({ report }) => report.type),
+      ...activeIncidents.map((incident) => incident.type),
+      ...(input.traffic?.level === 'HIGH' ? ['HIGH_TRAFFIC'] : []),
+    ];
+    const availability = {
+      status: availabilitySignals.some(
+        (signal) => signal === 'ROAD_BLOCKED' || signal === 'TRAFFIC_CUT',
+      )
+        ? ('BLOCKED' as const)
+        : availabilitySignals.length
+          ? ('RESTRICTED' as const)
+          : ('UNKNOWN' as const),
+      signals: [...new Set(availabilitySignals)],
+    };
 
     const latestActivity = reportEvaluations
       .map(({ evidence }) => lastActivityOf(evidence))
@@ -500,36 +431,37 @@ export class StreetScoreCalculator {
     const rawScore = factors.reduce((sum, factor) => sum + factor.impact, 0);
     const score = Math.max(0, Math.min(100, Math.round(rawScore)));
     const metrics = {
-      reports: input.reports.length,
+      reports: physicalReports.length,
       activeReports: active.length,
       recentReports: active.filter(({ freshness }) => freshness.freshness.level === 'FRESH').length,
       highSeverityReports: active.filter(
         ({ evidence }) =>
           evidence.report.severity === 'HIGH' || evidence.report.severity === 'CRITICAL',
       ).length,
-      confirmations: input.reports.reduce((sum, item) => sum + item.feedback.confirmations, 0),
+      confirmations: physicalReports.reduce((sum, item) => sum + item.feedback.confirmations, 0),
       resolvedReports:
-        input.reports.filter(({ report }) => report.status === 'RESOLVED').length +
-        input.reports.reduce((sum, item) => sum + item.feedback.resolvedReports, 0),
+        physicalReports.filter(({ report }) => report.status === 'RESOLVED').length +
+        physicalReports.reduce((sum, item) => sum + item.feedback.resolvedReports, 0),
       officialIncidents: activeIncidents.length,
       trafficLevel: input.traffic?.level ?? null,
-      latestReportAt: input.reports.length
-        ? input.reports.reduce(
+      latestReportAt: physicalReports.length
+        ? physicalReports.reduce(
             (latest, item) => (item.report.createdAt > latest ? item.report.createdAt : latest),
-            input.reports[0]!.report.createdAt,
+            physicalReports[0]!.report.createdAt,
           )
         : null,
     } satisfies ScoreMetrics;
     const confidence: StreetScoreConfidence =
       active.length >= 5 && new Set(selected.map((item) => item.actorId).filter(Boolean)).size >= 3
         ? 'HIGH'
-        : active.length > 0 || activeIncidents.length > 0 || input.traffic
+        : active.length > 0
           ? 'MEDIUM'
           : 'LOW';
     return {
       id: input.targetId,
       targetType: input.targetType,
       score,
+      hasEvidence: physicalReports.length > 0,
       level: scoreLevel(score),
       confidence,
       sourceStatus: {
@@ -537,13 +469,14 @@ export class StreetScoreCalculator {
         officialIncidents: input.officialIncidents === undefined ? 'UNAVAILABLE' : 'AVAILABLE',
         traffic: input.traffic == null ? 'UNAVAILABLE' : 'AVAILABLE',
       },
+      availability,
       factors,
       metrics,
       calculatedAt: input.calculatedAt,
     };
   }
 
-  private isActive(input: StreetScoreInput, asOf: Date): boolean {
+  private isActive(input: ScoreReportEvidence, asOf: Date): boolean {
     return reportFreshnessPolicy.evaluate(input.report, input.feedback, asOf).status === 'ACTIVE';
   }
 

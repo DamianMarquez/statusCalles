@@ -49,6 +49,7 @@ vi.mock('react-leaflet', async () => {
     Marker: ({ children }: React.PropsWithChildren) =>
       React.createElement('div', { 'data-testid': 'marker' }, children),
     Polyline: () => React.createElement('div', { 'data-testid': 'route-line' }),
+    GeoJSON: () => React.createElement('div', { 'data-testid': 'geojson-layer' }),
     Popup: ({ children }: React.PropsWithChildren) => React.createElement('div', null, children),
     Rectangle: ({ children }: React.PropsWithChildren) =>
       React.createElement('div', null, children),

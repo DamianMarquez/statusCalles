@@ -14,7 +14,8 @@ describe('MapLegend', () => {
     const onClose = vi.fn();
     render(<MapLegend open onClose={onClose} />);
     expect(screen.getByRole('dialog', { name: 'Referencias del mapa' })).toBeInTheDocument();
-    expect(screen.getByText('Street Score estimado')).toBeInTheDocument();
+    expect(screen.getByText('Condición física de las calles')).toBeInTheDocument();
+    expect(screen.getByText('Sin datos')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
   });

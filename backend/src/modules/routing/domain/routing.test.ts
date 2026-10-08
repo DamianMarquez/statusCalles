@@ -50,4 +50,31 @@ describe('calculateRoutePenalty', () => {
     expect(result.delaySeconds).toBeCloseTo((1000 / 13.89) * 5);
     expect(result.reasons).toContain('corte oficial activo');
   });
+
+  it('uses community blockage signals for blocked-route preference', () => {
+    const result = calculateRoutePenalty(
+      { ...segment, score: 75, maximumSeverity: null, availabilitySignals: ['ROAD_BLOCKED'] },
+      'AVOID_BLOCKED_STREETS',
+    );
+    expect(result.blocked).toBe(true);
+    expect(result.reasons).toContain('bloqueo o corte reportado');
+  });
+
+  it('adds explicit penalties for works, flooding and traffic without changing physical score', () => {
+    const result = calculateRoutePenalty(
+      {
+        ...segment,
+        score: 75,
+        maximumSeverity: null,
+        availabilitySignals: ['ROAD_WORK', 'FLOOD', 'HIGH_TRAFFIC'],
+      },
+      'AVOID_BAD_STREETS',
+    );
+    expect(result.delaySeconds).toBeCloseTo((1000 / 13.89) * 5.5);
+    expect(result.reasons).toEqual([
+      'obra reportada',
+      'inundación reportada',
+      'tráfico alto reportado',
+    ]);
+  });
 });

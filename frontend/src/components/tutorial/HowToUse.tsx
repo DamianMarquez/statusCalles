@@ -57,8 +57,8 @@ export function HowToUse() {
           <h2 id="tutorial-map-title">Un mapa para orientarte</h2>
           <p>
             Acercá, alejá y desplazate por el mapa. Los marcadores muestran reportes comunitarios;
-            las zonas coloreadas representan un Street Score estimado cuando hay información
-            suficiente.
+            las líneas coloreadas representan la condición física estimada de segmentos oficiales;
+            en vistas lejanas se agrupan por calle. Gris significa “Sin datos”.
           </p>
           <p>
             Usá <strong>Referencias</strong> para consultar tipos de reporte, estados y escala de
@@ -90,6 +90,16 @@ export function HowToUse() {
             ●
           </span>
           <span className="tutorial-map-demo__zone">58/100</span>
+          <div className="tutorial-condition-demo" aria-label="Escala de condición ilustrativa">
+            <span style={{ background: '#15803d' }}>Excelente</span>
+            <span style={{ background: '#65a30d' }}>Buena</span>
+            <span style={{ background: '#ca8a04' }}>Aceptable</span>
+            <span style={{ background: '#ea580c' }}>Incómoda</span>
+            <span style={{ background: '#dc2626' }}>Mala</span>
+            <span style={{ background: '#991b1b' }}>Muy mala</span>
+            <span style={{ background: '#581c1c' }}>Crítica</span>
+            <span style={{ background: '#7b8490' }}>Sin datos</span>
+          </div>
           <small>Vista ilustrativa · datos de ejemplo</small>
         </div>
       </section>
@@ -218,10 +228,15 @@ export function HowToUse() {
       </section>
 
       <aside className="tutorial-note">
-        <strong>Una estimación, no una verdad absoluta.</strong>
+        <strong>Una estimación, no una medición profesional.</strong>
         <p>
-          Street Score combina reportes comunitarios y fuentes oficiales disponibles. Su cobertura y
-          confianza varían según la información de cada zona.
+          La condición física se calcula con baches, daños, irregularidades, elevaciones anómalas y
+          hundimientos reportados. Cortes, obras, inundaciones y tráfico se muestran aparte como
+          señales de circulación. La cobertura y confianza varían según los datos disponibles.
+        </p>
+        <p>
+          La interpretación para auto común, SUV/4x4, deportivo o rally es orientativa e
+          ilustrativa; no constituye consejo de seguridad ni certificación del vehículo.
         </p>
       </aside>
     </main>

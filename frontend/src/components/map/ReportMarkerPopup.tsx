@@ -8,6 +8,7 @@ import {
   type OfficialMobilityInfrastructure,
 } from '../../api/streetsApi.js';
 import type { StreetScoreResultDto } from '../../api/streetScoreTypes.js';
+import { streetConditionLevel } from './streetConditionCatalog.js';
 
 const reportTypeLabels = Object.fromEntries(
   REPORT_TYPE_OPTIONS.map((option) => [option.value, option.popupLabel]),
@@ -135,16 +136,9 @@ export function ReportMarkerPopup({
         <section className="report-popup__score" aria-label="Estado estimado de la calle">
           <strong>Estado estimado de la calle</strong>
           <span className="report-popup__score-value">
-            {streetScore.score} / 100 ·{' '}
-            {streetScore.level === 'GOOD'
-              ? 'Bueno'
-              : streetScore.level === 'FAIR'
-                ? 'Regular'
-                : streetScore.level === 'BAD'
-                  ? 'Malo'
-                  : streetScore.level === 'VERY_BAD'
-                    ? 'Muy malo'
-                    : 'Intransitable'}
+            {streetScore.hasEvidence
+              ? `${streetScore.score ?? '—'} / 100 · ${streetConditionLevel(streetScore.level ?? '')?.label ?? 'Estimación'}`
+              : 'Sin datos suficientes para estimar la condición física'}
           </span>
           <span>
             {streetScore.metrics.activeReports} activos ({streetScore.metrics.recentReports}{' '}

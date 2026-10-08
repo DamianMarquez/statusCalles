@@ -25,6 +25,7 @@ export interface RouteSegmentEvidence {
   level: string | null;
   maximumSeverity: 1 | 2 | 3 | 4 | null;
   activeOfficialCut: boolean;
+  availabilitySignals?: string[];
 }
 
 export interface RouteSegmentPenalty {
@@ -72,15 +73,24 @@ export function calculateRoutePenalty(
   routeOption: RouteOption,
 ): RouteSegmentPenalty {
   const reasons: string[] = [];
-  const isImpassable = segment.level === 'IMPASSABLE' || segment.score === 0;
+  const isImpassable = segment.score === 0;
+  const reportedBlockage = (segment.availabilitySignals ?? []).some((signal) =>
+    ['ROAD_BLOCKED', 'TRAFFIC_CUT'].includes(signal),
+  );
   const isBad = segment.score !== null && segment.score < badScoreThreshold;
   if (isBad) reasons.push(`score bajo (${segment.score}/100)`);
   if (segment.maximumSeverity === 3) reasons.push('severidad alta');
   if (segment.maximumSeverity === 4) reasons.push('severidad crítica');
   if (segment.activeOfficialCut) reasons.push('corte oficial activo');
+  if (reportedBlockage && !segment.activeOfficialCut) reasons.push('bloqueo o corte reportado');
+  const signals = segment.availabilitySignals ?? [];
+  if (signals.includes('ROAD_WORK')) reasons.push('obra reportada');
+  if (signals.includes('FLOOD')) reasons.push('inundación reportada');
+  if (signals.includes('HIGH_TRAFFIC')) reasons.push('tráfico alto reportado');
   if (isImpassable) reasons.push('estado impasable');
   const blocked =
-    routeOption === 'AVOID_BLOCKED_STREETS' && (isImpassable || segment.activeOfficialCut);
+    routeOption === 'AVOID_BLOCKED_STREETS' &&
+    (isImpassable || segment.activeOfficialCut || reportedBlockage);
   if (routeOption === 'FASTEST') {
     return { segmentId: segment.id, delaySeconds: 0, blocked: false, reasons };
   }
@@ -107,6 +117,9 @@ export function calculateRoutePenalty(
   if (segment.activeOfficialCut) {
     if (routeOption === 'AVOID_BAD_STREETS') delaySeconds += traversalSeconds * 5;
   }
+  if (signals.includes('ROAD_WORK')) delaySeconds += traversalSeconds * 1.5;
+  if (signals.includes('FLOOD')) delaySeconds += traversalSeconds * 3;
+  if (signals.includes('HIGH_TRAFFIC')) delaySeconds += traversalSeconds;
 
   return { segmentId: segment.id, delaySeconds, blocked, reasons };
 }

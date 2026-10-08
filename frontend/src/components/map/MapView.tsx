@@ -36,6 +36,7 @@ import { MapFilters } from './MapFilters.js';
 import { useMapReportFilters } from './useMapReportFilters.js';
 import { filtersActiveCount } from './mapReportFilters.js';
 import { MapLegend } from './MapLegend.js';
+import { MapLayerControls } from './MapLayerControls.js';
 
 const currentLocationIcon = divIcon({
   className: 'user-marker-wrapper',
@@ -193,6 +194,12 @@ export default function MapView({
     legendToggleRef.current?.focus();
   }, []);
   const [scoreRefreshKey, setScoreRefreshKey] = useState(0);
+  const [reportsLayerVisible, setReportsLayerVisible] = useState(true);
+  const [conditionLayerVisible, setConditionLayerVisible] = useState(true);
+  const [conditionLevels, setConditionLevels] = useState<string[] | null>(null);
+  const [streetReportTarget, setStreetReportTarget] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const {
     reports,
     status: reportStatus,
@@ -380,7 +387,16 @@ export default function MapView({
         <TileLayer url={mapConfig.tileUrl} attribution={mapConfig.tileAttribution} />
         <ViewportReports onViewportChange={handleViewportChange} />
         <MapQueryFocus />
-        <StreetScoreLayer refreshKey={scoreRefreshKey} />
+        {conditionLayerVisible && (
+          <StreetScoreLayer
+            refreshKey={scoreRefreshKey}
+            levels={conditionLevels}
+            onViewStreetReports={(id, name) => {
+              setStreetReportTarget({ id, name });
+              setReportsLayerVisible(true);
+            }}
+          />
+        )}
         <RouteLayer route={calculatedRoute} />
         {(['origin', 'destination'] as const).map((slot) => {
           const location = routeLocations[slot];
@@ -407,21 +423,24 @@ export default function MapView({
           location={reportLocation}
           onSelect={selectReportLocation}
         />
-        {reports.map((report) => (
-          <ReportMarker
-            key={report.id}
-            report={report}
-            onVote={(type) => void voteOnReport(report.id, type)}
-            isVoting={votingReportIds.has(report.id)}
-            feedbackError={feedbackErrors[report.id] || null}
-            authenticated={Boolean(user)}
-            onRequestLogin={openAuthDialog}
-            onFlag={(reason) => void flagReportFromMap(report.id, reason)}
-            flagBusy={flagBusyIds.has(report.id)}
-            flagError={flagErrors[report.id] || null}
-            flagSuccess={flaggedIds.has(report.id)}
-          />
-        ))}
+        {reportsLayerVisible &&
+          reports
+            .filter((report) => !streetReportTarget || report.street?.id === streetReportTarget.id)
+            .map((report) => (
+              <ReportMarker
+                key={report.id}
+                report={report}
+                onVote={(type) => void voteOnReport(report.id, type)}
+                isVoting={votingReportIds.has(report.id)}
+                feedbackError={feedbackErrors[report.id] || null}
+                authenticated={Boolean(user)}
+                onRequestLogin={openAuthDialog}
+                onFlag={(reason) => void flagReportFromMap(report.id, reason)}
+                flagBusy={flagBusyIds.has(report.id)}
+                flagError={flagErrors[report.id] || null}
+                flagSuccess={flaggedIds.has(report.id)}
+              />
+            ))}
         {userLocation && (
           <>
             <LocationFocus location={userLocation} />
@@ -449,6 +468,22 @@ export default function MapView({
         authenticated={Boolean(user)}
         onRequestLogin={openAuthDialog}
       />
+      <MapLayerControls
+        reports={reportsLayerVisible}
+        condition={conditionLayerVisible}
+        levels={conditionLevels}
+        onReportsChange={setReportsLayerVisible}
+        onConditionChange={setConditionLayerVisible}
+        onLevelsChange={setConditionLevels}
+      />
+      {streetReportTarget && reportsLayerVisible && (
+        <div className="street-report-focus" role="status">
+          Reportes de {streetReportTarget.name}
+          <button type="button" onClick={() => setStreetReportTarget(null)}>
+            Mostrar todos
+          </button>
+        </div>
+      )}
       <button
         className="map-legend-toggle"
         ref={legendToggleRef}

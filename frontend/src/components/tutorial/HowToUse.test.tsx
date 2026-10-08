@@ -8,7 +8,8 @@ describe('HowToUse', () => {
   it('shows the real feature guide and explains the score as an estimate', () => {
     render(<HowToUse />);
     expect(screen.getByRole('heading', { name: 'Cómo usar Street Status' })).toBeInTheDocument();
-    expect(screen.getByText(/Street Score combina reportes comunitarios/)).toBeInTheDocument();
+    expect(screen.getByText(/La condición física se calcula con baches/)).toBeInTheDocument();
+    expect(screen.getByText(/no constituye consejo de seguridad/)).toBeInTheDocument();
     expect(screen.getByText(/direcciones e intersecciones/)).toBeInTheDocument();
   });
 

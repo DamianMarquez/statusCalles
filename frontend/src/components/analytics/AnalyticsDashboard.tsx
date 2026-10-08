@@ -29,11 +29,13 @@ const reportLabels: Record<string, string> = Object.fromEntries(
 );
 const severityLabels: Record<number, string> = { 1: 'Baja', 2: 'Media', 3: 'Alta', 4: 'Crítica' };
 const scoreLabels: Record<string, string> = {
-  GOOD: 'Bueno',
-  FAIR: 'Regular',
-  BAD: 'Malo',
-  VERY_BAD: 'Muy malo',
-  IMPASSABLE: 'Intransitable',
+  EXCELLENT: 'Excelente',
+  GOOD: 'Buena',
+  ACCEPTABLE: 'Aceptable',
+  UNCOMFORTABLE: 'Incómoda',
+  BAD: 'Mala',
+  VERY_BAD: 'Muy mala',
+  CRITICAL: 'Crítica',
 };
 
 function formatHours(hours: number): string {

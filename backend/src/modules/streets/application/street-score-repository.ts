@@ -19,7 +19,18 @@ export interface StreetScoreStreetInput {
 }
 
 export interface StreetScoreRepository {
-  findReportsInViewport(query: ReportViewportQuery, asOf: Date): Promise<StreetScoreReportInput[]>;
+  findConditionGeometry(
+    query: ReportViewportQuery,
+    zoom: number,
+  ): Promise<
+    Array<{
+      id: string;
+      streetId: string;
+      streetName: string;
+      geometry: { type: 'MultiLineString' | 'LineString'; coordinates: number[][][] | number[][] };
+      segmentIds: string[];
+    }>
+  >;
   findStreetScore(streetId: string, asOf: Date): Promise<StreetScoreStreetInput | null>;
   findSegmentScore(
     segmentId: string,

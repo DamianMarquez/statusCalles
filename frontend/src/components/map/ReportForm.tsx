@@ -110,6 +110,12 @@ export function ReportForm({
               ))}
             </select>
           </label>
+          {type === 'ROAD_ELEVATION' && (
+            <p className="report-form__hint">
+              Indicá una deformación anómala de la calzada. No incluyas lomos de burro ni badenes
+              intencionales.
+            </p>
+          )}
 
           <label>
             Severidad

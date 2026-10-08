@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyReportFeedbackSummary } from '../../reports/domain/report-feedback.js';
 import type { StreetReport } from '../../reports/domain/street-report.js';
-import { StreetScoreCalculator, type StreetScoreInput } from './street-score-calculator.js';
+import { StreetScoreCalculator, type ScoreReportEvidence } from './street-score-calculator.js';
 
 const calculator = new StreetScoreCalculator();
 const asOf = new Date('2026-10-06T12:00:00.000Z');
@@ -20,7 +20,7 @@ function input(
     weightedResolvedReports?: number;
     actorId?: string | null;
   } = {},
-): StreetScoreInput {
+): ScoreReportEvidence {
   const createdAt = new Date(asOf.getTime() - (options.ageDays ?? 0) * 86_400_000);
   return {
     report: {
@@ -48,85 +48,91 @@ function input(
 }
 
 describe('StreetScoreCalculator', () => {
-  it('returns no score when there is not enough report evidence', () => {
-    expect(calculator.calculate([], asOf)).toEqual([]);
-    expect(calculator.calculate([input('LOW')], asOf)).toEqual([]);
-  });
-
   it('penalizes a single mild issue less than severe clustered reports', () => {
-    const mild = calculator.calculate([input('LOW'), input('LOW')], asOf)[0]!;
-    const severe = calculator.calculate([input('CRITICAL'), input('HIGH')], asOf)[0]!;
+    const mild = calculator.calculateSegment({
+      targetId: 'mild',
+      reports: [input('LOW')],
+      calculatedAt: asOf,
+    });
+    const severe = calculator.calculateSegment({
+      targetId: 'severe',
+      reports: [input('CRITICAL'), input('HIGH', { actorId: 'other' })],
+      calculatedAt: asOf,
+    });
     expect(mild.score).toBeGreaterThan(severe.score);
-    expect(severe.reasons.highSeverityReports).toBe(2);
+    expect(severe.metrics.highSeverityReports).toBe(2);
   });
 
   it('reduces the impact of old reports using the freshness half-life', () => {
-    const recent = calculator.calculate([input('HIGH'), input('HIGH')], asOf)[0]!;
-    const aging = calculator.calculate(
-      [input('HIGH', { ageDays: 20 }), input('HIGH', { ageDays: 20, longitude: -58.379 })],
-      asOf,
-    )[0]!;
-    const stale = calculator.calculate(
-      [input('HIGH', { ageDays: 40 }), input('HIGH', { ageDays: 40, longitude: -58.379 })],
-      asOf,
-    );
+    const recent = calculator.calculateSegment({
+      targetId: 'recent',
+      reports: [input('HIGH')],
+      calculatedAt: asOf,
+    });
+    const aging = calculator.calculateSegment({
+      targetId: 'aging',
+      reports: [input('HIGH', { ageDays: 20 })],
+      calculatedAt: asOf,
+    });
+    const stale = calculator.calculateSegment({
+      targetId: 'stale',
+      reports: [input('HIGH', { ageDays: 40, status: 'STALE' })],
+      calculatedAt: asOf,
+    });
     expect(aging.score).toBeGreaterThan(recent.score);
-    expect(stale).toEqual([]);
+    expect(stale.metrics.activeReports).toBe(0);
+    expect(stale.hasEvidence).toBe(true);
     expect(recent.score).toBeLessThan(100);
   });
 
   it('does not let resolved reports reduce the score and reports them as historical context', () => {
-    const area = calculator.calculate(
-      [
-        input('CRITICAL', { status: 'RESOLVED' }),
-        input('LOW'),
-        input('LOW', { longitude: -58.379 }),
+    const result = calculator.calculateSegment({
+      targetId: 'street',
+      reports: [
+        input('CRITICAL', { status: 'RESOLVED', actorId: 'resolved' }),
+        input('LOW', { actorId: 'one' }),
+        input('LOW', { actorId: 'two' }),
       ],
-      asOf,
-    )[0]!;
-    expect(area.score).toBeLessThan(100);
-    expect(area.reasons.resolvedReports).toBe(1);
-    expect(area.reasons.activeReports).toBe(2);
+      calculatedAt: asOf,
+    });
+    expect(result.score).toBeLessThan(100);
+    expect(result.metrics.resolvedReports).toBe(1);
+    expect(result.metrics.activeReports).toBe(2);
   });
 
   it('shows a lower score when active reports have more weighted confirmations', () => {
-    const plain = calculator.calculate(
-      [input('HIGH'), input('HIGH', { longitude: -58.379 })],
-      asOf,
-    )[0]!;
-    const confirmed = calculator.calculate(
-      [
+    const plain = calculator.calculateSegment({
+      targetId: 'plain',
+      reports: [input('HIGH'), input('HIGH', { actorId: 'other' })],
+      calculatedAt: asOf,
+    });
+    const confirmed = calculator.calculateSegment({
+      targetId: 'confirmed',
+      reports: [
         input('HIGH', { confirmations: 8, weightedConfirmations: 8 }),
-        input('HIGH', { longitude: -58.379, confirmations: 8, weightedConfirmations: 8 }),
+        input('HIGH', { actorId: 'other', confirmations: 8, weightedConfirmations: 8 }),
       ],
-      asOf,
-    )[0]!;
+      calculatedAt: asOf,
+    });
     expect(confirmed.score).toBeLessThan(plain.score);
-    expect(confirmed.reasons.confirmations).toBe(16);
+    expect(confirmed.metrics.confirmations).toBe(16);
   });
 
   it('lets resolution feedback reduce a report penalty', () => {
-    const plain = calculator.calculate(
-      [input('HIGH'), input('HIGH', { longitude: -58.379 })],
-      asOf,
-    )[0]!;
-    const resolvedVotes = calculator.calculate(
-      [
+    const plain = calculator.calculateSegment({
+      targetId: 'plain',
+      reports: [input('HIGH'), input('HIGH', { actorId: 'other' })],
+      calculatedAt: asOf,
+    });
+    const resolvedVotes = calculator.calculateSegment({
+      targetId: 'resolved-votes',
+      reports: [
         input('HIGH', { resolvedVotes: 4, weightedResolvedReports: 4 }),
-        input('HIGH', { longitude: -58.379, resolvedVotes: 4, weightedResolvedReports: 4 }),
+        input('HIGH', { actorId: 'other', resolvedVotes: 4, weightedResolvedReports: 4 }),
       ],
-      asOf,
-    )[0]!;
+      calculatedAt: asOf,
+    });
     expect(resolvedVotes.score).toBeGreaterThan(plain.score);
-  });
-
-  it('keeps separate geographic concentrations in separate areas', () => {
-    expect(
-      calculator.calculate(
-        [input('LOW'), input('LOW', { longitude: -58.379 }), input('HIGH', { longitude: -58.3 })],
-        asOf,
-      ),
-    ).toHaveLength(1);
   });
 
   it('returns a neutral score with low confidence and no data for an unreported segment', () => {
@@ -135,7 +141,12 @@ describe('StreetScoreCalculator', () => {
       reports: [],
       calculatedAt: asOf,
     });
-    expect(result).toMatchObject({ score: 75, level: 'FAIR', confidence: 'LOW' });
+    expect(result).toMatchObject({
+      score: 75,
+      level: 'GOOD',
+      confidence: 'LOW',
+      hasEvidence: false,
+    });
     expect(result.factors[0]).toMatchObject({
       source: 'SYSTEM',
       impact: 75,
@@ -147,6 +158,58 @@ describe('StreetScoreCalculator', () => {
       officialIncidents: 'UNAVAILABLE',
       traffic: 'UNAVAILABLE',
     });
+  });
+
+  it('scores the three new physical report kinds using the common severity/freshness policy', () => {
+    for (const type of ['ROAD_IRREGULARITY', 'ROAD_ELEVATION', 'ROAD_SUBSIDENCE'] as const) {
+      const reportInput = input('HIGH');
+      reportInput.report.type = type;
+      const result = calculator.calculateSegment({
+        targetId: type,
+        reports: [reportInput],
+        calculatedAt: asOf,
+      });
+      expect(result.hasEvidence).toBe(true);
+      expect(result.metrics.activeReports).toBe(1);
+      expect(result.factors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'REPORT_SEVERITY' }),
+          expect.objectContaining({ code: 'REPORT_FRESHNESS' }),
+        ]),
+      );
+    }
+  });
+
+  it('does not let a blocked-road report degrade physical condition', () => {
+    const roadBlock = input('CRITICAL');
+    roadBlock.report.type = 'ROAD_BLOCKED';
+    const blocked = calculator.calculateSegment({
+      targetId: 'blocked',
+      reports: [roadBlock],
+      calculatedAt: asOf,
+    });
+    const empty = calculator.calculateSegment({
+      targetId: 'empty',
+      reports: [],
+      calculatedAt: asOf,
+    });
+    expect(blocked.score).toBe(empty.score);
+    expect(blocked.hasEvidence).toBe(false);
+    expect(blocked.availability.status).toBe('BLOCKED');
+  });
+
+  it('preserves availability signals when a street has no physical evidence', () => {
+    const roadBlock = input('CRITICAL');
+    roadBlock.report.type = 'ROAD_BLOCKED';
+    const result = calculator.calculateStreet({
+      targetId: 'street-blocked',
+      officialName: 'Avenida Ejemplo',
+      calculatedAt: asOf,
+      segments: [{ id: 'segment-blocked', reports: [roadBlock] }],
+    });
+    expect(result.hasEvidence).toBe(false);
+    expect(result.score).toBe(75);
+    expect(result.availability.status).toBe('BLOCKED');
   });
 
   it('shows severity and recency as separate deterministic factors', () => {
@@ -190,7 +253,7 @@ describe('StreetScoreCalculator', () => {
     );
   });
 
-  it('factors an active official road cut and high traffic separately from community signals', () => {
+  it('keeps cuts and traffic in availability without changing physical condition', () => {
     const community = calculator.calculateSegment({
       targetId: 'segment-1',
       reports: [],
@@ -203,14 +266,18 @@ describe('StreetScoreCalculator', () => {
       officialIncidents: [{ id: 'cut-1', type: 'TRAFFIC_CUT', active: true }],
       traffic: { level: 'HIGH', measuredAt: asOf },
     });
-    expect(official.score).toBeLessThan(community.score);
-    expect(official.factors).toEqual(
+    expect(official.score).toBe(community.score);
+    expect(official.factors).not.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: 'OFFICIAL_INCIDENTS', source: 'OFFICIAL', impact: -8 }),
-        expect.objectContaining({ code: 'OFFICIAL_TRAFFIC', source: 'OFFICIAL', impact: -5 }),
+        expect.objectContaining({ code: 'OFFICIAL_INCIDENTS' }),
+        expect.objectContaining({ code: 'OFFICIAL_TRAFFIC' }),
       ]),
     );
-    expect(official.confidence).toBe('MEDIUM');
+    expect(official.availability).toMatchObject({
+      status: 'BLOCKED',
+      signals: expect.arrayContaining(['TRAFFIC_CUT', 'HIGH_TRAFFIC']),
+    });
+    expect(official.confidence).toBe('LOW');
     expect(official.sourceStatus).toEqual({
       community: 'AVAILABLE',
       officialIncidents: 'AVAILABLE',
@@ -262,9 +329,9 @@ describe('StreetScoreCalculator', () => {
       calculatedAt: asOf,
     });
     expect(worst.score).toBe(0);
-    expect(worst.level).toBe('IMPASSABLE');
+    expect(worst.level).toBe('CRITICAL');
     expect(best.score).toBe(100);
-    expect(best.level).toBe('GOOD');
+    expect(best.level).toBe('EXCELLENT');
   });
 
   it('aggregates only segments with evidence and keeps segment explanations', () => {

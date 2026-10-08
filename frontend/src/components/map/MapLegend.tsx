@@ -4,7 +4,7 @@ import {
   REPORT_STATUS_OPTIONS,
   REPORT_TYPE_OPTIONS,
 } from '../../api/reportCatalog.js';
-import { STREET_SCORE_STOPS } from './streetScorePalette.js';
+import { STREET_CONDITION_LEVELS } from './streetConditionCatalog.js';
 
 export function MapLegend({ open, onClose }: { open: boolean; onClose: () => void }) {
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -75,22 +75,30 @@ export function MapLegend({ open, onClose }: { open: boolean; onClose: () => voi
           </span>
         ))}
       </div>
-      <h3>Street Score estimado</h3>
+      <h3>Condición física de las calles</h3>
       <p className="map-legend__note">
-        Es una estimación basada en reportes disponibles; no es una evaluación oficial de cada
-        calle.
+        Es una estimación comunitaria basada en reportes disponibles; no es una medición profesional
+        ni una evaluación oficial.
       </p>
       <div className="map-legend__grid">
-        {STREET_SCORE_STOPS.map((item) => (
-          <span className="map-legend__item" key={item.label}>
+        {STREET_CONDITION_LEVELS.map((item) => (
+          <span className="map-legend__item" key={item.value}>
             <span
               className="map-legend__score"
               style={{ backgroundColor: item.color }}
               aria-hidden="true"
             />
-            {item.label} {item.max === 0 ? '0' : item.max === 100 ? '80–100' : `hasta ${item.max}`}
+            {item.label} {item.range}
           </span>
         ))}
+        <span className="map-legend__item">
+          <span
+            className="map-legend__score"
+            style={{ backgroundColor: '#7b8490' }}
+            aria-hidden="true"
+          />
+          Sin datos
+        </span>
       </div>
     </section>
   );

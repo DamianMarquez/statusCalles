@@ -260,6 +260,8 @@ describe('reports API with PostgreSQL/PostGIS', () => {
   });
 
   it('combines multiple types, lifecycle status, severity, and server-relative time filters', async () => {
+    const fromDate = new Date(Date.now() - 86_400_000).toISOString();
+    const toDate = new Date(Date.now() + 86_400_000).toISOString();
     const pothole = await createReport({ ...validReport, description: 'Filtro bache uno' });
     const flood = await createReport({
       ...validReport,
@@ -276,7 +278,7 @@ describe('reports API with PostgreSQL/PostGIS', () => {
 
     const response = await app.inject({
       method: 'GET',
-      url: '/api/reports?south=-34.61&north=-34.59&west=-58.39&east=-58.37&types=POTHOLE,FLOOD&statuses=ACTIVE&fromDate=2026-10-01T00%3A00%3A00.000Z&toDate=2026-10-08T00%3A00%3A00.000Z&minSeverity=HIGH',
+      url: `/api/reports?south=-34.61&north=-34.59&west=-58.39&east=-58.37&types=POTHOLE,FLOOD&statuses=ACTIVE&fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}&minSeverity=HIGH`,
     });
     expect(response.statusCode).toBe(200);
     const page = response.json<{ items: ReportDto[]; hasMore: boolean }>();
@@ -503,49 +505,17 @@ describe('reports API with PostgreSQL/PostGIS', () => {
     expect(response.json()).toMatchObject({ code: 'INVALID_BOUNDS' });
   });
 
-  it('returns explained Street Score areas only where enough active reports exist', async () => {
-    const first = await createReport({ ...validReport, severity: 'CRITICAL' });
-    await createReport({ ...validReport, severity: 'HIGH' });
-    await submitFeedback(first.id, testUsers[0]!.cookie, 'CONFIRM');
-
+  it('returns condition features as GeoJSON from official street geometry', async () => {
     const response = await app.inject({
       method: 'GET',
-      url: '/api/streets/score?south=-34.61&north=-34.59&west=-58.39&east=-58.37',
+      url: '/api/streets/condition?south=-34.61&north=-34.59&west=-58.39&east=-58.37&zoom=16',
     });
 
     expect(response.statusCode).toBe(200);
-    const areas = response.json<
-      Array<{
-        score: number;
-        condition: string;
-        reasons: {
-          activeReports: number;
-          highSeverityReports: number;
-          confirmations: number;
-          latestReportAt: string;
-        };
-      }>
-    >();
-    expect(areas).toHaveLength(1);
-    expect(areas[0]).toMatchObject({
-      score: expect.any(Number),
-      condition: expect.any(String),
-      reasons: {
-        activeReports: expect.any(Number),
-        highSeverityReports: expect.any(Number),
-        confirmations: expect.any(Number),
-        latestReportAt: expect.any(String),
-      },
+    expect(response.json()).toMatchObject({
+      type: 'FeatureCollection',
+      features: expect.any(Array),
     });
-    expect(areas[0]!.reasons.activeReports).toBeGreaterThanOrEqual(2);
-  });
-
-  it('rejects oversized Street Score areas', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: '/api/streets/score?south=-34&north=34&west=-58&east=-57',
-    });
-    expect(response.statusCode).toBe(400);
   });
 
   it('returns 404 for an unknown report id', async () => {

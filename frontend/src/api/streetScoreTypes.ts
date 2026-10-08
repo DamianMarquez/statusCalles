@@ -1,6 +1,6 @@
-import type { ViewportBounds } from './reportTypes.js';
+import type { StreetScoreLevel } from '../components/map/streetConditionCatalog.js';
 
-export type StreetScoreLevel = 'GOOD' | 'FAIR' | 'BAD' | 'VERY_BAD' | 'IMPASSABLE';
+export type { StreetScoreLevel };
 export type StreetScoreConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export interface StreetScoreFactorDto {
@@ -11,53 +11,59 @@ export interface StreetScoreFactorDto {
   detail: string;
 }
 
-export interface StreetScoreAreaDto {
-  id: string;
-  bounds: ViewportBounds;
-  center: { latitude: number; longitude: number };
-  score: number;
-  condition: StreetScoreLevel;
-  confidence: StreetScoreConfidence;
-  sourceStatus: {
-    community: 'AVAILABLE' | 'UNAVAILABLE';
-    officialIncidents: 'AVAILABLE' | 'UNAVAILABLE';
-    traffic: 'AVAILABLE' | 'UNAVAILABLE';
-  };
-  factors: StreetScoreFactorDto[];
-  calculatedAt: string;
-  reasons: {
-    activeReports: number;
-    highSeverityReports: number;
-    confirmations: number;
-    resolvedReports: number;
-    latestReportAt: string;
-  };
+export interface StreetScoreMetricsDto {
+  reports: number;
+  activeReports: number;
+  recentReports: number;
+  highSeverityReports: number;
+  confirmations: number;
+  resolvedReports: number;
+  officialIncidents: number;
+  trafficLevel: 'LOW' | 'MODERATE' | 'HIGH' | null;
+  latestReportAt: string | null;
 }
 
 export interface StreetScoreResultDto {
   id: string;
-  targetType: 'SEGMENT' | 'STREET' | 'AREA';
+  targetType: 'SEGMENT' | 'STREET';
   officialName?: string;
-  score: number;
-  level: StreetScoreLevel;
+  score: number | null;
+  hasEvidence: boolean;
+  level: StreetScoreLevel | null;
   confidence: StreetScoreConfidence;
+  availability: { status: 'OPEN' | 'RESTRICTED' | 'BLOCKED' | 'UNKNOWN'; signals: string[] };
   sourceStatus: {
     community: 'AVAILABLE' | 'UNAVAILABLE';
     officialIncidents: 'AVAILABLE' | 'UNAVAILABLE';
     traffic: 'AVAILABLE' | 'UNAVAILABLE';
   };
   factors: StreetScoreFactorDto[];
-  metrics: {
-    reports: number;
-    activeReports: number;
-    recentReports: number;
-    highSeverityReports: number;
-    confirmations: number;
-    resolvedReports: number;
-    officialIncidents: number;
-    trafficLevel: 'LOW' | 'MODERATE' | 'HIGH' | null;
-    latestReportAt: string | null;
-  };
+  metrics: StreetScoreMetricsDto;
   calculatedAt: string;
   segments?: StreetScoreResultDto[];
+}
+
+export interface StreetConditionProperties extends Omit<
+  StreetScoreResultDto,
+  'id' | 'score' | 'level' | 'confidence' | 'targetType'
+> {
+  id: string;
+  streetId: string;
+  streetName: string;
+  targetType: 'SEGMENT' | 'STREET';
+  score: number | null;
+  level: StreetScoreLevel | null;
+  confidence: StreetScoreConfidence | null;
+}
+
+export interface StreetConditionFeature {
+  type: 'Feature';
+  id: string;
+  geometry: { type: 'LineString' | 'MultiLineString'; coordinates: number[][] | number[][][] };
+  properties: StreetConditionProperties;
+}
+
+export interface StreetConditionFeatureCollection {
+  type: 'FeatureCollection';
+  features: StreetConditionFeature[];
 }

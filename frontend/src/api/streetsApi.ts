@@ -1,5 +1,6 @@
 import type { ViewportBounds } from './reportTypes.js';
-import type { StreetScoreAreaDto, StreetScoreResultDto } from './streetScoreTypes.js';
+import type { StreetConditionFeatureCollection, StreetScoreResultDto } from './streetScoreTypes.js';
+import { STREET_CONDITION_LEVELS } from '../components/map/streetConditionCatalog.js';
 import { API_BASE_URL } from './apiBaseUrl.js';
 
 export interface OfficialMobilityInfrastructure {
@@ -55,12 +56,16 @@ function isScoreResult(value: unknown): value is StreetScoreResultDto {
   const result = value as Partial<StreetScoreResultDto>;
   return (
     typeof result.id === 'string' &&
-    typeof result.score === 'number' &&
-    result.score >= 0 &&
-    result.score <= 100 &&
-    ['GOOD', 'FAIR', 'BAD', 'VERY_BAD', 'IMPASSABLE'].includes(result.level ?? '') &&
+    (result.hasEvidence === false
+      ? result.score === null && result.level === null
+      : typeof result.score === 'number' &&
+        result.score >= 0 &&
+        result.score <= 100 &&
+        STREET_CONDITION_LEVELS.some(({ value }) => value === result.level)) &&
     ['LOW', 'MEDIUM', 'HIGH'].includes(result.confidence ?? '') &&
     !!result.sourceStatus &&
+    typeof result.hasEvidence === 'boolean' &&
+    !!result.availability &&
     ['AVAILABLE', 'UNAVAILABLE'].includes(result.sourceStatus.officialIncidents) &&
     ['AVAILABLE', 'UNAVAILABLE'].includes(result.sourceStatus.traffic) &&
     typeof result.calculatedAt === 'string' &&
@@ -99,46 +104,20 @@ export async function getStreetScore(
   return body;
 }
 
-function isStreetScoreArea(value: unknown): value is StreetScoreAreaDto {
-  if (!value || typeof value !== 'object') return false;
-  const area = value as Partial<StreetScoreAreaDto>;
-  return (
-    typeof area.id === 'string' &&
-    typeof area.score === 'number' &&
-    area.score >= 0 &&
-    area.score <= 100 &&
-    (area.condition === 'IMPASSABLE' ||
-      area.condition === 'VERY_BAD' ||
-      area.condition === 'BAD' ||
-      area.condition === 'FAIR' ||
-      area.condition === 'GOOD') &&
-    (area.confidence === 'LOW' || area.confidence === 'MEDIUM' || area.confidence === 'HIGH') &&
-    !!area.sourceStatus &&
-    Array.isArray(area.factors) &&
-    typeof area.bounds?.south === 'number' &&
-    typeof area.bounds?.north === 'number' &&
-    typeof area.bounds?.west === 'number' &&
-    typeof area.bounds?.east === 'number' &&
-    typeof area.center?.latitude === 'number' &&
-    typeof area.center?.longitude === 'number' &&
-    typeof area.reasons?.activeReports === 'number' &&
-    typeof area.reasons?.highSeverityReports === 'number' &&
-    typeof area.reasons?.confirmations === 'number' &&
-    typeof area.reasons?.resolvedReports === 'number' &&
-    typeof area.reasons?.latestReportAt === 'string'
-  );
-}
-
-export async function getStreetScoresInViewport(
+export async function getStreetConditionInViewport(
   bounds: ViewportBounds,
+  zoom: number,
+  levels: string[] | null,
   signal: AbortSignal,
-): Promise<StreetScoreAreaDto[]> {
+): Promise<StreetConditionFeatureCollection> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(bounds)) query.set(key, value.toFixed(5));
+  query.set('zoom', String(Math.floor(zoom)));
+  if (levels !== null) query.set('levels', levels.length ? levels.join(',') : 'NONE');
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/streets/score?${query.toString()}`, {
+    response = await fetch(`${API_BASE_URL}/streets/condition?${query.toString()}`, {
       headers: { Accept: 'application/json' },
       signal,
     });
@@ -154,7 +133,12 @@ export async function getStreetScoresInViewport(
   } catch {
     throw new StreetsApiError('El servicio devolvió una respuesta inválida.');
   }
-  if (!Array.isArray(result) || !result.every(isStreetScoreArea))
+  if (
+    !result ||
+    typeof result !== 'object' ||
+    (result as { type?: unknown }).type !== 'FeatureCollection' ||
+    !Array.isArray((result as { features?: unknown }).features)
+  )
     throw new StreetsApiError('El servicio devolvió una respuesta inválida.');
-  return result;
+  return result as StreetConditionFeatureCollection;
 }
