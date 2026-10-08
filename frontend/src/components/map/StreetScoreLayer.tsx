@@ -56,6 +56,7 @@ export function StreetScoreLayer({
     type: 'FeatureCollection',
     features: [],
   });
+  const [dataRevision, setDataRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [vehicleMode, setVehicleMode] = useState<keyof typeof vehicleInterpretations>('Auto común');
@@ -87,6 +88,9 @@ export function StreetScoreLayer({
         );
         if (requestNumber !== sequence.current || controller.signal.aborted) return;
         setData(result);
+        // react-leaflet's GeoJSON layer does not apply changed `data` props to
+        // an existing Leaflet layer, so remount it after each successful fetch.
+        setDataRevision((revision) => revision + 1);
         setError(false);
       } catch {
         if (requestNumber !== sequence.current || controller.signal.aborted) return;
@@ -110,7 +114,7 @@ export function StreetScoreLayer({
   return (
     <>
       <GeoJSON
-        key={`${refreshKey}:${levelKey}:${roadClassKey}`}
+        key={`${refreshKey}:${levelKey}:${roadClassKey}:${dataRevision}`}
         data={data as never}
         style={(feature) => {
           const level = (feature?.properties?.condition as string | null) ?? null;
