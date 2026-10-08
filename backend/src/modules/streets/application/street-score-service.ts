@@ -2,6 +2,8 @@ import type { ReportViewportQuery } from '../../reports/application/report-repos
 import { streetScoreCalculator } from '../domain/street-score-calculator.js';
 import type { StreetScoreRepository } from './street-score-repository.js';
 import type { StreetScoreLevel } from '../domain/street-score-calculator.js';
+import type { StreetRoadClass } from '../domain/street-road-class.js';
+import { STREET_LAYER_ZOOM_CONFIG, visibleRoadClassesAtZoom } from '../domain/street-road-class.js';
 
 export class StreetScoreService {
   constructor(
@@ -13,9 +15,16 @@ export class StreetScoreService {
     query: ReportViewportQuery,
     zoom: number,
     levels?: StreetScoreLevel[],
+    roadClasses: StreetRoadClass[] = ['PRIMARY', 'SECONDARY', 'LOCAL'],
   ) {
     const calculatedAt = this.clock();
-    const geometry = await this.repository.findConditionGeometry(query, zoom);
+    const visibleAtZoom = visibleRoadClassesAtZoom(zoom);
+    const effectiveClasses = visibleAtZoom.filter(
+      (roadClass) =>
+        roadClasses.includes(roadClass as StreetRoadClass) ||
+        (roadClass === 'UNKNOWN' && roadClasses.includes('LOCAL')),
+    ) as StreetRoadClass[];
+    const geometry = await this.repository.findConditionGeometry(query, zoom, effectiveClasses);
     const ids = [...new Set(geometry.flatMap((feature) => feature.segmentIds))];
     const evidence = await this.repository.findSegmentScores(ids, calculatedAt);
     const bySegment = new Map(evidence.map((segment) => [segment.id, segment.reports]));
@@ -23,7 +32,7 @@ export class StreetScoreService {
       .map((item) => {
         const segments = item.segmentIds.map((id) => ({ id, reports: bySegment.get(id) ?? [] }));
         const score =
-          zoom >= 15
+          zoom >= STREET_LAYER_ZOOM_CONFIG.detailedSegmentMinZoom
             ? streetScoreCalculator.calculateSegment({
                 targetId: item.id,
                 reports: segments[0]?.reports ?? [],
@@ -39,9 +48,15 @@ export class StreetScoreService {
           id: item.id,
           streetId: item.streetId,
           streetName: item.streetName,
-          targetType: zoom >= 15 ? ('SEGMENT' as const) : ('STREET' as const),
+          roadClass: item.roadClass,
+          targetType:
+            zoom >= STREET_LAYER_ZOOM_CONFIG.detailedSegmentMinZoom
+              ? ('SEGMENT' as const)
+              : ('STREET' as const),
           score: score.hasEvidence ? score.score : null,
           level: score.hasEvidence ? score.level : null,
+          condition: score.hasEvidence ? score.level : ('GOOD' as const),
+          hasReports: score.metrics.reports > 0,
           hasEvidence: score.hasEvidence,
           confidence: score.hasEvidence ? score.confidence : null,
           factors: score.factors,
@@ -51,11 +66,7 @@ export class StreetScoreService {
         };
         return { type: 'Feature' as const, id: item.id, geometry: item.geometry, properties };
       })
-      .filter(
-        (feature) =>
-          levels === undefined ||
-          (feature.properties.level !== null && levels.includes(feature.properties.level)),
-      );
+      .filter((feature) => levels === undefined || levels.includes(feature.properties.condition));
     return { type: 'FeatureCollection' as const, features };
   }
 

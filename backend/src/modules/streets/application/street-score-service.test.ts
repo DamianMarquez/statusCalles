@@ -10,6 +10,7 @@ describe('StreetScoreService condition viewport', () => {
           id: 'segment-1',
           streetId: 'street-1',
           streetName: 'Avenida Ejemplo',
+          roadClass: 'LOCAL',
           geometry: {
             type: 'MultiLineString',
             coordinates: [
@@ -34,7 +35,15 @@ describe('StreetScoreService condition viewport', () => {
     expect(response.type).toBe('FeatureCollection');
     expect(response.features[0]).toMatchObject({
       geometry: { type: 'MultiLineString' },
-      properties: { streetName: 'Avenida Ejemplo', score: null, level: null, hasEvidence: false },
+      properties: {
+        streetName: 'Avenida Ejemplo',
+        roadClass: 'LOCAL',
+        score: null,
+        level: null,
+        condition: 'GOOD',
+        hasReports: false,
+        hasEvidence: false,
+      },
     });
   });
 
@@ -45,6 +54,7 @@ describe('StreetScoreService condition viewport', () => {
           id: 's1',
           streetId: 'st1',
           streetName: 'A',
+          roadClass: 'LOCAL',
           geometry: {
             type: 'LineString',
             coordinates: [
@@ -65,5 +75,46 @@ describe('StreetScoreService condition viewport', () => {
       ['CRITICAL'],
     );
     expect(result.features).toHaveLength(0);
+  });
+
+  it('includes streets without reports when the visual GOOD condition is selected', async () => {
+    const repository: StreetScoreRepository = {
+      findConditionGeometry: vi.fn().mockResolvedValue([
+        {
+          id: 's1',
+          streetId: 'st1',
+          streetName: 'A',
+          roadClass: 'PRIMARY',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [0, 0],
+              [1, 1],
+            ],
+          },
+          segmentIds: ['s1'],
+        },
+      ]),
+      findSegmentScores: vi.fn().mockResolvedValue([]),
+      findStreetScore: vi.fn().mockResolvedValue(null),
+      findSegmentScore: vi.fn().mockResolvedValue(null),
+    };
+    const result = await new StreetScoreService(repository).findConditionInViewport(
+      { south: -1, north: 1, west: -1, east: 1 },
+      16,
+      ['GOOD'],
+    );
+    expect(result.features).toHaveLength(1);
+    expect(result.features[0]?.properties).toMatchObject({
+      condition: 'GOOD',
+      score: null,
+      hasEvidence: false,
+      hasReports: false,
+    });
+    expect(repository.findConditionGeometry).toHaveBeenCalledWith(
+      { south: -1, north: 1, west: -1, east: 1 },
+      16,
+      ['PRIMARY', 'SECONDARY', 'LOCAL', 'UNKNOWN'],
+    );
   });
 });

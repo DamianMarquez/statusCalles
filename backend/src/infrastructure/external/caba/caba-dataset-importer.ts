@@ -232,20 +232,20 @@ async function importStreetSegments(
         (segment, index) => sql`(
         ${segment.sourceSegmentId}, ${segment.sourceCode}, ${segment.normalizedName}, ${segment.neighborhoodName ? normalizeGeographicName(segment.neighborhoodName) : null},
         ${segment.communeNumber}, ${JSON.stringify(segment.geometry)}, ${sourceRecordId}::uuid,
-        ${JSON.stringify(raw[index]?.properties ?? segment.properties)}::jsonb
+        ${JSON.stringify(raw[index]?.properties ?? segment.properties)}::jsonb, ${segment.roadClass}
       )`,
       );
       const result = await tx.execute(sql`
-        INSERT INTO street_segments (source_segment_id, street_id, neighborhood_id, commune_id, geometry, source_id, metadata, updated_at)
+        INSERT INTO street_segments (source_segment_id, street_id, neighborhood_id, commune_id, road_class, geometry, source_id, metadata, updated_at)
         SELECT v.source_segment_id, s.id, n.id, c.id,
-          ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(v.geometry_json::text), 4326)), v.source_id, v.metadata, NOW()
-        FROM (VALUES ${sql.join(values, sql`, `)}) AS v(source_segment_id, source_code, normalized_name, neighborhood_name, commune_number, geometry_json, source_id, metadata)
+          v.road_class::street_road_class, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(v.geometry_json::text), 4326)), v.source_id, v.metadata, NOW()
+        FROM (VALUES ${sql.join(values, sql`, `)}) AS v(source_segment_id, source_code, normalized_name, neighborhood_name, commune_number, geometry_json, source_id, metadata, road_class)
         JOIN streets s ON s.source_code = v.source_code AND s.normalized_name = v.normalized_name
         LEFT JOIN neighborhoods n ON n.normalized_name = v.neighborhood_name
         LEFT JOIN communes c ON c.id = v.commune_number::integer
         ON CONFLICT (source_segment_id) DO UPDATE SET street_id = EXCLUDED.street_id,
           neighborhood_id = EXCLUDED.neighborhood_id, commune_id = EXCLUDED.commune_id,
-          geometry = EXCLUDED.geometry, source_id = EXCLUDED.source_id, metadata = EXCLUDED.metadata, updated_at = NOW()
+          road_class = EXCLUDED.road_class, geometry = EXCLUDED.geometry, source_id = EXCLUDED.source_id, metadata = EXCLUDED.metadata, updated_at = NOW()
         RETURNING source_segment_id
       `);
       if (result.rows.length !== batch.length) {

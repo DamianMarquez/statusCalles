@@ -34,6 +34,7 @@ describe('CABA dataset importer', () => {
               id: index === 0 ? sourceSegmentId : secondSourceSegmentId,
               codigo: sourceCode,
               nomoficial: name,
+              red_jerarq: index === 0 ? 'VÍA DISTRIBUIDORA PRINCIPAL' : 'VÍA LOCAL',
               BARRIO: 'Nuñez',
               COMUNA: 13,
             },
@@ -80,14 +81,20 @@ describe('CABA dataset importer', () => {
     await expect(importer.import('streets', { localFile: datasetFile })).resolves.toBe(2);
     await expect(importer.import('streets', { localFile: datasetFile })).resolves.toBe(2);
     const segments = await pool.query(
-      'SELECT count(*)::int AS count FROM street_segments WHERE source_segment_id = ANY($1)',
+      'SELECT source_segment_id, road_class FROM street_segments WHERE source_segment_id = ANY($1)',
       [[sourceSegmentId, secondSourceSegmentId]],
     );
     const streets = await pool.query(
       'SELECT count(*)::int AS count FROM streets WHERE source_code = $1',
       [sourceCode],
     );
-    expect(segments.rows[0]?.count).toBe(2);
+    expect(segments.rows).toHaveLength(2);
+    expect(segments.rows).toEqual(
+      expect.arrayContaining([
+        { source_segment_id: sourceSegmentId, road_class: 'PRIMARY' },
+        { source_segment_id: secondSourceSegmentId, road_class: 'LOCAL' },
+      ]),
+    );
     expect(streets.rows[0]?.count).toBe(2);
   });
 });

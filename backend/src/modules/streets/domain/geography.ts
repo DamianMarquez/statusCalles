@@ -19,6 +19,7 @@ export interface NormalizedStreetSegment {
   officialName: string;
   normalizedName: string;
   geometry: { type: 'MultiLineString'; coordinates: number[][][] };
+  roadClass: StreetRoadClass;
   properties: Record<string, unknown>;
   neighborhoodName: string | null;
   communeNumber: number | null;
@@ -150,6 +151,7 @@ export function normalizeStreetFeature(feature: GeoJsonFeature): NormalizedStree
     officialName,
     normalizedName: normalizeGeographicName(officialName),
     geometry: normalizeLineGeometry(feature.geometry),
+    roadClass: normalizeStreetRoadClass(property(properties, 'red_jerarq')),
     properties,
     neighborhoodName: typeof barrio === 'string' && barrio.trim() ? barrio.trim() : null,
     communeNumber,
@@ -206,3 +208,4 @@ export function parseFeatureCollection(input: unknown): GeoJsonFeatureCollection
   }
   return collection as GeoJsonFeatureCollection;
 }
+import { normalizeStreetRoadClass, type StreetRoadClass } from './street-road-class.js';

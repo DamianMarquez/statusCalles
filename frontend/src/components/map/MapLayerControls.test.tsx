@@ -11,9 +11,11 @@ describe('MapLayerControls', () => {
         reports
         condition
         levels={[]}
+        roadClasses={['PRIMARY', 'SECONDARY', 'LOCAL']}
         onReportsChange={onReportsChange}
         onConditionChange={onConditionChange}
         onLevelsChange={vi.fn()}
+        onRoadClassesChange={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByLabelText('Reportes'));
@@ -31,9 +33,11 @@ describe('MapLayerControls', () => {
         reports
         condition
         levels={null}
+        roadClasses={['PRIMARY', 'SECONDARY', 'LOCAL']}
         onReportsChange={vi.fn()}
         onConditionChange={vi.fn()}
         onLevelsChange={onLevelsChange}
+        onRoadClassesChange={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByText('Capas del mapa'));
@@ -41,6 +45,27 @@ describe('MapLayerControls', () => {
     expect(onLevelsChange).toHaveBeenCalledOnce();
     expect(onLevelsChange.mock.calls[0]?.[0]).not.toContain('UNCOMFORTABLE');
     expect(screen.getByLabelText('Crítica')).toBeInTheDocument();
+  });
+
+  it('filters road hierarchy independently from report and condition filters', () => {
+    const onRoadClassesChange = vi.fn();
+    const onLevelsChange = vi.fn();
+    render(
+      <MapLayerControls
+        reports
+        condition
+        levels={null}
+        roadClasses={['PRIMARY', 'SECONDARY', 'LOCAL']}
+        onReportsChange={vi.fn()}
+        onConditionChange={vi.fn()}
+        onLevelsChange={onLevelsChange}
+        onRoadClassesChange={onRoadClassesChange}
+      />,
+    );
+    fireEvent.click(screen.getByText('Capas del mapa'));
+    fireEvent.click(screen.getByLabelText('Arterias principales'));
+    expect(onRoadClassesChange).toHaveBeenCalledWith(['SECONDARY', 'LOCAL']);
+    expect(onLevelsChange).not.toHaveBeenCalled();
   });
 });
 afterEach(() => cleanup());

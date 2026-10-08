@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
+import { STREET_CONDITION_LEVELS } from '../map/streetConditionCatalog.js';
 
 const demoReports = [
   {
@@ -58,7 +59,9 @@ export function HowToUse() {
           <p>
             Acercá, alejá y desplazate por el mapa. Los marcadores muestran reportes comunitarios;
             las líneas coloreadas representan la condición física estimada de segmentos oficiales;
-            en vistas lejanas se agrupan por calle. Gris significa “Sin datos”.
+            en vistas lejanas se agrupan por calle. El verde también puede indicar el estado visual
+            predeterminado cuando no hay reportes físicos suficientes; en ese caso no se calcula un
+            score.
           </p>
           <p>
             Usá <strong>Referencias</strong> para consultar tipos de reporte, estados y escala de
@@ -91,14 +94,14 @@ export function HowToUse() {
           </span>
           <span className="tutorial-map-demo__zone">58/100</span>
           <div className="tutorial-condition-demo" aria-label="Escala de condición ilustrativa">
-            <span style={{ background: '#15803d' }}>Excelente</span>
-            <span style={{ background: '#65a30d' }}>Buena</span>
-            <span style={{ background: '#ca8a04' }}>Aceptable</span>
-            <span style={{ background: '#ea580c' }}>Incómoda</span>
-            <span style={{ background: '#dc2626' }}>Mala</span>
-            <span style={{ background: '#991b1b' }}>Muy mala</span>
-            <span style={{ background: '#581c1c' }}>Crítica</span>
-            <span style={{ background: '#7b8490' }}>Sin datos</span>
+            {STREET_CONDITION_LEVELS.map((level) => (
+              <span key={level.value} style={{ background: level.color }}>
+                {level.label}
+              </span>
+            ))}
+            <span style={{ background: STREET_CONDITION_LEVELS[1].color }}>
+              Buena por defecto · sin score
+            </span>
           </div>
           <small>Vista ilustrativa · datos de ejemplo</small>
         </div>

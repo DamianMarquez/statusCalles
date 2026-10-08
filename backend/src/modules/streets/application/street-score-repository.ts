@@ -1,6 +1,7 @@
 import type { ReportViewportQuery } from '../../reports/application/report-repository.js';
 import type { ReportFeedbackSummary } from '../../reports/domain/report-feedback.js';
 import type { StreetReport } from '../../reports/domain/street-report.js';
+import type { StreetRoadClass } from '../domain/street-road-class.js';
 
 export interface StreetScoreReportInput {
   report: StreetReport;
@@ -22,11 +23,13 @@ export interface StreetScoreRepository {
   findConditionGeometry(
     query: ReportViewportQuery,
     zoom: number,
+    roadClasses: StreetRoadClass[],
   ): Promise<
     Array<{
       id: string;
       streetId: string;
       streetName: string;
+      roadClass: StreetRoadClass;
       geometry: { type: 'MultiLineString' | 'LineString'; coordinates: number[][][] | number[][] };
       segmentIds: string[];
     }>

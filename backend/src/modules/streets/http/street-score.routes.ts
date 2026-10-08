@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ScoreResult, StreetScoreLevel } from '../domain/street-score-calculator.js';
 import { StreetScoreService } from '../application/street-score-service.js';
+import { STREET_ROAD_CLASS_FILTERS, type StreetRoadClass } from '../domain/street-road-class.js';
 
 interface ViewportQuery {
   south: number;
@@ -33,7 +34,7 @@ export async function registerStreetScoreRoutes(
   app: FastifyInstance,
   options: { service: StreetScoreService },
 ): Promise<void> {
-  app.get<{ Querystring: ViewportQuery & { zoom: number; levels?: string } }>(
+  app.get<{ Querystring: ViewportQuery & { zoom: number; levels?: string; roadClasses?: string } }>(
     '/streets/condition',
     {
       schema: {
@@ -48,12 +49,21 @@ export async function registerStreetScoreRoutes(
             east: { type: 'number', minimum: -180, maximum: 180 },
             zoom: { type: 'number', minimum: 10, maximum: 20 },
             levels: { type: 'string', maxLength: 200 },
+            roadClasses: { type: 'string', maxLength: 80 },
           },
         },
       },
     },
     async (request, reply) => {
-      const { south, north, west, east, zoom, levels: rawLevels } = request.query;
+      const {
+        south,
+        north,
+        west,
+        east,
+        zoom,
+        levels: rawLevels,
+        roadClasses: rawRoadClasses,
+      } = request.query;
       if (south >= north || west >= east || north - south > 1 || east - west > 1)
         return reply.code(400).send({ code: 'INVALID_BOUNDS', message: 'Invalid map bounds.' });
       const levels =
@@ -75,7 +85,29 @@ export async function registerStreetScoreRoutes(
         return reply
           .code(400)
           .send({ code: 'INVALID_LEVELS', message: 'Invalid condition level.' });
-      return options.service.findConditionInViewport({ south, north, west, east }, zoom, levels);
+      const roadClasses =
+        rawRoadClasses === undefined
+          ? (['PRIMARY', 'SECONDARY', 'LOCAL'] as StreetRoadClass[])
+          : rawRoadClasses === 'NONE'
+            ? []
+            : (rawRoadClasses.split(',').filter(Boolean) as StreetRoadClass[]);
+      if (
+        roadClasses.some(
+          (roadClass) =>
+            !STREET_ROAD_CLASS_FILTERS.includes(
+              roadClass as (typeof STREET_ROAD_CLASS_FILTERS)[number],
+            ),
+        )
+      )
+        return reply
+          .code(400)
+          .send({ code: 'INVALID_ROAD_CLASSES', message: 'Invalid road class.' });
+      return options.service.findConditionInViewport(
+        { south, north, west, east },
+        zoom,
+        levels,
+        roadClasses,
+      );
     },
   );
   const streetScoreHandler = async (

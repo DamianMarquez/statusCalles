@@ -37,6 +37,7 @@ import { useMapReportFilters } from './useMapReportFilters.js';
 import { filtersActiveCount } from './mapReportFilters.js';
 import { MapLegend } from './MapLegend.js';
 import { MapLayerControls } from './MapLayerControls.js';
+import type { StreetRoadClass } from '../../api/streetScoreTypes.js';
 
 const currentLocationIcon = divIcon({
   className: 'user-marker-wrapper',
@@ -197,6 +198,11 @@ export default function MapView({
   const [reportsLayerVisible, setReportsLayerVisible] = useState(true);
   const [conditionLayerVisible, setConditionLayerVisible] = useState(true);
   const [conditionLevels, setConditionLevels] = useState<string[] | null>(null);
+  const [roadClasses, setRoadClasses] = useState<StreetRoadClass[]>([
+    'PRIMARY',
+    'SECONDARY',
+    'LOCAL',
+  ]);
   const [streetReportTarget, setStreetReportTarget] = useState<{ id: string; name: string } | null>(
     null,
   );
@@ -391,6 +397,7 @@ export default function MapView({
           <StreetScoreLayer
             refreshKey={scoreRefreshKey}
             levels={conditionLevels}
+            roadClasses={roadClasses}
             onViewStreetReports={(id, name) => {
               setStreetReportTarget({ id, name });
               setReportsLayerVisible(true);
@@ -472,9 +479,11 @@ export default function MapView({
         reports={reportsLayerVisible}
         condition={conditionLayerVisible}
         levels={conditionLevels}
+        roadClasses={roadClasses}
         onReportsChange={setReportsLayerVisible}
         onConditionChange={setConditionLayerVisible}
         onLevelsChange={setConditionLevels}
+        onRoadClassesChange={setRoadClasses}
       />
       {streetReportTarget && reportsLayerVisible && (
         <div className="street-report-focus" role="status">

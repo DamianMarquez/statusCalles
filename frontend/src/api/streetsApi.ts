@@ -1,6 +1,7 @@
 import type { ViewportBounds } from './reportTypes.js';
 import type { StreetConditionFeatureCollection, StreetScoreResultDto } from './streetScoreTypes.js';
 import { STREET_CONDITION_LEVELS } from '../components/map/streetConditionCatalog.js';
+import type { StreetRoadClass } from './streetScoreTypes.js';
 import { API_BASE_URL } from './apiBaseUrl.js';
 
 export interface OfficialMobilityInfrastructure {
@@ -108,12 +109,17 @@ export async function getStreetConditionInViewport(
   bounds: ViewportBounds,
   zoom: number,
   levels: string[] | null,
+  roadClasses: StreetRoadClass[],
   signal: AbortSignal,
 ): Promise<StreetConditionFeatureCollection> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(bounds)) query.set(key, value.toFixed(5));
   query.set('zoom', String(Math.floor(zoom)));
   if (levels !== null) query.set('levels', levels.length ? levels.join(',') : 'NONE');
+  query.set(
+    'roadClasses',
+    roadClasses.filter((roadClass) => roadClass !== 'UNKNOWN').join(',') || 'NONE',
+  );
 
   let response: Response;
   try {

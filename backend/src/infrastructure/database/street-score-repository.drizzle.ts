@@ -15,6 +15,8 @@ import type {
   StreetScoreRepository,
 } from '../../modules/streets/application/street-score-repository.js';
 import { reportFreshnessThresholds } from '../../modules/reports/domain/report-freshness-policy.js';
+import type { StreetRoadClass } from '../../modules/streets/domain/street-road-class.js';
+import { STREET_LAYER_ZOOM_CONFIG } from '../../modules/streets/domain/street-road-class.js';
 
 interface ScoreReportRow extends Record<string, unknown> {
   id: string;
@@ -71,22 +73,34 @@ function mapInput(row: ScoreReportRow): StreetScoreReportInput {
 export class DrizzleStreetScoreRepository implements StreetScoreRepository {
   constructor(private readonly database: StreetStatusDatabase) {}
 
-  async findConditionGeometry(query: ReportViewportQuery, zoom: number) {
+  async findConditionGeometry(
+    query: ReportViewportQuery,
+    zoom: number,
+    roadClasses: StreetRoadClass[],
+  ) {
+    if (roadClasses.length === 0) return [];
     const envelope = sql`ST_MakeEnvelope(${query.west}, ${query.south}, ${query.east}, ${query.north}, 4326)`;
     const tolerance = Math.max(0.00001, Math.min(0.001, 0.08 / 2 ** Math.max(0, zoom - 12)));
-    if (zoom >= 15) {
+    const classesSql = sql.join(
+      roadClasses.map((roadClass) => sql`${roadClass}::street_road_class`),
+      sql`, `,
+    );
+    if (zoom >= STREET_LAYER_ZOOM_CONFIG.detailedSegmentMinZoom) {
       const result = await this.database.execute<{
         id: string;
         street_id: string;
         street_name: string;
+        road_class: StreetRoadClass;
         geometry: string;
       }>(sql`
         SELECT ss.id::text AS id, ss.street_id::text AS street_id, st.official_name AS street_name,
+          ss.road_class AS road_class,
           ST_AsGeoJSON(ST_SimplifyPreserveTopology(ss.geometry, ${tolerance})) AS geometry
         FROM street_segments ss
         JOIN streets st ON st.id = ss.street_id
         WHERE ss.geometry && ${envelope}
           AND ST_Intersects(ss.geometry, ${envelope})
+          AND ss.road_class IN (${classesSql})
         ORDER BY ss.street_id, ss.id
         LIMIT 1200
       `);
@@ -94,6 +108,7 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
         id: row.id,
         streetId: row.street_id,
         streetName: row.street_name,
+        roadClass: row.road_class,
         geometry: JSON.parse(row.geometry) as {
           type: 'MultiLineString' | 'LineString';
           coordinates: number[][][] | number[][];
@@ -104,27 +119,28 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
     const result = await this.database.execute<{
       street_id: string;
       street_name: string;
+      road_class: StreetRoadClass;
       geometry: string;
       segment_ids: string[];
     }>(sql`
       SELECT ss.street_id::text AS street_id, st.official_name AS street_name,
+        ss.road_class AS road_class,
         ST_AsGeoJSON(ST_Multi(ST_SimplifyPreserveTopology(ST_CollectionExtract(ST_LineMerge(ST_Collect(ss.geometry)), 2), ${tolerance}))) AS geometry,
-        array_agg(ss.id::text ORDER BY ss.id) AS segment_ids
+        ARRAY(SELECT all_segments.id::text FROM street_segments all_segments
+          WHERE all_segments.street_id = ss.street_id ORDER BY all_segments.id) AS segment_ids
       FROM street_segments ss
       JOIN streets st ON st.id = ss.street_id
       WHERE ss.geometry && ${envelope} AND ST_Intersects(ss.geometry, ${envelope})
-        AND EXISTS (
-          SELECT 1 FROM street_reports r
-          WHERE r.street_segment_id = ss.id AND r.moderation_status = 'VISIBLE'
-        )
-      GROUP BY ss.street_id, st.official_name
+        AND ss.road_class IN (${classesSql})
+      GROUP BY ss.street_id, st.official_name, ss.road_class
       ORDER BY st.official_name
       LIMIT 600
     `);
     return result.rows.map((row) => ({
-      id: row.street_id,
+      id: `${row.street_id}:${row.road_class}`,
       streetId: row.street_id,
       streetName: row.street_name,
+      roadClass: row.road_class,
       geometry: JSON.parse(row.geometry) as {
         type: 'MultiLineString' | 'LineString';
         coordinates: number[][][] | number[][];

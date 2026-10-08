@@ -17,6 +17,7 @@ import {
 import { REPORT_STATUSES, REPORT_TYPES } from '../../modules/reports/domain/street-report.js';
 import { REPORT_FEEDBACK_TYPES } from '../../modules/reports/domain/report-feedback.js';
 import { USER_ROLES } from '../../modules/users/domain/user.js';
+import { STREET_ROAD_CLASSES } from '../../modules/streets/domain/street-road-class.js';
 
 const geographyPoint = customType<{ data: string; driverData: string }>({
   dataType: () => 'geography(Point,4326)',
@@ -33,6 +34,7 @@ export const reportFlagReasonEnum = pgEnum('report_flag_reason', [
   'FALSE_INFORMATION',
   'OTHER',
 ]);
+export const streetRoadClassEnum = pgEnum('street_road_class', STREET_ROAD_CLASSES);
 
 const geometryMultiLineString = customType<{ data: string; driverData: string }>({
   dataType: () => 'geometry(MultiLineString,4326)',
@@ -155,6 +157,7 @@ export const streetSegments = pgTable(
       .references(() => streets.id),
     neighborhoodId: integer('neighborhood_id').references(() => neighborhoods.id),
     communeId: integer('commune_id').references(() => communes.id),
+    roadClass: streetRoadClassEnum('road_class').notNull().default('UNKNOWN'),
     geometry: geometryMultiLineString('geometry').notNull(),
     sourceId: uuid('source_id')
       .notNull()

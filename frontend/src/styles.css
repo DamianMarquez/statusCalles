@@ -1328,6 +1328,19 @@ a {
   box-shadow: 0 3px 12px rgb(20 50 30 / 12%);
 }
 
+.street-score-status__retry {
+  display: block;
+  margin-top: 6px;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: #176d4b;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .street-score-popup {
   display: grid;
   gap: 6px;
@@ -1394,6 +1407,11 @@ a {
   box-shadow: 0 4px 16px rgb(28 54 40 / 12%);
   color: #244936;
   font-size: 13px;
+}
+.map-layer-controls[open] {
+  max-height: min(72dvh, 680px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .map-layer-controls summary {
   cursor: pointer;

@@ -1,12 +1,16 @@
 import { STREET_CONDITION_LEVELS } from './streetConditionCatalog.js';
+import { STREET_ROAD_CLASS_OPTIONS } from './streetRoadClassCatalog.js';
+import type { StreetRoadClass } from '../../api/streetScoreTypes.js';
 
 interface Props {
   reports: boolean;
   condition: boolean;
   levels: string[] | null;
+  roadClasses: StreetRoadClass[];
   onReportsChange: (value: boolean) => void;
   onConditionChange: (value: boolean) => void;
   onLevelsChange: (value: string[] | null) => void;
+  onRoadClassesChange: (value: StreetRoadClass[]) => void;
 }
 
 export function MapLayerControls(props: Props) {
@@ -38,6 +42,24 @@ export function MapLayerControls(props: Props) {
         />{' '}
         Estado de calles
       </label>
+      <fieldset disabled={!props.condition}>
+        <legend>Jerarquía vial</legend>
+        {STREET_ROAD_CLASS_OPTIONS.map((item) => (
+          <label key={item.value}>
+            <input
+              type="checkbox"
+              checked={props.roadClasses.includes(item.value)}
+              onChange={() => {
+                const next = props.roadClasses.includes(item.value)
+                  ? props.roadClasses.filter((value) => value !== item.value)
+                  : [...props.roadClasses, item.value];
+                props.onRoadClassesChange(next);
+              }}
+            />{' '}
+            {item.label}
+          </label>
+        ))}
+      </fieldset>
       <fieldset disabled={!props.condition}>
         <legend>Niveles de condición</legend>
         {STREET_CONDITION_LEVELS.map((item) => (

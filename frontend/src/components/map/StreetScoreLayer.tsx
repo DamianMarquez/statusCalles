@@ -5,13 +5,12 @@ import { getStreetConditionInViewport } from '../../api/streetsApi.js';
 import type {
   StreetConditionFeature,
   StreetConditionFeatureCollection,
+  StreetRoadClass,
 } from '../../api/streetScoreTypes.js';
 import type { ViewportBounds } from '../../api/reportTypes.js';
-import {
-  NO_STREET_CONDITION_COLOR,
-  streetConditionColor,
-  streetConditionLevel,
-} from './streetConditionCatalog.js';
+import { streetConditionLevel } from './streetConditionCatalog.js';
+import { streetConditionLineStyle } from './streetConditionStyle.js';
+import { STREET_ROAD_CLASS_OPTIONS } from './streetRoadClassCatalog.js';
 
 const vehicleInterpretations = {
   'Auto común':
@@ -44,10 +43,12 @@ function confidenceLabel(confidence: string | null) {
 export function StreetScoreLayer({
   refreshKey,
   levels = null,
+  roadClasses = ['PRIMARY', 'SECONDARY', 'LOCAL'],
   onViewStreetReports,
 }: {
   refreshKey: number;
   levels?: string[] | null;
+  roadClasses?: StreetRoadClass[];
   onViewStreetReports: (streetId: string, streetName: string) => void;
 }) {
   const map = useMap();
@@ -66,6 +67,7 @@ export function StreetScoreLayer({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sequence = useRef(0);
   const levelKey = levels?.join(',') ?? '';
+  const roadClassKey = roadClasses.join(',');
 
   const request = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -80,6 +82,7 @@ export function StreetScoreLayer({
           currentBounds(map),
           map.getZoom(),
           levels,
+          roadClasses,
           controller.signal,
         );
         if (requestNumber !== sequence.current || controller.signal.aborted) return;
@@ -92,7 +95,7 @@ export function StreetScoreLayer({
         if (requestNumber === sequence.current && !controller.signal.aborted) setLoading(false);
       }
     }, 280);
-  }, [levelKey, levels, map]);
+  }, [levelKey, levels, map, roadClassKey, roadClasses]);
 
   useMapEvents({ moveend: request, zoomend: request });
   useEffect(() => {
@@ -107,17 +110,15 @@ export function StreetScoreLayer({
   return (
     <>
       <GeoJSON
-        key={`${refreshKey}:${levelKey}`}
+        key={`${refreshKey}:${levelKey}:${roadClassKey}`}
         data={data as never}
         style={(feature) => {
-          const level = (feature?.properties?.level as string | null) ?? null;
-          const color = level ? streetConditionColor(level as never) : NO_STREET_CONDITION_COLOR;
-          return {
-            color,
-            weight: level ? 5 : 3,
-            opacity: 0.88,
-            dashArray: feature?.properties?.availability?.status === 'BLOCKED' ? '7 5' : undefined,
-          };
+          const level = (feature?.properties?.condition as string | null) ?? null;
+          return streetConditionLineStyle(
+            level,
+            map.getZoom(),
+            feature?.properties?.availability?.status ?? 'UNKNOWN',
+          );
         }}
         eventHandlers={{
           click: (event) => {
@@ -132,6 +133,12 @@ export function StreetScoreLayer({
         <Popup position={selected.position} eventHandlers={{ remove: () => setSelected(null) }}>
           <div className="street-score-popup">
             <strong>{selected.feature.properties.streetName}</strong>
+            <span>
+              Jerarquía vial:{' '}
+              {STREET_ROAD_CLASS_OPTIONS.find(
+                (item) => item.value === selected.feature.properties.roadClass,
+              )?.label ?? 'Sin clasificar'}
+            </span>
             {selected.feature.properties.hasEvidence ? (
               <>
                 <span>
@@ -176,8 +183,16 @@ export function StreetScoreLayer({
                 </details>
               </>
             ) : (
-              <span>Sin datos suficientes para estimar la condición física.</span>
+              <span>
+                Buena por defecto · sin reportes físicos suficientes para calcular un score.
+              </span>
             )}
+            <span>
+              Reportes: {selected.feature.properties.metrics.reports}
+              {selected.feature.properties.hasReports
+                ? ''
+                : ' · sin reportes físicos asociados a esta vía'}
+            </span>
             <span>
               Circulación:{' '}
               {selected.feature.properties.availability.status === 'BLOCKED'
@@ -218,6 +233,16 @@ export function StreetScoreLayer({
           : error
             ? 'No pudimos actualizar el estado de las calles.'
             : `${data.features.length} segmentos o calles en el área visible.`}
+        {error && (
+          <button
+            type="button"
+            className="street-score-status__retry"
+            aria-label="Reintentar estado de calles"
+            onClick={request}
+          >
+            Reintentar
+          </button>
+        )}
       </div>
     </>
   );

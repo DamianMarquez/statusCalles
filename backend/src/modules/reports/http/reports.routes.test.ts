@@ -516,6 +516,13 @@ describe('reports API with PostgreSQL/PostGIS', () => {
       type: 'FeatureCollection',
       features: expect.any(Array),
     });
+
+    const invalidClass = await app.inject({
+      method: 'GET',
+      url: '/api/streets/condition?south=-34.61&north=-34.59&west=-58.39&east=-58.37&zoom=16&roadClasses=FAKE',
+    });
+    expect(invalidClass.statusCode).toBe(400);
+    expect(invalidClass.json()).toMatchObject({ code: 'INVALID_ROAD_CLASSES' });
   });
 
   it('returns 404 for an unknown report id', async () => {

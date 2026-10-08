@@ -10,6 +10,7 @@ const sourceId = randomUUID();
 const streetId = randomUUID();
 const segmentId = randomUUID();
 const outsideSegmentId = randomUUID();
+const noReportSegmentId = randomUUID();
 const reportId = randomUUID();
 const sourceSlug = `condition-test-${randomUUID()}`;
 const service = new StreetScoreService(new DrizzleStreetScoreRepository(database));
@@ -27,10 +28,11 @@ describe('Street condition PostGIS integration', () => {
       [streetId, `condition-${streetId}`, sourceId],
     );
     await pool.query(
-      `INSERT INTO street_segments (id, source_segment_id, street_id, geometry, source_id)
+      `INSERT INTO street_segments (id, source_segment_id, street_id, road_class, geometry, source_id)
        VALUES
-         ($1, $3, $4, ST_GeomFromText('MULTILINESTRING((-58.400 -34.600, -58.390 -34.600))', 4326), $5),
-         ($2, $6, $4, ST_GeomFromText('MULTILINESTRING((-58.600 -34.600, -58.590 -34.600))', 4326), $5)`,
+         ($1, $3, $4, 'PRIMARY', ST_GeomFromText('MULTILINESTRING((-58.400 -34.600, -58.390 -34.600))', 4326), $5),
+         ($2, $6, $4, 'UNKNOWN', ST_GeomFromText('MULTILINESTRING((-58.600 -34.600, -58.590 -34.600))', 4326), $5),
+         ($7, $8, $4, 'LOCAL', ST_GeomFromText('MULTILINESTRING((-58.400 -34.602, -58.390 -34.602))', 4326), $5)`,
       [
         segmentId,
         outsideSegmentId,
@@ -38,6 +40,8 @@ describe('Street condition PostGIS integration', () => {
         streetId,
         sourceId,
         `segment-${outsideSegmentId}`,
+        noReportSegmentId,
+        `segment-${noReportSegmentId}`,
       ],
     );
     await pool.query(
@@ -50,7 +54,7 @@ describe('Street condition PostGIS integration', () => {
   afterAll(async () => {
     await pool.query('DELETE FROM street_reports WHERE id = $1', [reportId]);
     await pool.query('DELETE FROM street_segments WHERE id = ANY($1::uuid[])', [
-      [segmentId, outsideSegmentId],
+      [segmentId, outsideSegmentId, noReportSegmentId],
     ]);
     await pool.query('DELETE FROM streets WHERE id = $1', [streetId]);
     await pool.query('DELETE FROM geographic_sources WHERE id = $1', [sourceId]);
@@ -71,12 +75,24 @@ describe('Street condition PostGIS integration', () => {
         level: 'UNCOMFORTABLE',
       },
     });
+    expect(close.features.find((feature) => feature.id === noReportSegmentId)).toMatchObject({
+      properties: {
+        condition: 'GOOD',
+        roadClass: 'LOCAL',
+        score: null,
+        hasReports: false,
+      },
+    });
+    expect(new Set(close.features.map((feature) => feature.id)).size).toBe(close.features.length);
 
     expect(close.features.some((feature) => feature.id === outsideSegmentId)).toBe(false);
+    const primaryOnly = await service.findConditionInViewport(bounds, 16, undefined, ['PRIMARY']);
+    expect(primaryOnly.features.map((feature) => feature.id)).toEqual([segmentId]);
+
     const far = await service.findConditionInViewport(bounds, 12);
-    const ourFarFeature = far.features.find((feature) => feature.id === streetId);
+    const ourFarFeature = far.features.find((feature) => feature.id === `${streetId}:PRIMARY`);
     expect(ourFarFeature).toMatchObject({
-      id: streetId,
+      id: `${streetId}:PRIMARY`,
       geometry: { type: 'MultiLineString' },
       properties: { targetType: 'STREET', score: 57, hasEvidence: true },
     });

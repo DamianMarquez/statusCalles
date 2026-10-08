@@ -2,6 +2,7 @@ import type { StreetScoreLevel } from '../components/map/streetConditionCatalog.
 
 export type { StreetScoreLevel };
 export type StreetScoreConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
+export type StreetRoadClass = 'PRIMARY' | 'SECONDARY' | 'LOCAL' | 'UNKNOWN';
 
 export interface StreetScoreFactorDto {
   code: string;
@@ -50,9 +51,12 @@ export interface StreetConditionProperties extends Omit<
   id: string;
   streetId: string;
   streetName: string;
+  roadClass: StreetRoadClass;
   targetType: 'SEGMENT' | 'STREET';
   score: number | null;
   level: StreetScoreLevel | null;
+  condition: StreetScoreLevel;
+  hasReports: boolean;
   confidence: StreetScoreConfidence | null;
 }
 
