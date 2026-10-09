@@ -40,7 +40,7 @@ describe('MapLayerControls', () => {
         onRoadClassesChange={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByText('Capas del mapa'));
+    fireEvent.click(screen.getByText(/Más filtros/));
     fireEvent.click(screen.getByLabelText('Incómoda'));
     expect(onLevelsChange).toHaveBeenCalledOnce();
     expect(onLevelsChange.mock.calls[0]?.[0]).not.toContain('UNCOMFORTABLE');
@@ -62,7 +62,7 @@ describe('MapLayerControls', () => {
         onRoadClassesChange={onRoadClassesChange}
       />,
     );
-    fireEvent.click(screen.getByText('Capas del mapa'));
+    fireEvent.click(screen.getByText(/Más filtros/));
     fireEvent.click(screen.getByLabelText('Arterias principales'));
     expect(onRoadClassesChange).toHaveBeenCalledWith(['SECONDARY', 'LOCAL']);
     expect(onLevelsChange).not.toHaveBeenCalled();
@@ -93,14 +93,48 @@ describe('MapLayerControls', () => {
         onSurfaceTreatmentsChange={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByText('Capas del mapa'));
-    fireEvent.click(screen.getByLabelText('Tipo de pavimento'));
+    fireEvent.click(screen.getByText(/Más filtros/));
+    fireEvent.click(screen.getByLabelText('Pavimento'));
     expect(onSurfaceChange).toHaveBeenCalledWith(false);
     fireEvent.click(screen.getByLabelText('Adoquín de granito'));
     expect(onSurfaceTypesChange).toHaveBeenCalledWith(
       expect.not.arrayContaining(['GRANITE_COBBLESTONE']),
     );
     expect(onLevelsChange).not.toHaveBeenCalled();
+    expect(onReportsChange).not.toHaveBeenCalled();
+  });
+
+  it('shows active advanced filters and clears them without changing visible layers', () => {
+    const onLevelsChange = vi.fn();
+    const onRoadClassesChange = vi.fn();
+    const onSurfaceTypesChange = vi.fn();
+    const onReportsChange = vi.fn();
+    render(
+      <MapLayerControls
+        reports
+        condition
+        surface
+        levels={['BAD']}
+        roadClasses={['PRIMARY']}
+        surfaceTypes={[]}
+        surfaceConditions={null}
+        surfaceTreatments={null}
+        onReportsChange={onReportsChange}
+        onConditionChange={vi.fn()}
+        onSurfaceChange={vi.fn()}
+        onLevelsChange={onLevelsChange}
+        onRoadClassesChange={onRoadClassesChange}
+        onSurfaceTypesChange={onSurfaceTypesChange}
+        onSurfaceConditionsChange={vi.fn()}
+        onSurfaceTreatmentsChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Más filtros · 3 activos')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Más filtros · 3 activos'));
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(onLevelsChange).toHaveBeenCalledWith(null);
+    expect(onRoadClassesChange).toHaveBeenCalledWith(['PRIMARY', 'SECONDARY', 'LOCAL']);
+    expect(onSurfaceTypesChange).toHaveBeenCalledWith(null);
     expect(onReportsChange).not.toHaveBeenCalled();
   });
 });

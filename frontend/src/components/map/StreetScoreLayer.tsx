@@ -12,7 +12,6 @@ import { streetConditionLevel } from './streetConditionCatalog.js';
 import { streetConditionLineStyle } from './streetConditionStyle.js';
 import { STREET_ROAD_CLASS_OPTIONS } from './streetRoadClassCatalog.js';
 import { roadSurfaceLineStyle } from './roadSurfaceStyle.js';
-import { RoadInformationPanel } from './RoadInformationPanel.js';
 import type {
   SurfaceCondition,
   SurfaceType,
@@ -56,9 +55,6 @@ export function StreetScoreLayer({
   surfaceTypes = null,
   surfaceConditions = null,
   surfaceTreatments = null,
-  authenticated = false,
-  onRequestLogin,
-  onInformationChanged,
   selectingRoadSegment = false,
   onRoadSegmentSelected,
   onViewStreetReports,
@@ -71,11 +67,8 @@ export function StreetScoreLayer({
   surfaceTypes?: SurfaceType[] | null;
   surfaceConditions?: SurfaceCondition[] | null;
   surfaceTreatments?: SpecialTreatment[] | null;
-  authenticated?: boolean;
-  onRequestLogin: () => void;
-  onInformationChanged: () => void;
   selectingRoadSegment?: boolean;
-  onRoadSegmentSelected: (segmentId: string) => void;
+  onRoadSegmentSelected: (feature: StreetConditionFeature) => void;
   onViewStreetReports: (streetId: string, streetName: string) => void;
 }) {
   const map = useMap();
@@ -169,9 +162,11 @@ export function StreetScoreLayer({
                 event.layer as typeof event.layer & { feature?: StreetConditionFeature }
               ).feature;
               if (feature?.properties) {
-                setSelected({ feature, position: event.latlng });
-                if (selectingRoadSegment && feature.properties.targetType === 'SEGMENT')
-                  onRoadSegmentSelected(feature.properties.id);
+                if (selectingRoadSegment && feature.properties.targetType === 'SEGMENT') {
+                  setSelected(null);
+                  map.closePopup();
+                  onRoadSegmentSelected(feature);
+                } else setSelected({ feature, position: event.latlng });
               }
             },
           }}
@@ -216,9 +211,11 @@ export function StreetScoreLayer({
                 event.layer as typeof event.layer & { feature?: StreetConditionFeature }
               ).feature;
               if (feature?.properties) {
-                setSelected({ feature, position: event.latlng });
-                if (selectingRoadSegment && feature.properties.targetType === 'SEGMENT')
-                  onRoadSegmentSelected(feature.properties.id);
+                if (selectingRoadSegment && feature.properties.targetType === 'SEGMENT') {
+                  setSelected(null);
+                  map.closePopup();
+                  onRoadSegmentSelected(feature);
+                } else setSelected({ feature, position: event.latlng });
               }
             },
           }}
@@ -234,15 +231,6 @@ export function StreetScoreLayer({
                 (item) => item.value === selected.feature.properties.roadClass,
               )?.label ?? 'Sin clasificar'}
             </span>
-            {selected.feature.properties.targetType === 'SEGMENT' && (
-              <RoadInformationPanel
-                key={selected.feature.properties.id}
-                segmentId={selected.feature.properties.id}
-                authenticated={authenticated}
-                onRequestLogin={onRequestLogin}
-                onChanged={onInformationChanged}
-              />
-            )}
             {selected.feature.properties.hasEvidence ? (
               <>
                 <span>

@@ -94,6 +94,40 @@ describe('RoadInformationPanel', () => {
     expect(propose).not.toHaveBeenCalled();
   });
 
+  it('opens the proposal form immediately when a selected road is handed to the panel', async () => {
+    getInformation.mockResolvedValue(emptyInformation);
+    render(
+      <RoadInformationPanel
+        segmentId="segment-1"
+        authenticated
+        initialFormOpen
+        onRequestLogin={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+    expect(await screen.findByRole('button', { name: 'Enviar propuesta' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Tipo de vía')).toHaveFocus();
+  });
+
+  it('shows the backend error and keeps the form open when proposal submission fails', async () => {
+    getInformation.mockResolvedValue(emptyInformation);
+    propose.mockRejectedValue(new Error('No pudimos enviar la propuesta.'));
+    render(
+      <RoadInformationPanel
+        segmentId="segment-1"
+        authenticated
+        initialFormOpen
+        onRequestLogin={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+    await screen.findByRole('button', { name: 'Enviar propuesta' });
+    fireEvent.change(screen.getByLabelText('Tipo de vía'), { target: { value: 'STREET' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar propuesta' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos enviar la propuesta.');
+    expect(screen.getByRole('button', { name: 'Enviar propuesta' })).toBeInTheDocument();
+  });
+
   it('shows pending confirmations and confirms a proposal', async () => {
     getInformation.mockResolvedValue({
       ...emptyInformation,
@@ -120,7 +154,7 @@ describe('RoadInformationPanel', () => {
         onChanged={vi.fn()}
       />,
     );
-    await screen.findByText('2/3 confirmaciones');
+    await screen.findByText(/2\/3 confirmaciones/);
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar información' }));
     await waitFor(() => expect(confirm).toHaveBeenCalledWith('proposal-2'));
   });

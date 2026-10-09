@@ -45,17 +45,20 @@ export function RoadInformationPanel({
   authenticated,
   onRequestLogin,
   onChanged,
+  initialFormOpen = false,
 }: {
   segmentId: string;
   authenticated: boolean;
   onRequestLogin: () => void;
   onChanged: () => void;
+  initialFormOpen?: boolean;
 }) {
   const [information, setInformation] = useState<SegmentRoadInformation | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(initialFormOpen);
+  const [success, setSuccess] = useState(false);
   const [roadType, setRoadType] = useState('');
   const [surfaceType, setSurfaceType] = useState('');
   const [surfaceCondition, setSurfaceCondition] = useState('');
@@ -127,6 +130,7 @@ export function RoadInformationPanel({
     try {
       setInformation(await proposeSegmentRoadInformation(segmentId, patch));
       setFormOpen(false);
+      setSuccess(true);
       setRoadType('');
       setSurfaceType('');
       setSurfaceCondition('');
@@ -171,7 +175,11 @@ export function RoadInformationPanel({
 
   return (
     <section className="road-information-panel" aria-label="Información del segmento vial">
-      <h3>Información de la calle</h3>
+      <h3>Datos del tramo</h3>
+      <p className="road-information-help">
+        La información vigente y las propuestas de la comunidad aparecen por separado. Completá solo
+        los datos que conocés.
+      </p>
       {loading ? (
         <p role="status">Cargando información…</p>
       ) : information ? (
@@ -191,7 +199,8 @@ export function RoadInformationPanel({
           )}
           {information.proposals.length > 0 && (
             <div className="road-information-proposals">
-              <h4>Propuestas de la comunidad</h4>
+              <h4>Propuestas pendientes</h4>
+              <p>Una propuesta se confirma con tres usuarios distintos de quien la creó.</p>
               {information.proposals.map((proposal) => (
                 <article key={proposal.id}>
                   <ul>
@@ -201,6 +210,7 @@ export function RoadInformationPanel({
                   </ul>
                   <span>
                     {proposal.confirmations}/{proposal.requiredConfirmations} confirmaciones
+                    {` · faltan ${Math.max(0, proposal.requiredConfirmations - proposal.confirmations)}`}
                   </span>
                   {!proposal.isAuthor && !proposal.userHasConfirmed && (
                     <button type="button" disabled={busy} onClick={() => void confirm(proposal.id)}>
@@ -233,6 +243,19 @@ export function RoadInformationPanel({
           {error}
         </p>
       )}
+      {error && !information && (
+        <button type="button" disabled={loading} onClick={() => void refresh()}>
+          {loading ? 'Cargando…' : 'Reintentar carga'}
+        </button>
+      )}
+      {success && (
+        <p className="road-information-success" role="status">
+          Propuesta enviada. Quedará vigente cuando reúna las confirmaciones necesarias.
+        </p>
+      )}
+      {!authenticated && (
+        <p className="road-information-help">Iniciá sesión para proponer o confirmar datos.</p>
+      )}
       {!formOpen ? (
         <button
           type="button"
@@ -243,9 +266,14 @@ export function RoadInformationPanel({
       ) : (
         <form className="road-information-form" onSubmit={(event) => void submit(event)}>
           <strong>Nueva propuesta</strong>
+          <small>Dejá en “Sin cambio” los atributos que no quieras informar.</small>
           <label>
             Tipo de vía
-            <select value={roadType} onChange={(event) => setRoadType(event.target.value)}>
+            <select
+              autoFocus={initialFormOpen}
+              value={roadType}
+              onChange={(event) => setRoadType(event.target.value)}
+            >
               <option value="">Sin cambio</option>
               {ROAD_TYPE_OPTIONS.map((item) => (
                 <option key={item.value} value={item.value}>

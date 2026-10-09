@@ -24,6 +24,8 @@ import { ReportForm } from './ReportForm.js';
 import { ReportLocationPicker } from './ReportLocationPicker.js';
 import { ReportMarker } from './ReportMarker.js';
 import { StreetScoreLayer } from './StreetScoreLayer.js';
+import type { StreetConditionFeature } from '../../api/streetScoreTypes.js';
+import { RoadInformationPanel } from './RoadInformationPanel.js';
 import { useViewportReports } from './useViewportReports.js';
 import type { UserLocation } from './types.js';
 import 'leaflet/dist/leaflet.css';
@@ -166,6 +168,31 @@ function getLocationErrorMessage(error: unknown): string {
   }
 }
 
+function geometryLengthMeters(feature: StreetConditionFeature): number {
+  const lines =
+    feature.geometry.type === 'LineString'
+      ? [feature.geometry.coordinates as number[][]]
+      : (feature.geometry.coordinates as number[][][]);
+  let meters = 0;
+  for (const line of lines) {
+    for (let index = 1; index < line.length; index += 1) {
+      const previous = line[index - 1];
+      const current = line[index];
+      if (!previous || !current) continue;
+      const radians = Math.PI / 180;
+      const latitudeDelta = (current[1]! - previous[1]!) * radians;
+      const longitudeDelta = (current[0]! - previous[0]!) * radians;
+      const latitude1 = previous[1]! * radians;
+      const latitude2 = current[1]! * radians;
+      const haversine =
+        Math.sin(latitudeDelta / 2) ** 2 +
+        Math.cos(latitude1) * Math.cos(latitude2) * Math.sin(longitudeDelta / 2) ** 2;
+      meters += 6_371_000 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+    }
+  }
+  return meters;
+}
+
 export default function MapView({
   startReportOnOpen = false,
   onStartReportHandled,
@@ -180,6 +207,9 @@ export default function MapView({
   const [isLocating, setIsLocating] = useState(false);
   const [isPickingReportLocation, setIsPickingReportLocation] = useState(false);
   const [isSelectingRoadSegment, setIsSelectingRoadSegment] = useState(false);
+  const [selectedRoadSegment, setSelectedRoadSegment] = useState<StreetConditionFeature | null>(
+    null,
+  );
   const [isReportFormOpen, setIsReportFormOpen] = useState(false);
   const [reportLocation, setReportLocation] = useState<UserLocation | null>(null);
   const [reportFocusLocation, setReportFocusLocation] = useState<UserLocation | null>(null);
@@ -213,6 +243,18 @@ export default function MapView({
     'SECONDARY',
     'LOCAL',
   ]);
+  const roadInfoReturnFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!selectedRoadSegment) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedRoadSegment(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      roadInfoReturnFocusRef.current?.focus();
+    };
+  }, [selectedRoadSegment]);
   const [streetReportTarget, setStreetReportTarget] = useState<{ id: string; name: string } | null>(
     null,
   );
@@ -274,6 +316,8 @@ export default function MapView({
     }
     setIsPickingReportLocation(false);
     setIsReportFormOpen(false);
+    setSelectedRoadSegment(null);
+    roadInfoReturnFocusRef.current = document.activeElement as HTMLElement | null;
     setIsSelectingRoadSegment(true);
     setConditionLayerVisible(true);
   }
@@ -425,11 +469,11 @@ export default function MapView({
             surfaceTypes={surfaceTypes}
             surfaceConditions={surfaceConditions}
             surfaceTreatments={surfaceTreatments}
-            authenticated={Boolean(user)}
-            onRequestLogin={openAuthDialog}
-            onInformationChanged={() => setScoreRefreshKey((current) => current + 1)}
             selectingRoadSegment={isSelectingRoadSegment}
-            onRoadSegmentSelected={() => setIsSelectingRoadSegment(false)}
+            onRoadSegmentSelected={(feature) => {
+              setIsSelectingRoadSegment(false);
+              setSelectedRoadSegment(feature);
+            }}
             onViewStreetReports={(id, name) => {
               setStreetReportTarget({ id, name });
               setReportsLayerVisible(true);
@@ -493,6 +537,67 @@ export default function MapView({
           </>
         )}
       </MapContainer>
+      {selectedRoadSegment && (
+        <>
+          <button
+            className="road-information-backdrop"
+            type="button"
+            aria-label="Cerrar información de calle"
+            onClick={() => setSelectedRoadSegment(null)}
+          />
+          <aside
+            className="road-information-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="road-information-title"
+            onKeyDown={(event) => {
+              if (event.key !== 'Tab') return;
+              const focusable = Array.from(
+                event.currentTarget.querySelectorAll<HTMLElement>(
+                  'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])',
+                ),
+              );
+              const first = focusable[0];
+              const last = focusable.at(-1);
+              if (!first || !last) return;
+              if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+              } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+              }
+            }}
+          >
+            <header>
+              <div>
+                <span className="road-information-eyebrow">Tramo oficial seleccionado</span>
+                <h2 id="road-information-title">{selectedRoadSegment.properties.streetName}</h2>
+                <p>
+                  Extensión aproximada: {Math.round(geometryLengthMeters(selectedRoadSegment))} m.
+                  La propuesta se aplica a este tramo completo.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="road-information-close"
+                aria-label="Cerrar"
+                onClick={() => setSelectedRoadSegment(null)}
+              >
+                ×
+              </button>
+            </header>
+            <RoadInformationPanel
+              key={selectedRoadSegment.properties.id}
+              segmentId={selectedRoadSegment.properties.id}
+              authenticated={Boolean(user)}
+              onRequestLogin={openAuthDialog}
+              onChanged={() => setScoreRefreshKey((current) => current + 1)}
+              initialFormOpen
+            />
+          </aside>
+        </>
+      )}
       <div className="report-status" aria-live="polite">
         <span role={reportStatus === 'error' ? 'alert' : 'status'}>{statusMessage}</span>
         {reportStatus === 'error' && (
