@@ -21,8 +21,9 @@ export function getTestDatabaseUrl(): string {
 }
 
 export function getDatabasePoolOptions() {
+  const defaultPoolSize = process.env.VERCEL === '1' ? 1 : 5;
   return {
-    max: getPositiveInteger('DB_POOL_MAX', 5),
+    max: getPositiveInteger('DB_POOL_MAX', defaultPoolSize),
     idleTimeoutMillis: getPositiveInteger('DB_IDLE_TIMEOUT_MS', 10_000),
     connectionTimeoutMillis: getPositiveInteger('DB_CONNECTION_TIMEOUT_MS', 10_000),
     query_timeout: getPositiveInteger('DB_QUERY_TIMEOUT_MS', 30_000),

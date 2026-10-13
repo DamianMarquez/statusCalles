@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
 import { registerHealthRoutes } from '../modules/health/health.routes.js';
 import type { ReportRepository } from '../modules/reports/application/report-repository.js';
 import { ReportService } from '../modules/reports/application/report-service.js';
@@ -55,6 +56,7 @@ export function buildApp(
     routingRepository?: RoutingRepository;
     addressSearchProvider?: AddressSearchProvider;
     checkDatabase?: () => Promise<unknown>;
+    rateLimitStore?: FastifyRateLimitStoreCtor;
   } = {},
 ): FastifyInstance {
   const trustedProxies = (process.env.TRUST_PROXY ?? '')
@@ -67,11 +69,18 @@ export function buildApp(
   });
   const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
     .split(',')
-    .map((origin) => origin.trim());
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  for (const vercelHost of [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL]) {
+    if (vercelHost) allowedOrigins.push(`https://${vercelHost}`);
+  }
 
   app.register(cors, { origin: allowedOrigins, credentials: true });
   app.register(cookie);
-  app.register(rateLimit, { global: false });
+  app.register(rateLimit, {
+    global: false,
+    ...(options.rateLimitStore ? { store: options.rateLimitStore } : {}),
+  });
   app.decorateRequest('authUser', null);
   app.register(registerHealthRoutes, {
     prefix: '/api',

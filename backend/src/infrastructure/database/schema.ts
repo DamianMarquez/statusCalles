@@ -13,6 +13,7 @@ import {
   text,
   uuid,
   varchar,
+  bigint,
 } from 'drizzle-orm/pg-core';
 import { REPORT_STATUSES, REPORT_TYPES } from '../../modules/reports/domain/street-report.js';
 import { REPORT_FEEDBACK_TYPES } from '../../modules/reports/domain/report-feedback.js';
@@ -376,4 +377,14 @@ export const reportFeedback = pgTable(
       sql`(${table.userId} IS NOT NULL AND ${table.voterId} IS NULL) OR (${table.userId} IS NULL AND ${table.voterId} IS NOT NULL)`,
     ),
   ],
+);
+
+export const rateLimitWindows = pgTable(
+  'rate_limit_windows',
+  {
+    key: varchar('key', { length: 64 }).primaryKey(),
+    count: bigint('count', { mode: 'number' }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('rate_limit_windows_expires_at_idx').on(table.expiresAt)],
 );
