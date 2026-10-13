@@ -120,6 +120,13 @@
       "when": 1791495413047,
       "tag": "0016_military_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791906783976,
+      "tag": "0017_wise_slapstick",
+      "breakpoints": true
     }
   ]
 }

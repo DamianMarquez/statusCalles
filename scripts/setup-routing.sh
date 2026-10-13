@@ -35,7 +35,11 @@ if [[ ! -f "$pbf" ]]; then
   mv "$pbf.tmp" "$pbf"
 fi
 
-pbf_sha256="$(shasum -a 256 "$pbf" | awk '{print $1}')"
+if command -v shasum >/dev/null 2>&1; then
+  pbf_sha256="$(shasum -a 256 "$pbf" | awk '{print $1}')"
+else
+  pbf_sha256="$(sha256sum "$pbf" | awk '{print $1}')"
+fi
 metadata_matches() {
   [[ -f "$dataset_dir/.street-status-routing.json" && -f "$graph.properties" && -f "$graph.mldgr" && -f "$graph.partition" ]] && \
     node -e 'const fs=require("node:fs");const f=process.argv[1];const m=JSON.parse(fs.readFileSync(f,"utf8"));process.exit(m.osrmVersion===process.argv[2]&&m.algorithm==="MLD"&&m.pbfSha256===process.argv[3]?0:1)' \
