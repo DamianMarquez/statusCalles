@@ -5,9 +5,10 @@ project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 document_root="${PLESK_DOCUMENT_ROOT:-$project_root}"
 restart_tmp_dir="${PLESK_APP_TMP_DIR:-$project_root/tmp}"
 
+# Plesk cron/deploy hooks may not load the interactive shell profile.
+export PATH="$HOME/.nodenv/shims:$HOME/.nodenv/bin:$PATH"
 if command -v nodenv >/dev/null 2>&1; then
-  export PATH="$HOME/.nodenv/shims:$HOME/.nodenv/bin:$PATH"
-  eval "$(nodenv init -)"
+  eval "$(nodenv init -)" 2>/dev/null || true
   export NODENV_VERSION=20
 fi
 
@@ -18,8 +19,16 @@ if ! node -e 'const [major,minor]=process.versions.node.split(".").map(Number);p
 fi
 
 cd "$project_root"
+echo "Deploying Street Status from: $project_root"
+echo "Frontend document root: $document_root"
+
+echo "Installing monorepo dependencies..."
 npm ci --include=dev
+
+echo "Building backend and frontend..."
 npm run build
+
+echo "Preparing or reusing the OSRM routing graph..."
 npm run routing:setup
 
 if [[ "${RUN_DB_MIGRATIONS:-0}" == "1" ]]; then
@@ -31,9 +40,13 @@ if [[ "${RUN_DB_MIGRATIONS:-0}" == "1" ]]; then
 fi
 
 mkdir -p "$document_root"
+echo "Publishing frontend files..."
 cp -R frontend/dist/. "$document_root/"
 
+echo "Removing development dependencies..."
 npm prune --omit=dev
+
 mkdir -p "$restart_tmp_dir"
 touch "$restart_tmp_dir/restart.txt"
-echo "Deploy copiado y reinicio solicitado con $restart_tmp_dir/restart.txt (startup file: app.js)."
+echo "Deploy complete. Passenger restart requested via $restart_tmp_dir/restart.txt."
+echo "Plesk startup file must be app.js."
