@@ -71,12 +71,8 @@
           "name": "auth_sessions_user_id_users_id_fk",
           "tableFrom": "auth_sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -152,12 +148,8 @@
           "name": "communes_source_id_geographic_sources_id_fk",
           "tableFrom": "communes",
           "tableTo": "geographic_sources",
-          "columnsFrom": [
-            "source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -392,12 +384,8 @@
           "name": "mobility_infrastructure_source_id_geographic_sources_id_fk",
           "tableFrom": "mobility_infrastructure",
           "tableTo": "geographic_sources",
-          "columnsFrom": [
-            "source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -465,12 +453,8 @@
           "name": "moderation_audit_moderator_id_users_id_fk",
           "tableFrom": "moderation_audit",
           "tableTo": "users",
-          "columnsFrom": [
-            "moderator_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["moderator_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -478,12 +462,8 @@
           "name": "moderation_audit_report_id_street_reports_id_fk",
           "tableFrom": "moderation_audit",
           "tableTo": "street_reports",
-          "columnsFrom": [
-            "report_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["report_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -601,12 +581,8 @@
           "name": "neighborhoods_commune_id_communes_id_fk",
           "tableFrom": "neighborhoods",
           "tableTo": "communes",
-          "columnsFrom": [
-            "commune_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["commune_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -614,12 +590,8 @@
           "name": "neighborhoods_source_id_geographic_sources_id_fk",
           "tableFrom": "neighborhoods",
           "tableTo": "geographic_sources",
-          "columnsFrom": [
-            "source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -786,12 +758,8 @@
           "name": "report_feedback_report_id_street_reports_id_fk",
           "tableFrom": "report_feedback",
           "tableTo": "street_reports",
-          "columnsFrom": [
-            "report_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["report_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -799,12 +767,8 @@
           "name": "report_feedback_user_id_users_id_fk",
           "tableFrom": "report_feedback",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -913,12 +877,8 @@
           "name": "report_flags_report_id_street_reports_id_fk",
           "tableFrom": "report_flags",
           "tableTo": "street_reports",
-          "columnsFrom": [
-            "report_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["report_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -926,12 +886,8 @@
           "name": "report_flags_user_id_users_id_fk",
           "tableFrom": "report_flags",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1109,12 +1065,8 @@
           "name": "street_reports_user_id_users_id_fk",
           "tableFrom": "street_reports",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1122,12 +1074,8 @@
           "name": "street_reports_street_id_streets_id_fk",
           "tableFrom": "street_reports",
           "tableTo": "streets",
-          "columnsFrom": [
-            "street_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["street_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1135,12 +1083,8 @@
           "name": "street_reports_street_segment_id_street_segments_id_fk",
           "tableFrom": "street_reports",
           "tableTo": "street_segments",
-          "columnsFrom": [
-            "street_segment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["street_segment_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1213,12 +1157,8 @@
           "name": "street_segment_information_segment_id_street_segments_id_fk",
           "tableFrom": "street_segment_information",
           "tableTo": "street_segments",
-          "columnsFrom": [
-            "segment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["segment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1226,12 +1166,8 @@
           "name": "street_segment_information_updated_by_proposal_id_street_segment_information_proposals_id_fk",
           "tableFrom": "street_segment_information",
           "tableTo": "street_segment_information_proposals",
-          "columnsFrom": [
-            "updated_by_proposal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["updated_by_proposal_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1294,12 +1230,8 @@
           "name": "street_segment_information_confirmations_proposal_id_street_segment_information_proposals_id_fk",
           "tableFrom": "street_segment_information_confirmations",
           "tableTo": "street_segment_information_proposals",
-          "columnsFrom": [
-            "proposal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proposal_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1307,12 +1239,8 @@
           "name": "street_segment_information_confirmations_user_id_users_id_fk",
           "tableFrom": "street_segment_information_confirmations",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1388,12 +1316,8 @@
           "name": "street_segment_information_history_segment_id_street_segments_id_fk",
           "tableFrom": "street_segment_information_history",
           "tableTo": "street_segments",
-          "columnsFrom": [
-            "segment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["segment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1401,12 +1325,8 @@
           "name": "street_segment_information_history_proposal_id_street_segment_information_proposals_id_fk",
           "tableFrom": "street_segment_information_history",
           "tableTo": "street_segment_information_proposals",
-          "columnsFrom": [
-            "proposal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["proposal_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1533,12 +1453,8 @@
           "name": "street_segment_information_proposals_segment_id_street_segments_id_fk",
           "tableFrom": "street_segment_information_proposals",
           "tableTo": "street_segments",
-          "columnsFrom": [
-            "segment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["segment_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1546,12 +1462,8 @@
           "name": "street_segment_information_proposals_author_id_users_id_fk",
           "tableFrom": "street_segment_information_proposals",
           "tableTo": "users",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["author_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1719,12 +1631,8 @@
           "name": "street_segments_street_id_streets_id_fk",
           "tableFrom": "street_segments",
           "tableTo": "streets",
-          "columnsFrom": [
-            "street_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["street_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1732,12 +1640,8 @@
           "name": "street_segments_neighborhood_id_neighborhoods_id_fk",
           "tableFrom": "street_segments",
           "tableTo": "neighborhoods",
-          "columnsFrom": [
-            "neighborhood_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["neighborhood_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1745,12 +1649,8 @@
           "name": "street_segments_commune_id_communes_id_fk",
           "tableFrom": "street_segments",
           "tableTo": "communes",
-          "columnsFrom": [
-            "commune_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["commune_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1758,12 +1658,8 @@
           "name": "street_segments_source_id_geographic_sources_id_fk",
           "tableFrom": "street_segments",
           "tableTo": "geographic_sources",
-          "columnsFrom": [
-            "source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1867,12 +1763,8 @@
           "name": "streets_source_id_geographic_sources_id_fk",
           "tableFrom": "streets",
           "tableTo": "geographic_sources",
-          "columnsFrom": [
-            "source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1964,37 +1856,22 @@
     "public.report_feedback_type": {
       "name": "report_feedback_type",
       "schema": "public",
-      "values": [
-        "CONFIRM",
-        "RESOLVED"
-      ]
+      "values": ["CONFIRM", "RESOLVED"]
     },
     "public.report_flag_reason": {
       "name": "report_flag_reason",
       "schema": "public",
-      "values": [
-        "SPAM",
-        "INAPPROPRIATE",
-        "FALSE_INFORMATION",
-        "OTHER"
-      ]
+      "values": ["SPAM", "INAPPROPRIATE", "FALSE_INFORMATION", "OTHER"]
     },
     "public.report_moderation_status": {
       "name": "report_moderation_status",
       "schema": "public",
-      "values": [
-        "VISIBLE",
-        "HIDDEN"
-      ]
+      "values": ["VISIBLE", "HIDDEN"]
     },
     "public.report_status": {
       "name": "report_status",
       "schema": "public",
-      "values": [
-        "ACTIVE",
-        "STALE",
-        "RESOLVED"
-      ]
+      "values": ["ACTIVE", "STALE", "RESOLVED"]
     },
     "public.report_type": {
       "name": "report_type",
@@ -2015,22 +1892,12 @@
     "public.road_information_proposal_status": {
       "name": "road_information_proposal_status",
       "schema": "public",
-      "values": [
-        "PROPOSED",
-        "CONFIRMED"
-      ]
+      "values": ["PROPOSED", "CONFIRMED"]
     },
     "public.road_type": {
       "name": "road_type",
       "schema": "public",
-      "values": [
-        "STREET",
-        "AVENUE",
-        "PASSAGE",
-        "BOULEVARD",
-        "HIGHWAY",
-        "ACCESS"
-      ]
+      "values": ["STREET", "AVENUE", "PASSAGE", "BOULEVARD", "HIGHWAY", "ACCESS"]
     },
     "public.special_treatment": {
       "name": "special_treatment",
@@ -2049,22 +1916,12 @@
     "public.street_road_class": {
       "name": "street_road_class",
       "schema": "public",
-      "values": [
-        "PRIMARY",
-        "SECONDARY",
-        "LOCAL",
-        "UNKNOWN"
-      ]
+      "values": ["PRIMARY", "SECONDARY", "LOCAL", "UNKNOWN"]
     },
     "public.surface_condition": {
       "name": "surface_condition",
       "schema": "public",
-      "values": [
-        "GOOD",
-        "REGULAR",
-        "POOR",
-        "VERY_POOR"
-      ]
+      "values": ["GOOD", "REGULAR", "POOR", "VERY_POOR"]
     },
     "public.surface_type": {
       "name": "surface_type",
@@ -2084,11 +1941,7 @@
     "public.user_role": {
       "name": "user_role",
       "schema": "public",
-      "values": [
-        "USER",
-        "MODERATOR",
-        "ADMIN"
-      ]
+      "values": ["USER", "MODERATOR", "ADMIN"]
     }
   },
   "schemas": {},

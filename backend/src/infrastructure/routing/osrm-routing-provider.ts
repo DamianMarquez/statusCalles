@@ -157,7 +157,11 @@ export async function createOsrmRoutingProvider(
   const configuredDataRoot = process.env.OSRM_DATA_DIR;
   const dataRoot =
     options.dataRoot ??
-    (configuredDataRoot ? resolve(configuredDataRoot) : join(projectRoot, 'data', 'routing'));
+    (configuredDataRoot
+      ? resolve(configuredDataRoot)
+      : process.env.VERCEL === '1'
+        ? resolve(process.cwd(), 'data', 'routing')
+        : join(projectRoot, 'data', 'routing'));
   const loadConstructor =
     options.loadConstructor ??
     (async () => (await import('./osrm-native.js')).loadOsrmConstructor());

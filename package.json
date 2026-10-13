@@ -26,7 +26,7 @@
     "sync:caba:infrastructure": "npm run sync:caba:infrastructure --workspace backend",
     "routing:setup": "bash scripts/setup-routing.sh",
     "routing:check": "node scripts/check-routing.mjs",
-    "vercel:build": "npm run routing:setup && npm run build",
+    "vercel:backend-build": "OSRM_DATA_DIR=backend/data/routing npm run routing:setup && npm run build --workspace backend",
     "build": "npm run build --workspace backend && npm run build --workspace frontend",
     "test": "npm run test --workspace backend && npm run test --workspace frontend",
     "lint": "eslint .",

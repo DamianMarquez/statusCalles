@@ -1,13 +1,29 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm ci --include=dev",
-  "buildCommand": "npm run vercel:build",
-  "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/[...path].ts": {
-      "includeFiles": "{data/routing/osrm-26.9.0/**,node_modules/@project-osrm/osrm/**}",
-      "maxDuration": 60
+  "services": {
+    "backend": {
+      "root": "backend",
+      "entrypoint": "api/[...path].ts",
+      "installCommand": "cd .. && npm ci --include=dev",
+      "buildCommand": "cd .. && npm run vercel:backend-build",
+      "functions": {
+        "api/[...path].ts": {
+          "includeFiles": "{data/routing/osrm-26.9.0/**,../node_modules/@project-osrm/osrm/**}",
+          "maxDuration": 60
+        }
+      }
+    },
+    "frontend": {
+      "root": "frontend",
+      "framework": "vite",
+      "installCommand": "cd .. && npm ci --include=dev",
+      "buildCommand": "cd .. && npm run build --workspace frontend",
+      "outputDirectory": "dist",
+      "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/index.html" }]
     }
   },
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "backend" } },
+    { "source": "/(.*)", "destination": { "service": "frontend" } }
+  ]
 }
