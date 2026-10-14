@@ -10,7 +10,8 @@ describe('HowToUse', () => {
     expect(screen.getByRole('heading', { name: 'Cómo usar Street Status' })).toBeInTheDocument();
     expect(screen.getByText(/La condición física se calcula con baches/)).toBeInTheDocument();
     expect(screen.getByText(/no constituye consejo de seguridad/)).toBeInTheDocument();
-    expect(screen.getByText(/direcciones e intersecciones/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Seguimiento de tus aportes' })).toBeInTheDocument();
+    expect(screen.queryByText(/evitar calles bloqueadas/)).not.toBeInTheDocument();
   });
 
   it('runs local-only report filters and tutorial steps without writing to the API', () => {

@@ -5,13 +5,7 @@
       "root": "backend",
       "entrypoint": "api/[...path].ts",
       "installCommand": "cd .. && npm ci --include=dev",
-      "buildCommand": "cd .. && npm run vercel:backend-build",
-      "functions": {
-        "api/[...path].ts": {
-          "includeFiles": "{data/routing/osrm-26.9.0/**,../node_modules/@project-osrm/osrm/**}",
-          "maxDuration": 60
-        }
-      }
+      "buildCommand": "cd .. && npm run build --workspace backend"
     },
     "frontend": {
       "root": "frontend",

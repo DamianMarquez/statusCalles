@@ -193,40 +193,11 @@ export function HowToUse() {
       <section className="tutorial-section" aria-labelledby="tutorial-account-title">
         <div className="tutorial-copy">
           <span className="tutorial-step">04 · SEGUIMIENTO</span>
-          <h2 id="tutorial-account-title">Tus aportes y las rutas</h2>
+          <h2 id="tutorial-account-title">Seguimiento de tus aportes</h2>
           <p>
             En <strong>Mis reportes</strong> consultás tus contribuciones, feedback y estado. Si sos
             su autor, podés marcar un reporte como resuelto o volver a activarlo.
           </p>
-          <p>
-            La búsqueda de direcciones e intersecciones permite definir origen y destino. Elegí una
-            ruta más rápida, evitar calles en mal estado o evitar calles bloqueadas. La ruta se
-            calcula según los criterios elegidos y puede incluir advertencias.
-          </p>
-        </div>
-        <div className="tutorial-route-card">
-          <span>
-            ORIGEN <strong>Congreso</strong>
-          </span>
-          <span aria-hidden="true">↓</span>
-          <span>
-            DESTINO <strong>San Telmo</strong>
-          </span>
-          <div>
-            {['Más rápida', 'Evitar calles malas', 'Evitar calles bloqueadas'].map(
-              (label, index) => (
-                <button
-                  key={label}
-                  type="button"
-                  aria-pressed={demoStep === index}
-                  onClick={() => setDemoStep(index)}
-                >
-                  {label}
-                </button>
-              ),
-            )}
-          </div>
-          <small>Ejemplo ilustrativo · no calcula una ruta real</small>
         </div>
       </section>
 

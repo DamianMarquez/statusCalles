@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { divIcon } from 'leaflet';
-import {
-  MapContainer,
-  Marker,
-  Polyline,
-  Popup,
-  TileLayer,
-  useMap,
-  useMapEvents,
-} from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import { createReport, flagReport } from '../../api/reportsApi.js';
 import type { ReportFlagReason } from '../../api/reportsApi.js';
 import type {
@@ -30,9 +22,6 @@ import { useViewportReports } from './useViewportReports.js';
 import type { UserLocation } from './types.js';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../../auth/AuthContext.js';
-import { RoutePlanner } from './RoutePlanner.js';
-import type { CalculatedRoute } from '../../api/routingApi.js';
-import type { RouteLocation } from './RoutePlanner.js';
 import type { AddressSearchResult } from '../../api/addressesApi.js';
 import { MapFilters } from './MapFilters.js';
 import { useMapReportFilters } from './useMapReportFilters.js';
@@ -51,13 +40,6 @@ const currentLocationIcon = divIcon({
   html: '<span class="user-marker" aria-hidden="true"><span></span></span>',
   iconSize: [28, 28],
   iconAnchor: [14, 14],
-});
-
-const addressMarkerIcon = divIcon({
-  className: 'address-marker-wrapper',
-  html: '<span class="address-marker" aria-hidden="true">⌖</span>',
-  iconSize: [34, 42],
-  iconAnchor: [17, 38],
 });
 
 function readViewportBounds(map: ReturnType<typeof useMap>): ViewportBounds {
@@ -106,33 +88,6 @@ function ReportFocus({ location }: { location: UserLocation | null }) {
     }
   }, [location, map]);
   return null;
-}
-
-function RouteLocationFocus({ location }: { location: RouteLocation | null }) {
-  const map = useMap();
-  useEffect(() => {
-    if (location) {
-      map.setView([location.latitude, location.longitude], Math.max(map.getZoom(), 16), {
-        animate: true,
-      });
-    }
-  }, [location, map]);
-  return null;
-}
-
-function RouteLayer({ route }: { route: CalculatedRoute | null }) {
-  const map = useMap();
-  const positions =
-    route?.route.coordinates.map(
-      ([longitude, latitude]) => [latitude, longitude] as [number, number],
-    ) ?? [];
-  useEffect(() => {
-    if (positions.length >= 2) map.fitBounds(positions, { padding: [44, 44], maxZoom: 17 });
-  }, [map, route]);
-  if (!route || positions.length < 2) return null;
-  return (
-    <Polyline positions={positions} pathOptions={{ color: '#246fc5', weight: 6, opacity: 0.9 }} />
-  );
 }
 
 function MapQueryFocus() {
@@ -214,11 +169,6 @@ export default function MapView({
   const [reportLocation, setReportLocation] = useState<UserLocation | null>(null);
   const [reportFocusLocation, setReportFocusLocation] = useState<UserLocation | null>(null);
   const [reportSuccess, setReportSuccess] = useState(false);
-  const [calculatedRoute, setCalculatedRoute] = useState<CalculatedRoute | null>(null);
-  const [routeLocations, setRouteLocations] = useState<{
-    origin: RouteLocation | null;
-    destination: RouteLocation | null;
-  }>({ origin: null, destination: null });
   const [votingReportIds, setVotingReportIds] = useState<Set<string>>(() => new Set());
   const [feedbackErrors, setFeedbackErrors] = useState<Record<string, string>>({});
   const [flagBusyIds, setFlagBusyIds] = useState<Set<string>>(() => new Set());
@@ -480,26 +430,6 @@ export default function MapView({
             }}
           />
         )}
-        <RouteLayer route={calculatedRoute} />
-        {(['origin', 'destination'] as const).map((slot) => {
-          const location = routeLocations[slot];
-          if (!location) return null;
-          return (
-            <Marker
-              key={slot}
-              position={[location.latitude, location.longitude]}
-              icon={addressMarkerIcon}
-              zIndexOffset={950}
-            >
-              <Popup>
-                <strong>{slot === 'origin' ? 'Origen' : 'Destino'}</strong>
-                <br />
-                {location.displayName}
-              </Popup>
-            </Marker>
-          );
-        })}
-        <RouteLocationFocus location={routeLocations.destination ?? routeLocations.origin} />
         <ReportFocus location={reportFocusLocation} />
         <ReportLocationPicker
           active={isPickingReportLocation}
@@ -684,14 +614,6 @@ export default function MapView({
           </p>
         )}
       </div>
-      <RoutePlanner
-        onRoute={setCalculatedRoute}
-        currentLocation={userLocation}
-        onRequestLocation={handleLocateMe}
-        onSelectLocation={(slot, location) =>
-          setRouteLocations((current) => ({ ...current, [slot]: location }))
-        }
-      />
       {isPickingReportLocation && (
         <div className="report-pick-prompt" role="status">
           <strong>Elegí la ubicación del problema</strong>

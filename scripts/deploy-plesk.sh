@@ -28,9 +28,6 @@ npm ci --include=dev
 echo "Building backend and frontend..."
 npm run build
 
-echo "Preparing or reusing the OSRM routing graph..."
-npm run routing:setup
-
 if [[ "${RUN_DB_MIGRATIONS:-0}" == "1" ]]; then
   if [[ -z "${DATABASE_URL:-}" ]]; then
     echo "RUN_DB_MIGRATIONS=1 requiere DATABASE_URL configurada en el entorno." >&2

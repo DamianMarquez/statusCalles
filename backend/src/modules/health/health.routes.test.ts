@@ -29,6 +29,13 @@ describe('GET /api/health', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: 'ok' });
+
+    const removedRoutingEndpoint = await app.inject({
+      method: 'POST',
+      url: '/api/routing',
+      payload: {},
+    });
+    expect(removedRoutingEndpoint.statusCode).toBe(404);
     await app.close();
   });
 
