@@ -109,7 +109,8 @@ export class DrizzleRoadInformationRepository implements RoadInformationReposito
     const information = await this.database.execute<InformationRow>(sql`
       SELECT ss.id::text AS segment_id, s.id::text AS street_id,
         s.official_name AS street_name, current.road_type, current.surface_type,
-        current.surface_condition, current.special_treatments, current.updated_at
+        current.surface_condition, current.special_treatments::text[] AS special_treatments,
+        current.updated_at
       FROM street_segments ss
       JOIN streets s ON s.id = ss.street_id
       LEFT JOIN street_segment_information current ON current.segment_id = ss.id
@@ -120,7 +121,8 @@ export class DrizzleRoadInformationRepository implements RoadInformationReposito
     if (!row) return null;
     const proposals = await this.database.execute<ProposalRow>(sql`
       SELECT p.id::text, p.author_id::text AS author_id, p.road_type, p.surface_type,
-        p.surface_condition, p.special_treatments, p.status, p.created_at, p.confirmed_at,
+        p.surface_condition, p.special_treatments::text[] AS special_treatments,
+        p.status, p.created_at, p.confirmed_at,
         COUNT(c.user_id)::int AS confirmations,
         COALESCE(BOOL_OR(c.user_id = ${userId}::uuid), FALSE) AS user_has_confirmed
       FROM street_segment_information_proposals p
@@ -138,7 +140,8 @@ export class DrizzleRoadInformationRepository implements RoadInformationReposito
       special_treatments: RoadInformationPatch['specialTreatments'] | null;
       created_at: Date | string;
     }>(sql`
-      SELECT id::text, road_type, surface_type, surface_condition, special_treatments, created_at
+      SELECT id::text, road_type, surface_type, surface_condition,
+        special_treatments::text[] AS special_treatments, created_at
       FROM street_segment_information_history
       WHERE segment_id = ${segmentId}::uuid
       ORDER BY created_at DESC LIMIT 20
@@ -162,7 +165,7 @@ export class DrizzleRoadInformationRepository implements RoadInformationReposito
         ${segmentId}::uuid, ${authorId}::uuid, ${attributes.roadType ?? null}::road_type,
         ${attributes.surfaceType ?? null}::surface_type,
         ${attributes.surfaceCondition ?? null}::surface_condition,
-        ${attributes.specialTreatments ?? null}::special_treatment[]
+        ${sql.param(attributes.specialTreatments ?? null)}::special_treatment[]
       )
     `);
     return this.findForSegment(segmentId, authorId);
@@ -187,7 +190,7 @@ export class DrizzleRoadInformationRepository implements RoadInformationReposito
         status: 'PROPOSED' | 'CONFIRMED';
       }>(sql`
         SELECT id::text, segment_id::text, author_id::text, road_type, surface_type,
-          surface_condition, special_treatments, status
+          surface_condition, special_treatments::text[] AS special_treatments, status
         FROM street_segment_information_proposals
         WHERE id = ${proposalId}::uuid
         FOR UPDATE
@@ -223,7 +226,7 @@ export class DrizzleRoadInformationRepository implements RoadInformationReposito
             ${proposal.segment_id}::uuid, ${proposal.road_type}::road_type,
             ${proposal.surface_type}::surface_type,
             ${proposal.surface_condition}::surface_condition,
-            ${proposal.special_treatments}::special_treatment[], ${proposalId}::uuid, NOW()
+            ${sql.param(proposal.special_treatments)}::special_treatment[], ${proposalId}::uuid, NOW()
           )
           ON CONFLICT (segment_id) DO UPDATE SET
             road_type = COALESCE(EXCLUDED.road_type, street_segment_information.road_type),
@@ -262,7 +265,8 @@ export class DrizzleRoadInformationRepository implements RoadInformationReposito
     const result = await tx.execute<InformationRow>(sql`
       SELECT ss.id::text AS segment_id, s.id::text AS street_id,
         s.official_name AS street_name, current.road_type, current.surface_type,
-        current.surface_condition, current.special_treatments, current.updated_at
+        current.surface_condition, current.special_treatments::text[] AS special_treatments,
+        current.updated_at
       FROM street_segments ss
       JOIN streets s ON s.id = ss.street_id
       LEFT JOIN street_segment_information current ON current.segment_id = ss.id
@@ -272,7 +276,8 @@ export class DrizzleRoadInformationRepository implements RoadInformationReposito
     if (!row) return null;
     const proposals = await tx.execute<ProposalRow>(sql`
       SELECT p.id::text, p.author_id::text AS author_id, p.road_type, p.surface_type,
-        p.surface_condition, p.special_treatments, p.status, p.created_at, p.confirmed_at,
+        p.surface_condition, p.special_treatments::text[] AS special_treatments,
+        p.status, p.created_at, p.confirmed_at,
         COUNT(c.user_id)::int AS confirmations,
         COALESCE(BOOL_OR(c.user_id = ${userId}::uuid), FALSE) AS user_has_confirmed
       FROM street_segment_information_proposals p
@@ -288,7 +293,8 @@ export class DrizzleRoadInformationRepository implements RoadInformationReposito
       special_treatments: RoadInformationPatch['specialTreatments'] | null;
       created_at: Date | string;
     }>(sql`
-      SELECT id::text, road_type, surface_type, surface_condition, special_treatments, created_at
+      SELECT id::text, road_type, surface_type, surface_condition,
+        special_treatments::text[] AS special_treatments, created_at
       FROM street_segment_information_history
       WHERE segment_id = ${segmentId}::uuid
       ORDER BY created_at DESC LIMIT 20

@@ -109,5 +109,28 @@ describe('road information PostGIS integration', () => {
     expect(
       viewport.features.find((feature) => feature.id === segmentId)?.properties.roadInformation,
     ).toMatchObject({ surfaceType: 'ASPHALT', surfaceCondition: 'POOR' });
-  });
+  }, 30_000);
+
+  it.each([
+    { label: 'one treatment', values: ['SPEED_BUMP'] as const },
+    { label: 'multiple treatments', values: ['BUS_STOP', 'GUTTER'] as const },
+    { label: 'an explicitly empty list', values: [] as const },
+  ])('round-trips $label through proposal and community confirmation', async ({ values }) => {
+    const [authorId, firstVoter, secondVoter, thirdVoter] = userIds;
+    const created = await repository.createProposal(segmentId, authorId!, {
+      specialTreatments: [...values],
+    });
+    const proposal = created?.proposals[0];
+    expect(proposal?.attributes.specialTreatments).toEqual(values);
+    expect(proposal?.status).toBe('PROPOSED');
+
+    for (const voterId of [firstVoter, secondVoter, thirdVoter]) {
+      const result = await repository.confirmProposal(proposal!.id, voterId!);
+      expect(result.information).toBeTruthy();
+    }
+
+    const confirmed = await repository.findForSegment(segmentId, authorId!);
+    expect(confirmed?.profile.specialTreatments).toEqual(values);
+    expect(confirmed?.history[0]?.specialTreatments).toEqual(values);
+  }, 30_000);
 });
