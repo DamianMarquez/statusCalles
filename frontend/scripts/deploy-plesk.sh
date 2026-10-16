@@ -17,20 +17,23 @@ command -v npm >/dev/null 2>&1 || fail "npm no está disponible en el entorno Ru
 if [[ -z "${VITE_API_URL:-}" ]]; then
   for env_file in .env.production .env; do
     [[ -f "$env_file" ]] || continue
-    VITE_API_URL="$(awk -F= '
-      /^[[:space:]]*#/ { next }
-      /^[[:space:]]*VITE_API_URL[[:space:]]*=/ {
-        sub(/^[^=]*=/, "")
-        gsub(/^[[:space:]\047\"]+|[[:space:]\047\"]+$/, "")
-        print
-        exit
-      }
-    ' "$env_file")"
+    while IFS= read -r env_line || [[ -n "$env_line" ]]; do
+      [[ "$env_line" =~ ^[[:space:]]*VITE_API_URL[[:space:]]*=(.*)$ ]] || continue
+      VITE_API_URL="${BASH_REMATCH[1]}"
+      VITE_API_URL="${VITE_API_URL#"${VITE_API_URL%%[![:space:]]*}"}"
+      VITE_API_URL="${VITE_API_URL%"${VITE_API_URL##*[![:space:]]}"}"
+      case "$VITE_API_URL" in
+        \"*\") VITE_API_URL="${VITE_API_URL:1:${#VITE_API_URL}-2}" ;;
+        \'*\') VITE_API_URL="${VITE_API_URL:1:${#VITE_API_URL}-2}" ;;
+      esac
+      break
+    done < "$env_file"
     [[ -n "$VITE_API_URL" ]] && break
   done
 fi
 
 [[ -n "${VITE_API_URL:-}" ]] || fail "Falta VITE_API_URL. Configurala en Plesk o en frontend/.env.production (ej.: https://api.pozometro.com.ar)."
+export VITE_API_URL
 if ! node -e '
   try {
     const url = new URL(process.env.VITE_API_URL);
@@ -39,7 +42,6 @@ if ! node -e '
 '; then
   fail "VITE_API_URL debe ser un origen HTTPS público (opcionalmente terminado en /api), sin credenciales, query ni fragmento."
 fi
-export VITE_API_URL
 
 log "Node $(node --version), npm $(npm --version)."
 log "API pública configurada; no se imprimirá porque queda incorporada al bundle."
