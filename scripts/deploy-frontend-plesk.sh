@@ -15,20 +15,24 @@ NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 [[ "$NODE_MAJOR" == 20 ]] || fail "Plesk debe usar Node 20 para este proyecto; se encontró $(node --version)."
 command -v npm >/dev/null 2>&1 || fail "npm no está disponible en el entorno de ejecución de Plesk."
 
-if [[ -z "${VITE_API_URL:-}" && -f "$ROOT/.env.production" ]]; then
-  VITE_API_URL="$(awk -F= '
-    /^[[:space:]]*#/ { next }
-    /^[[:space:]]*VITE_API_URL[[:space:]]*=/ {
-      sub(/^[^=]*=/, "")
-      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
-      gsub(/^"|"$/, "")
-      print
-      exit
-    }
-  ' "$ROOT/.env.production")"
+if [[ -z "${VITE_API_URL:-}" ]]; then
+  for env_file in "$ROOT/.env.production" "$ROOT/.env"; do
+    [[ -f "$env_file" ]] || continue
+    VITE_API_URL="$(awk -F= '
+      /^[[:space:]]*#/ { next }
+      /^[[:space:]]*VITE_API_URL[[:space:]]*=/ {
+        sub(/^[^=]*=/, "")
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        gsub(/^"|"$/, "")
+        print
+        exit
+      }
+    ' "$env_file")"
+    [[ -n "$VITE_API_URL" ]] && break
+  done
 fi
 if [[ -z "${VITE_API_URL:-}" ]]; then
-  fail "Falta VITE_API_URL. Configurala en el entorno de Run Script o en .env.production (ej.: https://api.tudominio.com)."
+  fail "Falta VITE_API_URL. Configurala en el entorno de Run Script, .env.production o .env (ej.: https://api.tudominio.com)."
 fi
 export VITE_API_URL
 case "$VITE_API_URL" in

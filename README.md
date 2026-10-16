@@ -34,10 +34,10 @@ No hay login social ni dashboard de moderación.
 2. Crear las variables locales:
 
    ```bash
-   cp .env.example .env
+   cp .env.sample .env
    ```
 
-   `DATABASE_URL` por defecto conecta con `street_status` en `localhost:5433`. `TEST_DATABASE_URL` debe apuntar a una base separada para tests que escriben y borran registros de prueba.
+   La plantilla trae placeholders de producción: para desarrollo local, configurar `NODE_ENV=development`, `CORS_ORIGIN=http://localhost:5173` y `DATABASE_URL=postgresql://street_status:street_status@localhost:5433/street_status`. `TEST_DATABASE_URL` debe apuntar a una base separada para tests que escriben y borran registros de prueba. La URL del frontend local queda sin configurar para que Vite use su proxy `/api`.
 
 3. Iniciar PostgreSQL + PostGIS:
 
@@ -80,7 +80,7 @@ No hay login social ni dashboard de moderación.
 
    Vite informa la URL local, normalmente `http://localhost:5173`.
 
-Para crear una migración al cambiar el esquema: `npm run db:generate`; revisar el SQL generado y aplicarlo con `npm run db:migrate`. Las credenciales de `.env.example` son solo para desarrollo local.
+Para crear una migración al cambiar el esquema: `npm run db:generate`; revisar el SQL generado y aplicarlo con `npm run db:migrate`. La plantilla [.env.sample](.env.sample) no contiene credenciales reales; reemplazá sus valores según el entorno y no la uses sin editar como configuración de producción.
 
 La aplicación usa los tiles estándar de OpenStreetMap y muestra su atribución visible en el mapa. El servicio público de tiles tiene capacidad limitada y disponibilidad best-effort; para producción o tráfico importante, revisar la [política de uso de tiles de OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/) y elegir un proveedor de tiles basado en OSM o alojar tiles propios según corresponda.
 
@@ -135,7 +135,7 @@ Para crear un reporte, presionar **Reportar problema**, tocar el mapa para marca
 
 ## Cuentas y sesión
 
-El registro pide email, nombre visible y contraseña de al menos 12 caracteres. El backend almacena exclusivamente un hash `scrypt` con salt aleatorio (N=32768, r=8, p=1); el login responde con un error genérico cuando email o contraseña no coinciden. Los límites por IP se configuran con variables `RATE_LIMIT_*_MAX` y `RATE_LIMIT_*_WINDOW_SECONDS`; los valores del `.env.example` son 20 reportes, 30 feedbacks, 5 denuncias, 5 logins, 5 registros, 10 cambios de estado, 60 consultas de analytics, 20 rutas, 30 búsquedas de direcciones y 15 aportes/confirmaciones de información vial por 60 segundos. Se validan como enteros positivos y los contadores viven en PostgreSQL, compartidos por todas las instancias. La migración `0017_wise_slapstick` crea el almacenamiento y debe estar aplicada antes de desplegar esta versión. Si el backend está detrás de un proxy, `TRUST_PROXY` debe listar las IP/CIDR del proxy de confianza para calcular la IP cliente correctamente; no lo configures como `*`.
+El registro pide email, nombre visible y contraseña de al menos 12 caracteres. El backend almacena exclusivamente un hash `scrypt` con salt aleatorio (N=32768, r=8, p=1); el login responde con un error genérico cuando email o contraseña no coinciden. Los límites por IP se configuran con variables `RATE_LIMIT_*_MAX` y `RATE_LIMIT_*_WINDOW_SECONDS`; los valores del `.env.sample` son 20 reportes, 30 feedbacks, 5 denuncias, 5 logins, 5 registros, 10 cambios de estado, 60 consultas de analytics, 20 rutas, 30 búsquedas de direcciones y 15 aportes/confirmaciones de información vial por 60 segundos. Se validan como enteros positivos y los contadores viven en PostgreSQL, compartidos por todas las instancias. La migración `0017_wise_slapstick` crea el almacenamiento y debe estar aplicada antes de desplegar esta versión. Si el backend está detrás de un proxy, `TRUST_PROXY` debe listar las IP/CIDR del proxy de confianza para calcular la IP cliente correctamente; no lo configures como `*`.
 
 El BFF emite un token aleatorio opaco de 256 bits como cookie `street_status_session` (`HttpOnly`, `SameSite=Lax`, `Path=/api`, 30 días); la base conserva solo su SHA-256 y vencimiento. En producción la cookie usa `Secure`. El frontend envía cookies con `credentials: include`; no guarda tokens, contraseñas ni identificadores de voto en `localStorage`. El BFF comprueba `Origin` contra `CORS_ORIGIN` en solicitudes con origen y CORS permite credenciales únicamente para los orígenes configurados. Publicá frontend y BFF bajo el mismo site (idealmente detrás de un mismo origen/reverse proxy) para que `SameSite=Lax` funcione. Configurá HTTPS y `NODE_ENV=production` detrás del proxy de producción.
 
@@ -216,7 +216,7 @@ npm run import:caba:neighborhoods
 npm run import:caba:streets
 ```
 
-O ejecutar las tres en el orden requerido con `npm run import:caba:all`. Cada comando descarga el GeoJSON oficial; para usar un archivo ya descargado, ejecutar `npm run import:caba:streets --workspace backend -- --file=/ruta/al/archivo.geojson`. Las URL se pueden cambiar mediante `CABA_COMMUNES_URL`, `CABA_NEIGHBORHOODS_URL` y `CABA_STREETS_URL` (sus valores oficiales están en `.env.example`). Barrios referencia comuna, y los tramos resuelven barrio/comuna si esos catálogos ya están importados; por eso el orden indicado permite dejar todas las relaciones pobladas. Un tramo que no trae barrio o comuna oficiales se conserva con esa relación nula.
+O ejecutar las tres en el orden requerido con `npm run import:caba:all`. Cada comando descarga el GeoJSON oficial; para usar un archivo ya descargado, ejecutar `npm run import:caba:streets --workspace backend -- --file=/ruta/al/archivo.geojson`. Las URL se pueden cambiar mediante `CABA_COMMUNES_URL`, `CABA_NEIGHBORHOODS_URL` y `CABA_STREETS_URL` (sus valores oficiales están en `.env.sample`). Barrios referencia comuna, y los tramos resuelven barrio/comuna si esos catálogos ya están importados; por eso el orden indicado permite dejar todas las relaciones pobladas. Un tramo que no trae barrio o comuna oficiales se conserva con esa relación nula.
 
 Al crear un reporte, `StreetLocationResolverService` busca con PostGIS el tramo más cercano en un radio máximo de 35 m. La búsqueda usa el GiST de geometría para acotar candidatos y `ST_DWithin`/`ST_Distance` sobre geography para confirmar distancia real. Si no hay coincidencia dentro del umbral, el reporte queda sin calle asociada y sigue siendo válido. La API devuelve `street` como un DTO resumido; el popup muestra nombre oficial, barrio y comuna cuando existen.
 
