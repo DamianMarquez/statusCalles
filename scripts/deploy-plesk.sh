@@ -112,7 +112,10 @@ cd "$BASE_DIR"
 
 log "Instalando o actualizando dependencias..."
 step_start=$SECONDS
-npm install --include=dev --no-audit --no-fund
+npm install --include=dev --no-audit --no-fund \
+  --fetch-retries=5 \
+  --fetch-retry-mintimeout=10000 \
+  --fetch-retry-maxtimeout=60000
 log "Dependencias listas en $((SECONDS - step_start)) s."
 
 log "Compilando backend y frontend..."
