@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  envDir: '..',
+  envDir: '.',
   server: {
     allowedHosts: ['bladder-sandpaper-tilt.ngrok-free.dev'],
     proxy: {

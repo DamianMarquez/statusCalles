@@ -1,57 +1,53 @@
-# Deploy separado del frontend en Plesk
+# Deploy independiente del frontend en Plesk
 
-El frontend es una SPA estática. El script de publicación instala y compila únicamente el workspace `frontend`; no instala, compila ni reinicia el backend.
+El frontend se publica como una SPA estática. Node 20 y npm se usan únicamente para instalar y compilar; no queda un proceso Node sirviendo la web. Fastify corre por separado y el navegador lo consulta directamente.
 
-## Configurar la URL pública del backend
+## Configuración de Plesk
 
-El bundle se genera con la variable pública `VITE_API_URL`. Su valor es el origen público del backend, sin secretos. Por ejemplo:
+En **Node.js** configurá:
 
-```text
-VITE_API_URL=https://api.pozometro.com.ar
-```
+- **Versión de Node.js:** 20.x.
+- **Raíz de la aplicación:** `/httpdocs/frontend`.
+- **Raíz del documento:** `/httpdocs/frontend/dist`.
+- **Modo:** `production`.
+- No hace falta archivo de inicio ni proceso Node permanente para servir la SPA.
 
-El frontend agrega `/api` automáticamente, por lo que consultará `https://api.pozometro.com.ar/api/...`. También acepta que la variable termine en `/api`. Si se usa un proxy del mismo origen, el valor puede ser `/api`.
+El build escribe en `frontend/dist`. Apache/Plesk sirve esa carpeta y el archivo `.htaccess` incluido permite recargar rutas como `/como-usar`.
 
-En Plesk, configurá `VITE_API_URL` en el entorno que ejecuta **Run Script** antes del build. Si ese entorno no hereda las variables de la aplicación Node, creá en la raíz del monorepo un archivo `.env.production` con esta línea:
+## URL del backend
+
+Crear `frontend/.env.production` a partir de [frontend/.env.sample](frontend/.env.sample), o definir la variable en el entorno que ejecuta **Run Script**:
 
 ```dotenv
 VITE_API_URL=https://api.pozometro.com.ar
 ```
 
-El archivo solo contiene una dirección pública, no credenciales. La URL queda incluida en los archivos JavaScript descargados por los navegadores; nunca pongas `DATABASE_URL`, passwords, claves privadas ni tokens en variables `VITE_*`. Cada vez que cambie la URL del backend, hay que volver a ejecutar el deploy del frontend.
+Es el origen HTTPS público de Fastify, sin ruta. El frontend agrega `/api` automáticamente. Esta variable queda incorporada al JavaScript público: no colocar contraseñas, tokens ni otras claves. Cada cambio requiere volver a compilar y publicar el frontend.
 
-## Publicar
+## Ejecutar el deploy
 
-Desde **Plesk → Node.js → Run Script**, en la raíz del proyecto, ejecutar el script npm:
-
-```text
-deploy:frontend:plesk
-```
-
-Equivale a:
-
-```bash
-npm run deploy:frontend:plesk
-```
-
-El proceso requiere Node 20 y npm disponible en Plesk. Instala las dependencias del workspace frontend usando el `package-lock.json` de la raíz, compila Vite y copia `frontend/dist` al document root. Por defecto publica en `public/` dentro de la raíz de la aplicación. Si el document root configurado es otro, establecer `PLESK_DOCUMENT_ROOT` en el entorno del script, por ejemplo `/var/www/vhosts/pozometro.com.ar/httpdocs`.
-
-No hace falta mantener un proceso Node corriendo para servir los archivos estáticos. En Plesk, apuntá el document root del dominio a la carpeta de destino del build. El `.htaccess` de Vite se copia junto con el bundle para que funcionen las rutas SPA al abrirlas o recargarlas.
-
-## Configuración del backend
-
-En la aplicación Node que ejecuta Fastify, configurar:
+Desde **Plesk → Node.js → Run Script**, con la raíz de aplicación configurada como `/httpdocs/frontend`, ejecutar:
 
 ```text
+deploy:plesk
+```
+
+El comando equivale a `npm run deploy:plesk` dentro de `frontend/`. Usa el `frontend/package-lock.json`, instala solamente las dependencias del frontend con `npm ci --workspaces=false`, compila y deja el resultado en `dist/`. No instala ni compila el backend y no ejecuta migraciones.
+
+No ejecutar otro build automático del monorepo ni usar **NPM install** desde el panel: el script realiza la instalación reproducible requerida. Revisar el log de **Run Script**; falla temprano si falta `VITE_API_URL`, Node no es 20 o no se genera `dist/.htaccess`.
+
+## Configuración separada del backend
+
+En el servidor que ejecuta Fastify, definir `CORS_ORIGIN` con el origen exacto del frontend, por ejemplo:
+
+```dotenv
 CORS_ORIGIN=https://www.pozometro.com.ar
 NODE_ENV=production
-DATABASE_URL=... (solo en el backend)
+DATABASE_URL=... # solo en el backend
 ```
 
-`CORS_ORIGIN` debe ser el origen exacto del frontend: incluir `https://` y, si corresponde, el puerto; no agregar rutas ni una barra final. Fastify ya habilita CORS con credenciales, y el frontend envía cookies con `credentials: include`.
+Habilitar HTTPS en ambos hosts. Mantener frontend y API bajo el mismo dominio registrable —por ejemplo `www.pozometro.com.ar` y `api.pozometro.com.ar`— para que funcionen las cookies de sesión actuales. Ngrok sirve para pruebas temporales, no para producción. CORS debe permitir credenciales y coincidir exactamente con el origen frontend.
 
-Para que login, sesión y funciones autenticadas funcionen con la cookie `SameSite=Lax`, lo recomendado es publicar ambos hosts bajo el mismo dominio registrable y con HTTPS, por ejemplo `www.pozometro.com.ar` y `api.pozometro.com.ar`. Si el frontend y el backend están en dominios registrables distintos, la cookie actual no se enviará en las llamadas fetch cross-site; hace falta adaptar deliberadamente la política de cookies y protección CSRF del backend. CORS por sí solo no resuelve ese caso.
+## Verificación
 
-## Comprobación
-
-Después de publicar, abrir en el navegador la URL del frontend y revisar la pestaña **Network**. Las solicitudes deben ir a `https://api.pozometro.com.ar/api/...`, no a `localhost`. Probar también `https://api.pozometro.com.ar/api/health/live`. Si el navegador informa un error CORS, revisar que `CORS_ORIGIN` coincida exactamente con el origen del sitio y que el backend permita credenciales.
+Abrir la pestaña **Network** del navegador y confirmar que las llamadas van a `https://api.pozometro.com.ar/api/...`, nunca a `localhost`. Probar también `https://api.pozometro.com.ar/api/health/live`. Si aparece un error CORS, revisar `CORS_ORIGIN` en Fastify y que el certificado HTTPS del backend sea válido.
