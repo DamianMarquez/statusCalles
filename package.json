@@ -25,6 +25,7 @@
     "sync:caba:metrobus-stops": "npm run sync:caba:metrobus-stops --workspace backend",
     "sync:caba:infrastructure": "npm run sync:caba:infrastructure --workspace backend",
     "deploy:plesk": "bash scripts/deploy-plesk.sh",
+    "deploy:frontend:plesk": "bash scripts/deploy-frontend-plesk.sh",
     "build": "npm run build --workspace backend && npm run build --workspace frontend",
     "test": "npm run test --workspace backend && npm run test --workspace frontend",
     "lint": "eslint .",

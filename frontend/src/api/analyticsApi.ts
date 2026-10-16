@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './apiBaseUrl.js';
+
 export interface AnalyticsFilters {
   from?: string;
   to?: string;
@@ -98,15 +100,18 @@ export async function getAnalyticsDashboard(filters: AnalyticsFilters, signal: A
   heatmapParams.set('cellSize', '0.008');
   const [overview, reports, neighborhoods, communes, trends, streets, segments, heatmap, official] =
     await Promise.all([
-      get<AnalyticsOverview>(`/api/analytics/overview${suffix}`, signal),
-      get<AnalyticsReportDistribution>(`/api/analytics/reports${suffix}`, signal),
-      get<AnalyticsNeighborhood[]>(`/api/analytics/neighborhoods${suffix}`, signal),
-      get<AnalyticsNeighborhood[]>(`/api/analytics/communes${suffix}`, signal),
-      get<AnalyticsTrend[]>(`/api/analytics/trends${suffix}`, signal),
-      get<AnalyticsScoreRank[]>(`/api/analytics/streets${suffix}`, signal),
-      get<AnalyticsScoreRank[]>(`/api/analytics/segments${suffix}`, signal),
-      get<{ cells: AnalyticsHeatCell[] }>(`/api/analytics/heatmap?${heatmapParams}`, signal),
-      get<OfficialAnalytics>('/api/analytics/official', signal),
+      get<AnalyticsOverview>(`${API_BASE_URL}/analytics/overview${suffix}`, signal),
+      get<AnalyticsReportDistribution>(`${API_BASE_URL}/analytics/reports${suffix}`, signal),
+      get<AnalyticsNeighborhood[]>(`${API_BASE_URL}/analytics/neighborhoods${suffix}`, signal),
+      get<AnalyticsNeighborhood[]>(`${API_BASE_URL}/analytics/communes${suffix}`, signal),
+      get<AnalyticsTrend[]>(`${API_BASE_URL}/analytics/trends${suffix}`, signal),
+      get<AnalyticsScoreRank[]>(`${API_BASE_URL}/analytics/streets${suffix}`, signal),
+      get<AnalyticsScoreRank[]>(`${API_BASE_URL}/analytics/segments${suffix}`, signal),
+      get<{ cells: AnalyticsHeatCell[] }>(
+        `${API_BASE_URL}/analytics/heatmap?${heatmapParams}`,
+        signal,
+      ),
+      get<OfficialAnalytics>(`${API_BASE_URL}/analytics/official`, signal),
     ]);
   return {
     overview,

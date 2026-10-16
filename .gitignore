@@ -39,6 +39,10 @@ build/Release
 
 # Dependency directories
 node_modules/
+deploy/
+# deploy.tar.gz
+.deploy.next.*
+.deploy.tar.gz.next.*
 data/routing/
 backend/data/routing/
 jspm_packages/
