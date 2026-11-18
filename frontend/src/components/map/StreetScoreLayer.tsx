@@ -19,6 +19,7 @@ import {
   streetSurfaceWidthExpression,
   streetWidthExpression,
 } from './streetLayerStyle.js';
+import { ConditionCache, conditionCacheKey, snapBounds } from './streetConditionCache.js';
 import { focusMap, MapPopup, useMapEvents, useMapInstance } from './maplibre/mapLibre.js';
 import {
   SURFACE_TYPE_OPTIONS,
@@ -145,6 +146,8 @@ export function StreetScoreLayer({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sequence = useRef(0);
   const featuresById = useRef(new Map<string, StreetConditionFeature>());
+  const cache = useRef(new ConditionCache());
+  const lastRefreshKey = useRef(refreshKey);
   const selectingRef = useRef(selectingRoadSegment);
   const onSelectedRef = useRef(onRoadSegmentSelected);
   useEffect(() => {
@@ -163,17 +166,39 @@ export function StreetScoreLayer({
     const requestNumber = ++sequence.current;
     setLoading(true);
     timer.current = setTimeout(async () => {
+      // Un cambio de datos (reporte nuevo, voto) invalida lo guardado.
+      const fresh = lastRefreshKey.current !== refreshKey;
+      if (fresh) {
+        cache.current.clear();
+        lastRefreshKey.current = refreshKey;
+      }
+      const zoom = map.getZoom();
+      const bounds = snapBounds(currentBounds(map), zoom);
+      const effectiveLevels = surfaceVisible ? null : levels;
+      const key = conditionCacheKey(bounds, zoom, effectiveLevels, roadClasses);
+      const cached = cache.current.get(key);
+      if (cached) {
+        featuresById.current = new Map(
+          cached.features.map((feature) => [feature.properties.id, feature]),
+        );
+        setData(cached);
+        setError(false);
+        setLoading(false);
+        return;
+      }
       const controller = new AbortController();
       activeController.current = controller;
       try {
         const result = await getStreetConditionInViewport(
-          currentBounds(map),
-          map.getZoom(),
-          surfaceVisible ? null : levels,
+          bounds,
+          zoom,
+          effectiveLevels,
           roadClasses,
           controller.signal,
+          { fresh },
         );
         if (requestNumber !== sequence.current || controller.signal.aborted) return;
+        cache.current.set(key, result);
         featuresById.current = new Map(
           result.features.map((feature) => [feature.properties.id, feature]),
         );
@@ -186,7 +211,7 @@ export function StreetScoreLayer({
         if (requestNumber === sequence.current && !controller.signal.aborted) setLoading(false);
       }
     }, 280);
-  }, [levelKey, levels, map, roadClassKey, roadClasses, surfaceVisible]);
+  }, [levelKey, levels, map, refreshKey, roadClassKey, roadClasses, surfaceVisible]);
 
   useMapEvents({ moveend: request, zoomend: request });
   useEffect(() => {

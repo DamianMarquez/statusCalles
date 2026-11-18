@@ -4,6 +4,8 @@ import { getDatabaseUrl } from './infrastructure/database/config.js';
 import { DrizzleReportRepository } from './infrastructure/database/report-repository.drizzle.js';
 import { DrizzleReportFeedbackRepository } from './infrastructure/database/report-feedback-repository.drizzle.js';
 import { DrizzleStreetScoreRepository } from './infrastructure/database/street-score-repository.drizzle.js';
+import { DrizzleStreetScoreStore } from './infrastructure/database/street-score-store.drizzle.js';
+import { StreetScoreRefresher } from './modules/streets/application/street-score-refresher.js';
 import { DrizzleAuthRepository } from './infrastructure/database/auth-repository.drizzle.js';
 import { DrizzleStreetCatalogRepository } from './infrastructure/database/street-catalog-repository.drizzle.js';
 import { DrizzleMobilityCatalogRepository } from './infrastructure/database/mobility-catalog-repository.drizzle.js';
@@ -21,6 +23,7 @@ export async function createServerApp(options: { logger?: boolean } = {}) {
       {
         logger: options.logger,
         streetScoreRepository: new DrizzleStreetScoreRepository(database),
+        streetScoreRefresher: new StreetScoreRefresher(new DrizzleStreetScoreStore(database)),
         roadInformationRepository: new DrizzleRoadInformationRepository(database),
         authRepository: new DrizzleAuthRepository(database),
         moderationDatabase: database,

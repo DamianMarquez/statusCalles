@@ -163,6 +163,16 @@ La verificación local de `EXPLAIN (ANALYZE, BUFFERS)` se hizo con 31.961 segmen
 
 Los tipos `ROAD_IRREGULARITY`, `ROAD_ELEVATION` y `ROAD_SUBSIDENCE` se agregaron con la migración aditiva `0013_loving_hex.sql`. La jerarquía vial normalizada y su backfill desde metadata oficial se agrega con `0014_blue_jean_grey.sql`. Aplicá las migraciones con `npm run db:migrate` en cada entorno antes de desplegar el backend nuevo; las migraciones no corren durante el startup. En Elevación anómala, la UI aclara que no se deben reportar lomos de burro o badenes intencionales. Reportes, filtros, marcadores, analíticas y validación del backend usan el catálogo extendido.
 
+## Puntajes precalculados
+
+El mapa no calcula puntajes al vuelo: `GET /api/streets/condition` lee `street_segment_scores` y `street_scores` (migración `0018`) y la vista materializada `street_class_geometries` (calles unidas por clase vial). Las tablas son dispersas: sin fila significa "sin datos" (gris).
+
+- Se recalculan solos al crear un reporte, cambiar su estado, votar o moderar (`StreetScoreRefresher`).
+- La frescura decae con el tiempo (vida media de 30 días, paso a STALE a los 30 días), por eso hay que correr el recálculo periódicamente: `npm run scores:refresh --workspace @street-status/backend` (cron cada hora en Plesk). También sirve como carga inicial tras migrar.
+- Tras importar calles (`import:caba:*`) hay que refrescar la vista: `REFRESH MATERIALIZED VIEW CONCURRENTLY street_class_geometries;`.
+- La respuesta se comprime (`@fastify/compress`) y lleva `Cache-Control` corto; el frontend ajusta el viewport a una cuadrícula y guarda respuestas en memoria.
+- Medición en local (31.961 tramos): zoom 13 pasó de ~170–330 ms y 298 KB a ~36 ms y 30 KB (comprimido); zoom 15 de ~70 ms y 157 KB a ~19 ms y 12 KB.
+
 ## Informar calles
 
 El mapa separa `+ Informar calle` de `+ Reportar problema`. Para proponer información vial se elige un segmento oficial (el mapa acerca automáticamente a zoom 16); los campos son parciales: tipo de vía, pavimento, estado de calzada y tratamientos especiales. Los campos omitidos conservan el valor confirmado existente. `CONCRETE_ASPHALT` se mantiene como categoría propia. La falta de datos no se interpreta como asfalto.

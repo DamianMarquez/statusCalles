@@ -7,11 +7,13 @@ import type {
   ReportViewportQuery,
 } from './report-repository.js';
 import type { StreetLocationResolver } from '../../streets/application/street-location-resolver.js';
+import type { ScoreRefresher } from '../../streets/application/street-score-refresher.js';
 
 export class ReportService {
   constructor(
     private readonly repository: ReportRepository,
     private readonly streetResolver?: StreetLocationResolver,
+    private readonly scoreRefresher?: ScoreRefresher,
   ) {}
 
   async create(input: CreateStreetReport, userId?: string | null): Promise<StreetReport> {
@@ -19,7 +21,9 @@ export class ReportService {
       input.location.latitude,
       input.location.longitude,
     );
-    return this.repository.create(input, userId, street);
+    const report = await this.repository.create(input, userId, street);
+    await this.scoreRefresher?.refreshForReport(report.id);
+    return report;
   }
 
   findNearby(query: NearbyReportsQuery): Promise<StreetReport[]> {
@@ -50,7 +54,9 @@ export class ReportService {
     return this.repository.isOwner(id, userId);
   }
 
-  updateStatus(id: string, status: ReportStatus): Promise<StreetReport | null> {
-    return this.repository.updateStatus(id, status);
+  async updateStatus(id: string, status: ReportStatus): Promise<StreetReport | null> {
+    const report = await this.repository.updateStatus(id, status);
+    if (report) await this.scoreRefresher?.refreshForReport(id);
+    return report;
   }
 }

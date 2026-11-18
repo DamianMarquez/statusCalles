@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   customType,
   index,
@@ -183,11 +184,46 @@ export const streetSegments = pgTable(
   (table) => [
     uniqueIndex('street_segments_source_id_unique').on(table.sourceSegmentId),
     index('street_segments_street_id_idx').on(table.streetId),
+    index('street_segments_road_class_street_idx').on(table.roadClass, table.streetId),
     index('street_segments_neighborhood_id_idx').on(table.neighborhoodId),
     index('street_segments_commune_id_idx').on(table.communeId),
     index('street_segments_geometry_gix').using('gist', table.geometry),
   ],
 );
+
+/**
+ * Puntajes precalculados. Son dispersos: solo existe fila si hay evidencia o señales de
+ * circulación; sin fila significa "sin datos". `result` guarda el resultado completo
+ * (factores, métricas, disponibilidad) ya serializado.
+ */
+export const streetSegmentScores = pgTable(
+  'street_segment_scores',
+  {
+    segmentId: uuid('segment_id')
+      .primaryKey()
+      .references(() => streetSegments.id, { onDelete: 'cascade' }),
+    streetId: uuid('street_id')
+      .notNull()
+      .references(() => streets.id, { onDelete: 'cascade' }),
+    score: smallint('score'),
+    level: varchar('level', { length: 20 }),
+    hasEvidence: boolean('has_evidence').notNull(),
+    result: jsonb('result').notNull(),
+    calculatedAt: timestamp('calculated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('street_segment_scores_street_id_idx').on(table.streetId)],
+);
+
+export const streetScores = pgTable('street_scores', {
+  streetId: uuid('street_id')
+    .primaryKey()
+    .references(() => streets.id, { onDelete: 'cascade' }),
+  score: smallint('score'),
+  level: varchar('level', { length: 20 }),
+  hasEvidence: boolean('has_evidence').notNull(),
+  result: jsonb('result').notNull(),
+  calculatedAt: timestamp('calculated_at', { withTimezone: true }).notNull(),
+});
 
 export const streetSegmentInformation = pgTable('street_segment_information', {
   segmentId: uuid('segment_id')
@@ -317,6 +353,9 @@ export const streetReports = pgTable(
     index('street_reports_user_id_idx').on(table.userId),
     index('street_reports_street_id_idx').on(table.streetId),
     index('street_reports_segment_id_idx').on(table.streetSegmentId),
+    index('street_reports_visible_segment_idx')
+      .on(table.streetSegmentId)
+      .where(sql`${table.moderationStatus} = 'VISIBLE'`),
   ],
 );
 

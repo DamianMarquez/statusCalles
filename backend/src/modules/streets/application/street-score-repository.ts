@@ -2,6 +2,7 @@ import type { ReportViewportQuery } from '../../reports/application/report-repos
 import type { ReportFeedbackSummary } from '../../reports/domain/report-feedback.js';
 import type { StreetReport } from '../../reports/domain/street-report.js';
 import type { StreetRoadClass } from '../domain/street-road-class.js';
+import type { StoredScore } from '../domain/stored-street-score.js';
 import type {
   RoadType,
   SpecialTreatment,
@@ -25,28 +26,29 @@ export interface StreetScoreStreetInput {
   }>;
 }
 
+export interface ConditionFeatureInput {
+  id: string;
+  streetId: string;
+  streetName: string;
+  roadClass: StreetRoadClass;
+  roadInformation: {
+    roadType: RoadType | null;
+    surfaceType: SurfaceType | null;
+    surfaceCondition: SurfaceCondition | null;
+    specialTreatments: SpecialTreatment[] | null;
+    updatedAt: string | null;
+  } | null;
+  geometry: { type: 'MultiLineString' | 'LineString'; coordinates: number[][][] | number[][] };
+  /** Puntaje precalculado; null cuando no hay evidencia ni señales. */
+  score: StoredScore | null;
+}
+
 export interface StreetScoreRepository {
-  findConditionGeometry(
+  findConditionFeatures(
     query: ReportViewportQuery,
     zoom: number,
     roadClasses: StreetRoadClass[],
-  ): Promise<
-    Array<{
-      id: string;
-      streetId: string;
-      streetName: string;
-      roadClass: StreetRoadClass;
-      roadInformation: {
-        roadType: RoadType | null;
-        surfaceType: SurfaceType | null;
-        surfaceCondition: SurfaceCondition | null;
-        specialTreatments: SpecialTreatment[] | null;
-        updatedAt: string | null;
-      } | null;
-      geometry: { type: 'MultiLineString' | 'LineString'; coordinates: number[][][] | number[][] };
-      segmentIds: string[];
-    }>
-  >;
+  ): Promise<ConditionFeatureInput[]>;
   findStreetScore(streetId: string, asOf: Date): Promise<StreetScoreStreetInput | null>;
   findSegmentScore(
     segmentId: string,

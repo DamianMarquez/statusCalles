@@ -23,6 +23,11 @@ if (!selected.every((name) => order.includes(name))) {
       const count = await importer.import(dataset, { ...(localFile ? { localFile } : {}) });
       console.info(`${dataset}: ${count} official records imported/updated.`);
     }
+    if (selected.includes('streets')) {
+      // El mapa lee las calles ya unidas por clase vial: hay que regenerarlas tras importar.
+      await pool.query('REFRESH MATERIALIZED VIEW street_class_geometries');
+      console.info('street_class_geometries refreshed.');
+    }
   } catch (error) {
     let cause: unknown = error;
     const messages: string[] = [];

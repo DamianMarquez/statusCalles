@@ -37,3 +37,13 @@ El backend se despliega por separado en su servidor de aplicación. Configurar a
 | `PORT`         | Puerto asignado por el hosting; Fastify lo consume al iniciar          |
 
 Las cookies actuales requieren HTTPS y conviene que frontend y API compartan el dominio registrable, por ejemplo `www.pozometro.com.ar` y `api.pozometro.com.ar`. CORS debe aceptar credenciales y usar el origen exacto. Las migraciones se ejecutan explícitamente contra la base antes de publicar cambios de esquema; no forman parte del build frontend.
+
+## Puntajes de calles (cron)
+
+Programar en Plesk (Tareas programadas) cada hora, con la raíz del backend:
+
+```bash
+npm run scores:refresh --workspace @street-status/backend
+```
+
+Antes del primer despliegue: aplicar la migración `0018` (`npm run db:migrate`) y correr este comando una vez para cargar los puntajes iniciales.

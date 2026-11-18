@@ -9,7 +9,9 @@ import {
   type ReportType,
   type StreetReport,
 } from '../../modules/reports/domain/street-report.js';
+import type { StoredScore } from '../../modules/streets/domain/stored-street-score.js';
 import type {
+  ConditionFeatureInput,
   StreetScoreReportInput,
   StreetScoreStreetInput,
   StreetScoreRepository,
@@ -73,11 +75,11 @@ function mapInput(row: ScoreReportRow): StreetScoreReportInput {
 export class DrizzleStreetScoreRepository implements StreetScoreRepository {
   constructor(private readonly database: StreetStatusDatabase) {}
 
-  async findConditionGeometry(
+  async findConditionFeatures(
     query: ReportViewportQuery,
     zoom: number,
     roadClasses: StreetRoadClass[],
-  ) {
+  ): Promise<ConditionFeatureInput[]> {
     if (roadClasses.length === 0) return [];
     const envelope = sql`ST_MakeEnvelope(${query.west}, ${query.south}, ${query.east}, ${query.north}, 4326)`;
     const tolerance = Math.max(0.00001, Math.min(0.001, 0.08 / 2 ** Math.max(0, zoom - 12)));
@@ -97,14 +99,17 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
         special_treatments: string[] | null;
         information_updated_at: Date | string | null;
         geometry: string;
+        score_result: StoredScore | null;
       }>(sql`
         SELECT ss.id::text AS id, ss.street_id::text AS street_id, st.official_name AS street_name,
           ss.road_class AS road_class, info.road_type, info.surface_type, info.surface_condition,
           info.special_treatments, info.updated_at AS information_updated_at,
-          ST_AsGeoJSON(ST_SimplifyPreserveTopology(ss.geometry, ${tolerance})) AS geometry
+          ST_AsGeoJSON(ST_SimplifyPreserveTopology(ss.geometry, ${tolerance})) AS geometry,
+          sc.result AS score_result
         FROM street_segments ss
         JOIN streets st ON st.id = ss.street_id
         LEFT JOIN street_segment_information info ON info.segment_id = ss.id
+        LEFT JOIN street_segment_scores sc ON sc.segment_id = ss.id
         WHERE ss.geometry && ${envelope}
           AND ST_Intersects(ss.geometry, ${envelope})
           AND ss.road_class IN (${classesSql})
@@ -125,45 +130,43 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
             ? new Date(row.information_updated_at).toISOString()
             : null,
         },
-        geometry: JSON.parse(row.geometry) as {
-          type: 'MultiLineString' | 'LineString';
-          coordinates: number[][][] | number[][];
-        },
-        segmentIds: [row.id],
+        geometry: JSON.parse(row.geometry) as ConditionFeatureInput['geometry'],
+        score: row.score_result,
       }));
     }
+    // Calles agrupadas: geometría ya unida (vista materializada) y puntaje por calle guardado.
+    // Se recorta a un marco algo mayor que el viewport para no enviar avenidas enteras.
     const result = await this.database.execute<{
       street_id: string;
       street_name: string;
       road_class: StreetRoadClass;
-      geometry: string;
-      segment_ids: string[];
+      geometry: string | null;
+      score_result: StoredScore | null;
     }>(sql`
-      SELECT ss.street_id::text AS street_id, st.official_name AS street_name,
-        ss.road_class AS road_class,
-        ST_AsGeoJSON(ST_Multi(ST_SimplifyPreserveTopology(ST_CollectionExtract(ST_LineMerge(ST_Collect(ss.geometry)), 2), ${tolerance}))) AS geometry,
-        ARRAY(SELECT all_segments.id::text FROM street_segments all_segments
-          WHERE all_segments.street_id = ss.street_id ORDER BY all_segments.id) AS segment_ids
-      FROM street_segments ss
-      JOIN streets st ON st.id = ss.street_id
-      WHERE ss.geometry && ${envelope} AND ST_Intersects(ss.geometry, ${envelope})
-        AND ss.road_class IN (${classesSql})
-      GROUP BY ss.street_id, st.official_name, ss.road_class
-      ORDER BY st.official_name
+      SELECT g.street_id::text AS street_id, g.official_name AS street_name,
+        g.road_class AS road_class,
+        ST_AsGeoJSON(ST_Multi(ST_SimplifyPreserveTopology(
+          ST_CollectionExtract(ST_ClipByBox2D(g.geometry, ST_Expand(${envelope}, 0.01)), 2),
+          ${tolerance}))) AS geometry,
+        sc.result AS score_result
+      FROM street_class_geometries g
+      LEFT JOIN street_scores sc ON sc.street_id = g.street_id
+      WHERE g.geometry && ${envelope} AND ST_Intersects(g.geometry, ${envelope})
+        AND g.road_class IN (${classesSql})
+      ORDER BY g.official_name
       LIMIT 600
     `);
-    return result.rows.map((row) => ({
-      id: `${row.street_id}:${row.road_class}`,
-      streetId: row.street_id,
-      streetName: row.street_name,
-      roadClass: row.road_class,
-      roadInformation: null,
-      geometry: JSON.parse(row.geometry) as {
-        type: 'MultiLineString' | 'LineString';
-        coordinates: number[][][] | number[][];
-      },
-      segmentIds: row.segment_ids,
-    }));
+    return result.rows
+      .filter((row) => row.geometry !== null)
+      .map((row) => ({
+        id: `${row.street_id}:${row.road_class}`,
+        streetId: row.street_id,
+        streetName: row.street_name,
+        roadClass: row.road_class,
+        roadInformation: null,
+        geometry: JSON.parse(row.geometry as string) as ConditionFeatureInput['geometry'],
+        score: row.score_result,
+      }));
   }
 
   async findStreetScore(streetId: string, asOf: Date): Promise<StreetScoreStreetInput | null> {
@@ -256,10 +259,8 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
 
   async findSegmentScores(segmentIds: string[], asOf: Date) {
     if (segmentIds.length === 0) return [];
-    const segmentIdArray = sql`ARRAY[${sql.join(
-      segmentIds.map((id) => sql`${id}::uuid`),
-      sql`, `,
-    )}]::uuid[]`;
+    // Un solo parámetro JSON en lugar de un bind por id (evita el límite de parámetros).
+    const segmentIdList = sql`(SELECT jsonb_array_elements_text(${JSON.stringify(segmentIds)}::jsonb)::uuid)`;
     const result = await this.database.execute<ScoreReportRow>(sql`
       SELECT r.id::text AS id, r.user_id::text AS actor_id, r.street_segment_id::text AS segment_id,
         r.type, r.severity, r.description,
@@ -281,10 +282,9 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
           MAX(updated_at) FILTER (WHERE type = 'CONFIRM') AS latest_confirmation_at
         FROM report_feedback WHERE report_id = r.id
       ) f ON TRUE
-      WHERE r.street_segment_id = ANY(${segmentIdArray})
+      WHERE r.street_segment_id IN ${segmentIdList}
         AND r.moderation_status = 'VISIBLE'
       ORDER BY r.created_at DESC
-      LIMIT 5000
     `);
     const grouped = new Map<string, StreetScoreReportInput[]>();
     for (const row of result.rows) {

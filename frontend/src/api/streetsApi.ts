@@ -111,6 +111,7 @@ export async function getStreetConditionInViewport(
   levels: string[] | null,
   roadClasses: StreetRoadClass[],
   signal: AbortSignal,
+  options: { fresh?: boolean } = {},
 ): Promise<StreetConditionFeatureCollection> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(bounds)) query.set(key, value.toFixed(5));
@@ -126,6 +127,8 @@ export async function getStreetConditionInViewport(
     response = await fetch(`${API_BASE_URL}/streets/condition?${query.toString()}`, {
       headers: { Accept: 'application/json' },
       signal,
+      // Tras un cambio propio (reporte, voto) hay que saltear la caché HTTP del navegador.
+      ...(options.fresh ? { cache: 'reload' as const } : {}),
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;

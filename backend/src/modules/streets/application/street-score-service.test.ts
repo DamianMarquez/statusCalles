@@ -5,7 +5,7 @@ import { StreetScoreService } from './street-score-service.js';
 describe('StreetScoreService condition viewport', () => {
   it('returns official geometry as GeoJSON and keeps segments without evidence unscored', async () => {
     const repository: StreetScoreRepository = {
-      findConditionGeometry: vi.fn().mockResolvedValue([
+      findConditionFeatures: vi.fn().mockResolvedValue([
         {
           id: 'segment-1',
           streetId: 'street-1',
@@ -20,7 +20,8 @@ describe('StreetScoreService condition viewport', () => {
               ],
             ],
           },
-          segmentIds: ['segment-1'],
+          score: null,
+          roadInformation: null,
         },
       ]),
       findSegmentScores: vi.fn().mockResolvedValue([]),
@@ -49,7 +50,7 @@ describe('StreetScoreService condition viewport', () => {
 
   it('filters computed results by requested condition levels', async () => {
     const repository: StreetScoreRepository = {
-      findConditionGeometry: vi.fn().mockResolvedValue([
+      findConditionFeatures: vi.fn().mockResolvedValue([
         {
           id: 's1',
           streetId: 'st1',
@@ -62,7 +63,8 @@ describe('StreetScoreService condition viewport', () => {
               [1, 1],
             ],
           },
-          segmentIds: ['s1'],
+          score: null,
+          roadInformation: null,
         },
       ]),
       findSegmentScores: vi.fn().mockResolvedValue([]),
@@ -79,7 +81,7 @@ describe('StreetScoreService condition viewport', () => {
 
   it('includes streets without reports when the visual GOOD condition is selected', async () => {
     const repository: StreetScoreRepository = {
-      findConditionGeometry: vi.fn().mockResolvedValue([
+      findConditionFeatures: vi.fn().mockResolvedValue([
         {
           id: 's1',
           streetId: 'st1',
@@ -92,7 +94,8 @@ describe('StreetScoreService condition viewport', () => {
               [1, 1],
             ],
           },
-          segmentIds: ['s1'],
+          score: null,
+          roadInformation: null,
         },
       ]),
       findSegmentScores: vi.fn().mockResolvedValue([]),
@@ -111,10 +114,68 @@ describe('StreetScoreService condition viewport', () => {
       hasEvidence: false,
       hasReports: false,
     });
-    expect(repository.findConditionGeometry).toHaveBeenCalledWith(
+    expect(repository.findConditionFeatures).toHaveBeenCalledWith(
       { south: -1, north: 1, west: -1, east: 1 },
       16,
       ['PRIMARY', 'SECONDARY', 'LOCAL', 'UNKNOWN'],
     );
+  });
+
+  it('uses the precalculated score without recomputing it', async () => {
+    const repository: StreetScoreRepository = {
+      findConditionFeatures: vi.fn().mockResolvedValue([
+        {
+          id: 's1',
+          streetId: 'st1',
+          streetName: 'A',
+          roadClass: 'LOCAL',
+          roadInformation: null,
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [0, 0],
+              [1, 1],
+            ],
+          },
+          score: {
+            score: 38,
+            level: 'BAD',
+            hasEvidence: true,
+            confidence: 'MEDIUM',
+            factors: [],
+            metrics: {
+              reports: 2,
+              activeReports: 2,
+              recentReports: 1,
+              highSeverityReports: 1,
+              confirmations: 0,
+              resolvedReports: 0,
+              officialIncidents: 0,
+              trafficLevel: null,
+              latestReportAt: '2026-10-07T10:00:00.000Z',
+            },
+            availability: { status: 'UNKNOWN', signals: [] },
+            calculatedAt: '2026-10-08T11:00:00.000Z',
+          },
+        },
+      ]),
+      findSegmentScores: vi.fn(),
+      findStreetScore: vi.fn(),
+      findSegmentScore: vi.fn(),
+    };
+    const result = await new StreetScoreService(repository).findConditionInViewport(
+      { south: -1, north: 1, west: -1, east: 1 },
+      16,
+      ['BAD'],
+    );
+    expect(result.features[0]?.properties).toMatchObject({
+      score: 38,
+      level: 'BAD',
+      condition: 'BAD',
+      hasEvidence: true,
+      hasReports: true,
+      calculatedAt: '2026-10-08T11:00:00.000Z',
+    });
+    expect(repository.findSegmentScores).not.toHaveBeenCalled();
   });
 });

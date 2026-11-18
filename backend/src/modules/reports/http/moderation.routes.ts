@@ -39,7 +39,10 @@ function moderator(request: FastifyRequest, reply: FastifyReply): boolean {
 
 export async function registerModerationRoutes(
   app: FastifyInstance,
-  options: { database: StreetStatusDatabase },
+  options: {
+    database: StreetStatusDatabase;
+    scoreRefresher?: { refreshForReport(reportId: string): Promise<void> };
+  },
 ): Promise<void> {
   const { database } = options;
 
@@ -166,6 +169,7 @@ export async function registerModerationRoutes(
       });
       if (!result)
         return reply.code(404).send({ code: 'REPORT_NOT_FOUND', message: 'Report not found.' });
+      await options.scoreRefresher?.refreshForReport(request.params.id);
       return { id: request.params.id, status: result.moderation_status };
     },
   );

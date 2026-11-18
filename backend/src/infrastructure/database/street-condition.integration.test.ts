@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase } from './database.js';
 import { getTestDatabaseUrl } from './config.js';
 import { DrizzleStreetScoreRepository } from './street-score-repository.drizzle.js';
+import { DrizzleStreetScoreStore } from './street-score-store.drizzle.js';
+import { StreetScoreRefresher } from '../../modules/streets/application/street-score-refresher.js';
 import { StreetScoreService } from '../../modules/streets/application/street-score-service.js';
 
 const { database, pool } = createDatabase(getTestDatabaseUrl());
@@ -49,6 +51,11 @@ describe('Street condition PostGIS integration', () => {
        VALUES ($1, $2, $3, 'POTHOLE', 3, 'Test physical evidence', ST_SetSRID(ST_MakePoint(-58.395, -34.600), 4326)::geography)`,
       [reportId, streetId, segmentId],
     );
+    // El mapa lee puntajes y geometrías ya calculados.
+    await new StreetScoreRefresher(new DrizzleStreetScoreStore(database)).refreshStreets([
+      streetId,
+    ]);
+    await pool.query('REFRESH MATERIALIZED VIEW street_class_geometries');
   });
 
   afterAll(async () => {
@@ -58,6 +65,7 @@ describe('Street condition PostGIS integration', () => {
     ]);
     await pool.query('DELETE FROM streets WHERE id = $1', [streetId]);
     await pool.query('DELETE FROM geographic_sources WHERE id = $1', [sourceId]);
+    await pool.query('REFRESH MATERIALIZED VIEW street_class_geometries');
     await pool.end();
   });
 
@@ -87,7 +95,12 @@ describe('Street condition PostGIS integration', () => {
 
     expect(close.features.some((feature) => feature.id === outsideSegmentId)).toBe(false);
     const primaryOnly = await service.findConditionInViewport(bounds, 16, undefined, ['PRIMARY']);
-    expect(primaryOnly.features.map((feature) => feature.id)).toEqual([segmentId]);
+    // La base puede tener calles reales importadas: solo se compara la calle de la prueba.
+    expect(
+      primaryOnly.features
+        .filter((feature) => feature.properties.streetId === streetId)
+        .map((feature) => feature.id),
+    ).toEqual([segmentId]);
 
     const far = await service.findConditionInViewport(bounds, 12);
     const ourFarFeature = far.features.find((feature) => feature.id === `${streetId}:PRIMARY`);

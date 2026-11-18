@@ -102,6 +102,9 @@ export async function registerStreetScoreRoutes(
         return reply
           .code(400)
           .send({ code: 'INVALID_ROAD_CLASSES', message: 'Invalid road class.' });
+      // Los puntajes se refrescan al cambiar un reporte; unos segundos de caché alcanzan
+      // para que mover el mapa no vuelva a pedir lo mismo.
+      reply.header('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
       return options.service.findConditionInViewport(
         { south, north, west, east },
         zoom,

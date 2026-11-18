@@ -1,17 +1,19 @@
 import type { ReportFeedbackSummary, ReportFeedbackType } from '../domain/report-feedback.js';
 import type { ReportFeedbackRepository } from './report-feedback-repository.js';
+import type { ScoreRefresher } from '../../streets/application/street-score-refresher.js';
 
 export class ReportFeedbackService {
   constructor(
     private readonly repository: ReportFeedbackRepository,
     private readonly clock: () => Date = () => new Date(),
+    private readonly scoreRefresher?: ScoreRefresher,
   ) {}
 
   now(): Date {
     return this.clock();
   }
 
-  submit(
+  async submit(
     input: {
       reportId: string;
       userId: string;
@@ -19,7 +21,9 @@ export class ReportFeedbackService {
     },
     asOf = this.now(),
   ): Promise<ReportFeedbackSummary | null> {
-    return this.repository.submit(input, asOf);
+    const summary = await this.repository.submit(input, asOf);
+    if (summary) await this.scoreRefresher?.refreshForReport(input.reportId);
+    return summary;
   }
 
   summariesForReports(

@@ -22,9 +22,11 @@
     "sync:caba:metrobus": "tsx src/infrastructure/external/caba/mobility-import-cli.ts metrobus",
     "sync:caba:metrobus-stops": "tsx src/infrastructure/external/caba/mobility-import-cli.ts metrobusStops",
     "seed:lab": "tsx src/infrastructure/database/seed-lab-reports.ts",
-    "sync:caba:infrastructure": "tsx src/infrastructure/external/caba/mobility-import-cli.ts all"
+    "sync:caba:infrastructure": "tsx src/infrastructure/external/caba/mobility-import-cli.ts all",
+    "scores:refresh": "tsx src/infrastructure/database/street-score-refresh-cli.ts"
   },
   "dependencies": {
+    "@fastify/compress": "^9.3.0",
     "@fastify/cookie": "11.0.2",
     "@fastify/cors": "^11.3.0",
     "@fastify/rate-limit": "^11.2.0",

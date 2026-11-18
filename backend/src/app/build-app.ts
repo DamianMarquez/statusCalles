@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import compress from '@fastify/compress';
 import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
 import { registerHealthRoutes } from '../modules/health/health.routes.js';
 import type { ReportRepository } from '../modules/reports/application/report-repository.js';
@@ -16,6 +17,7 @@ import type { StreetCatalogRepository } from '../modules/streets/application/str
 import { StreetCatalogService } from '../modules/streets/application/street-catalog.js';
 import { StreetLocationResolverService } from '../modules/streets/application/street-location-resolver.js';
 import { registerStreetCatalogRoutes } from '../modules/streets/http/street-catalog.routes.js';
+import type { StreetScoreRefresher } from '../modules/streets/application/street-score-refresher.js';
 import { StreetScoreService } from '../modules/streets/application/street-score-service.js';
 import { registerStreetScoreRoutes } from '../modules/streets/http/street-score.routes.js';
 import type { RoadInformationRepository } from '../modules/streets/application/road-information-service.js';
@@ -42,6 +44,7 @@ export function buildApp(
   options: {
     logger?: boolean;
     streetScoreRepository?: StreetScoreRepository;
+    streetScoreRefresher?: StreetScoreRefresher;
     roadInformationRepository?: RoadInformationRepository;
     authRepository?: AuthRepository;
     moderationDatabase?: StreetStatusDatabase;
@@ -71,6 +74,8 @@ export function buildApp(
 
   app.register(cors, { origin: allowedOrigins, credentials: true });
   app.register(cookie);
+  // Las respuestas de calles son JSON grande y repetitivo: comprimen muy bien.
+  app.register(compress, { threshold: 1024 });
   app.register(rateLimit, {
     global: false,
     ...(options.rateLimitStore ? { store: options.rateLimitStore } : {}),
@@ -98,8 +103,13 @@ export function buildApp(
   const reportService = new ReportService(
     reportRepository,
     streetCatalog ? new StreetLocationResolverService(streetCatalog) : undefined,
+    options.streetScoreRefresher,
   );
-  const feedbackService = new ReportFeedbackService(feedbackRepository);
+  const feedbackService = new ReportFeedbackService(
+    feedbackRepository,
+    undefined,
+    options.streetScoreRefresher,
+  );
   app.register(registerReportsRoutes, {
     prefix: '/api',
     service: reportService,
@@ -114,6 +124,7 @@ export function buildApp(
     app.register(registerModerationRoutes, {
       prefix: '/api',
       database: options.moderationDatabase,
+      ...(options.streetScoreRefresher ? { scoreRefresher: options.streetScoreRefresher } : {}),
     });
   }
   const streetScoreService = options.streetScoreRepository
