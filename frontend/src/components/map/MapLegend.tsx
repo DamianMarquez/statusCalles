@@ -5,7 +5,36 @@ import {
   REPORT_TYPE_OPTIONS,
 } from '../../api/reportCatalog.js';
 import { STREET_CONDITION_LEVELS, streetConditionColor } from './streetConditionCatalog.js';
-import { SURFACE_TYPE_OPTIONS } from '../../api/roadInformationTypes.js';
+import {
+  SURFACE_CONDITION_OPTIONS,
+  SURFACE_TYPE_OPTIONS,
+  type SurfaceCondition,
+} from '../../api/roadInformationTypes.js';
+import { surfaceConditionDashArray } from './roadSurfaceStyle.js';
+
+function SurfaceLineSwatch({
+  color,
+  condition,
+}: {
+  color: string;
+  condition?: SurfaceCondition | null;
+}) {
+  const dashArray = condition === undefined ? undefined : surfaceConditionDashArray(condition);
+  return (
+    <svg className="map-legend__surface-line" viewBox="0 0 32 10" aria-hidden="true">
+      <line
+        x1="2"
+        y1="5"
+        x2="30"
+        y2="5"
+        stroke={color}
+        strokeWidth="6"
+        strokeLinecap="round"
+        {...(dashArray ? { strokeDasharray: dashArray } : {})}
+      />
+    </svg>
+  );
+}
 
 export function MapLegend({ open, onClose }: { open: boolean; onClose: () => void }) {
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -81,27 +110,51 @@ export function MapLegend({ open, onClose }: { open: boolean; onClose: () => voi
         Es una estimación comunitaria basada en reportes disponibles; no es una medición profesional
         ni una evaluación oficial.
       </p>
+      <h3>Cómo leer las calles</h3>
+      <div className="map-legend__grid">
+        <span className="map-legend__item">
+          <SurfaceLineSwatch color={streetConditionColor('GOOD')} />
+          Color del centro: condición general
+        </span>
+        <span className="map-legend__item">
+          <SurfaceLineSwatch color="#d17b37" />
+          Color del borde: tipo de pavimento
+        </span>
+        <span className="map-legend__item">
+          <SurfaceLineSwatch color="#7b8490" condition="VERY_POOR" />
+          Patrón: condición del pavimento
+        </span>
+      </div>
       <h3>Tipo de pavimento</h3>
       <div className="map-legend__grid">
         {SURFACE_TYPE_OPTIONS.map((surface) => (
           <span className="map-legend__item" key={surface.value}>
-            <span
-              className="map-legend__surface-line"
-              style={{
-                borderColor: surface.color,
-                borderStyle: surface.dashArray ? 'dashed' : 'solid',
-              }}
-              aria-hidden="true"
-            />
+            <SurfaceLineSwatch color={surface.color} />
             {surface.label}
           </span>
         ))}
-        <span className="map-legend__item">Sin pavimento informado: sin color de superficie</span>
+        <span className="map-legend__item">
+          <SurfaceLineSwatch color="#7b8490" />
+          Tipo de pavimento sin informar
+        </span>
       </div>
       <p className="map-legend__note">
         Son aportes de la comunidad asociados a un segmento oficial. Las propuestas requieren tres
         confirmaciones independientes; la falta de información no indica un tipo de pavimento.
       </p>
+      <h3>Condición del pavimento (patrón)</h3>
+      <div className="map-legend__grid">
+        {SURFACE_CONDITION_OPTIONS.map((condition) => (
+          <span className="map-legend__item" key={condition.value}>
+            <SurfaceLineSwatch color="#7b8490" condition={condition.value} />
+            {condition.label}
+          </span>
+        ))}
+        <span className="map-legend__item">
+          <SurfaceLineSwatch color="#7b8490" condition={null} />
+          Sin condición informada
+        </span>
+      </div>
       <h3>Score estimado</h3>
       <div className="map-legend__grid">
         {STREET_CONDITION_LEVELS.map((item) => (

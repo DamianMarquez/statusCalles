@@ -9,30 +9,27 @@ export const ROAD_TYPE_OPTIONS = [
 export type RoadType = (typeof ROAD_TYPE_OPTIONS)[number]['value'];
 
 export const SURFACE_TYPE_OPTIONS = [
-  { value: 'ASPHALT', label: 'Asfalto', color: '#d17b37', dashArray: undefined },
-  { value: 'SPECIAL_ASPHALT', label: 'Asfalto especial', color: '#a95e2b', dashArray: '8 3' },
-  { value: 'CONCRETE', label: 'Hormigón', color: '#587e9e', dashArray: undefined },
+  { value: 'ASPHALT', label: 'Asfalto', color: '#d17b37' },
+  { value: 'SPECIAL_ASPHALT', label: 'Asfalto especial', color: '#a95e2b' },
+  { value: 'CONCRETE', label: 'Hormigón', color: '#587e9e' },
   {
     value: 'CONCRETE_ASPHALT',
     label: 'Hormigón + carpeta asfáltica',
     color: '#815ba0',
-    dashArray: '10 3',
   },
   {
     value: 'GRANITE_COBBLESTONE',
     label: 'Adoquín de granito',
     color: '#626c5e',
-    dashArray: '3 3',
   },
-  { value: 'GRANITULLO', label: 'Granitullo', color: '#986b54', dashArray: '2 4' },
-  { value: 'CONCRETE_PAVER', label: 'Adoquín de hormigón', color: '#4f8f8b', dashArray: '7 3 2 3' },
+  { value: 'GRANITULLO', label: 'Granitullo', color: '#986b54' },
+  { value: 'CONCRETE_PAVER', label: 'Adoquín de hormigón', color: '#4f8f8b' },
   {
     value: 'INTERLOCKING_PAVER',
     label: 'Pavimento intertrabado',
     color: '#b06e8a',
-    dashArray: '1 3',
   },
-  { value: 'PERMEABLE', label: 'Pavimento permeable', color: '#5e9760', dashArray: '9 4' },
+  { value: 'PERMEABLE', label: 'Pavimento permeable', color: '#5e9760' },
 ] as const;
 export type SurfaceType = (typeof SURFACE_TYPE_OPTIONS)[number]['value'];
 

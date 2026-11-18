@@ -4,11 +4,13 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   envDir: '.',
+  // MapLibre carga su worker como módulo propio; el prebundle de Vite lo rompe en dev.
+  optimizeDeps: { exclude: ['maplibre-gl'] },
   server: {
     allowedHosts: ['bladder-sandpaper-tilt.ngrok-free.dev'],
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:3000',
+        target: process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3000',
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyRequest) => {

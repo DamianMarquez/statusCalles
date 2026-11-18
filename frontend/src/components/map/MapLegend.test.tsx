@@ -15,9 +15,15 @@ describe('MapLegend', () => {
     render(<MapLegend open onClose={onClose} />);
     expect(screen.getByRole('dialog', { name: 'Referencias del mapa' })).toBeInTheDocument();
     expect(screen.getByText('Condición física de las calles')).toBeInTheDocument();
+    expect(screen.getByText('Cómo leer las calles')).toBeInTheDocument();
+    expect(screen.getByText('Color del centro: condición general')).toBeInTheDocument();
+    expect(screen.getByText('Color del borde: tipo de pavimento')).toBeInTheDocument();
+    expect(screen.getByText('Patrón: condición del pavimento')).toBeInTheDocument();
     expect(screen.getByText('Tipo de pavimento')).toBeInTheDocument();
+    expect(screen.getByText('Condición del pavimento (patrón)')).toBeInTheDocument();
     expect(screen.getByText('Hormigón + carpeta asfáltica')).toBeInTheDocument();
     expect(screen.getByText(/tres confirmaciones independientes/)).toBeInTheDocument();
+    expect(screen.getByText('Sin condición informada')).toBeInTheDocument();
     expect(screen.getByText('Buena por defecto · sin score calculado')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();

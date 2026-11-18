@@ -138,7 +138,7 @@ export function MapLayerControls(props: Props) {
             ))}
           </fieldset>
           <fieldset disabled={!props.surface}>
-            <legend>Estado de calzada</legend>
+            <legend>Condición del pavimento</legend>
             {SURFACE_CONDITION_OPTIONS.map((item) => (
               <label key={item.value}>
                 <input

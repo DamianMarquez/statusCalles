@@ -118,6 +118,13 @@ function renderAuthenticatedMap() {
 }
 
 describe('MapView report creation', () => {
+  it('shows street condition and pavement together by default', () => {
+    render(<MapView />);
+
+    expect(screen.getByLabelText('Estado de calles')).toBeChecked();
+    expect(screen.getByLabelText('Pavimento')).toBeChecked();
+  });
+
   it('keeps the map and report flow without showing route planning controls', () => {
     render(<MapView />);
 

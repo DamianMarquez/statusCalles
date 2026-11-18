@@ -1101,11 +1101,11 @@ a {
 }
 
 .map-legend__surface-line {
-  width: 27px;
-  height: 0;
-  flex: 0 0 27px;
-  border-top: 4px solid;
-  border-radius: 4px;
+  display: block;
+  width: 32px;
+  height: 10px;
+  flex: 0 0 32px;
+  overflow: visible;
 }
 
 .road-information-panel {
@@ -3180,4 +3180,98 @@ a {
   .primary-nav button {
     padding-inline: 9px;
   }
+}
+
+/* Lab MapLibre */
+.lab-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+}
+.lab-map {
+  flex: 1;
+  min-width: 0;
+}
+.lab-panel {
+  width: 280px;
+  padding: 16px;
+  overflow-y: auto;
+  background: #fff;
+  border-left: 1px solid #ddd;
+  font-size: 14px;
+}
+.lab-panel h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.lab-panel h3 {
+  margin: 16px 0 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #555;
+}
+.lab-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+.lab-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.lab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.lab-btn {
+  padding: 6px 10px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #f6f6f6;
+  cursor: pointer;
+}
+.lab-btn--on {
+  background: #1f6feb;
+  border-color: #1f6feb;
+  color: #fff;
+}
+.lab-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+.lab-hint {
+  color: #666;
+  font-size: 12px;
+  margin: 6px 0;
+}
+@media (max-width: 640px) {
+  .lab-shell {
+    flex-direction: column;
+  }
+  .lab-panel {
+    width: auto;
+    max-height: 40%;
+    border-left: 0;
+    border-top: 1px solid #ddd;
+  }
+}
+.lab-ramp {
+  height: 12px;
+  border-radius: 6px;
+  margin: 4px 0;
+}
+.lab-ramp-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 8px;
 }

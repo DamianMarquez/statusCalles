@@ -20,8 +20,8 @@ export function streetConditionLineStyle(
   const detail = zoom >= 15;
   return {
     color: level ? streetConditionColor(level as StreetScoreLevel) : NO_STREET_CONDITION_COLOR,
-    weight: detail ? (hasScore ? 5 : 3.5) : hasScore ? 3.5 : 2.5,
-    opacity: detail ? 0.9 : 0.74,
+    weight: detail ? (hasScore ? 3 : 2.5) : hasScore ? 2.25 : 1.75,
+    opacity: 0.92,
     ...(availability === 'BLOCKED' ? { dashArray: '7 5' } : {}),
   };
 }

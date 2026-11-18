@@ -1,16 +1,35 @@
-import { SURFACE_TYPE_OPTIONS, type SurfaceType } from '../../api/roadInformationTypes.js';
+import {
+  SURFACE_TYPE_OPTIONS,
+  type SurfaceCondition,
+  type SurfaceType,
+} from '../../api/roadInformationTypes.js';
+
+export function surfaceConditionDashArray(condition: SurfaceCondition | null): string {
+  switch (condition) {
+    case 'GOOD':
+      return '';
+    case 'REGULAR':
+      return '8 4';
+    case 'POOR':
+      return '4 3';
+    case 'VERY_POOR':
+      return '1 3';
+    default:
+      return '2 4';
+  }
+}
 
 export function roadSurfaceLineStyle(
-  surfaceType: SurfaceType,
+  surfaceType: SurfaceType | null,
   zoom: number,
-  condition: string | null,
+  condition: SurfaceCondition | null,
 ) {
   const surface = SURFACE_TYPE_OPTIONS.find((item) => item.value === surfaceType);
-  const poorCondition = condition === 'POOR' || condition === 'VERY_POOR';
+  const dashArray = surfaceConditionDashArray(condition);
   return {
-    color: surface?.color ?? '#65756b',
-    weight: zoom >= 17 ? (poorCondition ? 7 : 5) : 3.5,
-    opacity: 0.92,
-    ...(surface?.dashArray ? { dashArray: surface.dashArray } : {}),
+    color: surface?.color ?? '#7b8490',
+    weight: zoom >= 17 ? 6 : 4.5,
+    opacity: 0.9,
+    ...(dashArray ? { dashArray } : {}),
   };
 }

@@ -1,11 +1,11 @@
 export const STREET_CONDITION_LEVELS = [
-  { value: 'EXCELLENT', label: 'Excelente', range: '90–100', color: '#76bd83' },
-  { value: 'GOOD', label: 'Buena', range: '75–89', color: '#76bd83' },
-  { value: 'ACCEPTABLE', label: 'Aceptable', range: '60–74', color: '#e8c84b' },
-  { value: 'UNCOMFORTABLE', label: 'Incómoda', range: '45–59', color: '#eb963f' },
-  { value: 'BAD', label: 'Mala', range: '30–44', color: '#d95a45' },
-  { value: 'VERY_BAD', label: 'Muy mala', range: '15–29', color: '#d95a45' },
-  { value: 'CRITICAL', label: 'Crítica', range: '0–14', color: '#d95a45' },
+  { value: 'EXCELLENT', label: 'Excelente', range: '90–100', color: '#6f9f78' },
+  { value: 'GOOD', label: 'Buena', range: '75–89', color: '#6f9f78' },
+  { value: 'ACCEPTABLE', label: 'Aceptable', range: '60–74', color: '#c8ae55' },
+  { value: 'UNCOMFORTABLE', label: 'Incómoda', range: '45–59', color: '#cc8654' },
+  { value: 'BAD', label: 'Mala', range: '30–44', color: '#c66a5e' },
+  { value: 'VERY_BAD', label: 'Muy mala', range: '15–29', color: '#c66a5e' },
+  { value: 'CRITICAL', label: 'Crítica', range: '0–14', color: '#c66a5e' },
 ] as const;
 
 export type StreetScoreLevel = (typeof STREET_CONDITION_LEVELS)[number]['value'];

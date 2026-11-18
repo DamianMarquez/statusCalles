@@ -94,6 +94,7 @@ describe('MapLayerControls', () => {
       />,
     );
     fireEvent.click(screen.getByText(/Más filtros/));
+    expect(screen.getByText('Condición del pavimento')).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Pavimento'));
     expect(onSurfaceChange).toHaveBeenCalledWith(false);
     fireEvent.click(screen.getByLabelText('Adoquín de granito'));

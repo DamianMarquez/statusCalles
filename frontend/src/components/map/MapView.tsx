@@ -183,7 +183,7 @@ export default function MapView({
   const [scoreRefreshKey, setScoreRefreshKey] = useState(0);
   const [reportsLayerVisible, setReportsLayerVisible] = useState(true);
   const [conditionLayerVisible, setConditionLayerVisible] = useState(true);
-  const [surfaceLayerVisible, setSurfaceLayerVisible] = useState(false);
+  const [surfaceLayerVisible, setSurfaceLayerVisible] = useState(true);
   const [surfaceTypes, setSurfaceTypes] = useState<SurfaceType[] | null>(null);
   const [surfaceConditions, setSurfaceConditions] = useState<SurfaceCondition[] | null>(null);
   const [surfaceTreatments, setSurfaceTreatments] = useState<SpecialTreatment[] | null>(null);

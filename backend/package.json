@@ -21,6 +21,7 @@
     "sync:caba:ciclovias": "tsx src/infrastructure/external/caba/mobility-import-cli.ts ciclovias",
     "sync:caba:metrobus": "tsx src/infrastructure/external/caba/mobility-import-cli.ts metrobus",
     "sync:caba:metrobus-stops": "tsx src/infrastructure/external/caba/mobility-import-cli.ts metrobusStops",
+    "seed:lab": "tsx src/infrastructure/database/seed-lab-reports.ts",
     "sync:caba:infrastructure": "tsx src/infrastructure/external/caba/mobility-import-cli.ts all"
   },
   "dependencies": {
