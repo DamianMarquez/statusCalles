@@ -4,13 +4,8 @@ import { getAnalyticsDashboard } from '../../api/analyticsApi.js';
 import { AnalyticsDashboard } from './AnalyticsDashboard.js';
 
 vi.mock('../../api/analyticsApi.js', () => ({ getAnalyticsDashboard: vi.fn() }));
-vi.mock('react-leaflet', () => ({
-  MapContainer: ({ children }: { children: React.ReactNode }) => (
-    <div aria-label="Mapa de concentración">{children}</div>
-  ),
-  TileLayer: () => <span>OpenStreetMap</span>,
-  CircleMarker: () => null,
-  Popup: () => null,
+vi.mock('./AnalyticsHeatMap.js', () => ({
+  AnalyticsHeatMap: () => <div aria-label="Mapa de concentración" />,
 }));
 
 const payload = {
@@ -108,7 +103,7 @@ describe('AnalyticsDashboard', () => {
     expect(screen.getAllByText('Avenida Ejemplo')).toHaveLength(2);
     expect(screen.getByText('Infraestructura cargada')).toBeInTheDocument();
     expect(screen.getByText(/no disponibles/)).toBeInTheDocument();
-    expect(screen.getByText('OpenStreetMap')).toBeInTheDocument();
+    expect(screen.getByLabelText('Mapa de concentración')).toBeInTheDocument();
   });
 
   it('reloads the analytics after changing the time range', async () => {

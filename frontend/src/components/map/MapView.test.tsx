@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
   getReportsInViewport: vi.fn(),
   createReport: vi.fn(),
   submitReportFeedback: vi.fn(),
-  mapEvents: {} as Record<string, (event: { latlng: { lat: number; lng: number } }) => void>,
+  focusMap: vi.fn(),
+  mapEvents: {} as Record<string, (event: { lat: number; lng: number }) => void>,
   map: {
     getBounds: () => ({
       getSouth: () => -34.7,
@@ -17,7 +18,6 @@ const mocks = vi.hoisted(() => ({
       getEast: () => -58.3,
     }),
     getZoom: () => 13,
-    setView: vi.fn(),
   },
 }));
 
@@ -26,29 +26,24 @@ vi.mock('../../api/reportsApi.js', () => ({
   createReport: mocks.createReport,
   submitReportFeedback: mocks.submitReportFeedback,
 }));
-vi.mock('leaflet', () => ({
-  divIcon: (options: unknown) => options,
-}));
-vi.mock('react-leaflet', async () => {
+vi.mock('./StreetScoreLayer.js', () => ({ StreetScoreLayer: () => null }));
+vi.mock('./maplibre/mapLibre.js', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
   return {
-    MapContainer: ({ children }: React.PropsWithChildren) =>
+    MapCanvas: ({ children }: React.PropsWithChildren) =>
       React.createElement(
         'div',
         {
           'data-testid': 'map',
-          onClick: () => mocks.mapEvents.click?.({ latlng: { lat: -34.6037, lng: -58.3816 } }),
+          onClick: () => mocks.mapEvents.click?.({ lat: -34.6037, lng: -58.3816 }),
         },
         children,
       ),
-    Marker: ({ children }: React.PropsWithChildren) =>
-      React.createElement('div', { 'data-testid': 'marker' }, children),
-    GeoJSON: () => React.createElement('div', { 'data-testid': 'geojson-layer' }),
-    Popup: ({ children }: React.PropsWithChildren) => React.createElement('div', null, children),
-    Rectangle: ({ children }: React.PropsWithChildren) =>
-      React.createElement('div', null, children),
-    TileLayer: () => null,
-    useMap: () => mocks.map,
+    MapMarker: ({ popup }: { popup?: React.ReactNode }) =>
+      React.createElement('div', { 'data-testid': 'marker' }, popup),
+    MapPopup: ({ children }: React.PropsWithChildren) => React.createElement('div', null, children),
+    focusMap: mocks.focusMap,
+    useMapInstance: () => mocks.map,
     useMapEvents: (handlers: typeof mocks.mapEvents) => {
       Object.assign(mocks.mapEvents, handlers);
       return mocks.map;
@@ -181,9 +176,7 @@ describe('MapView report creation', () => {
     expect(
       await screen.findByText(/Mostrando todos los reportes disponibles · 1 en esta zona/),
     ).toBeInTheDocument();
-    await waitFor(() =>
-      expect(mocks.map.setView).toHaveBeenCalledWith([-34.6037, -58.3816], 16, { animate: true }),
-    );
+    await waitFor(() => expect(mocks.focusMap).toHaveBeenCalledWith(mocks.map, -34.6037, -58.3816));
   });
 
   it('shows a backend error and lets the user keep editing the report', async () => {

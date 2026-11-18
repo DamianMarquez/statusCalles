@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { divIcon } from 'leaflet';
-import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import {
+  focusMap,
+  MapCanvas,
+  MapMarker,
+  useMapEvents,
+  useMapInstance,
+} from './maplibre/mapLibre.js';
 import { createReport, flagReport } from '../../api/reportsApi.js';
 import type { ReportFlagReason } from '../../api/reportsApi.js';
 import type {
@@ -11,7 +16,6 @@ import type {
 } from '../../api/reportTypes.js';
 import { submitReportFeedback } from '../../api/reportsApi.js';
 import { GeolocationError, requestUserLocation } from './geolocation.js';
-import { mapConfig } from './mapConfig.js';
 import { ReportForm } from './ReportForm.js';
 import { ReportLocationPicker } from './ReportLocationPicker.js';
 import { ReportMarker } from './ReportMarker.js';
@@ -20,7 +24,6 @@ import type { StreetConditionFeature } from '../../api/streetScoreTypes.js';
 import { RoadInformationPanel } from './RoadInformationPanel.js';
 import { useViewportReports } from './useViewportReports.js';
 import type { UserLocation } from './types.js';
-import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../../auth/AuthContext.js';
 import type { AddressSearchResult } from '../../api/addressesApi.js';
 import { MapFilters } from './MapFilters.js';
@@ -35,14 +38,7 @@ import type {
   SurfaceType,
 } from '../../api/roadInformationTypes.js';
 
-const currentLocationIcon = divIcon({
-  className: 'user-marker-wrapper',
-  html: '<span class="user-marker" aria-hidden="true"><span></span></span>',
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
-});
-
-function readViewportBounds(map: ReturnType<typeof useMap>): ViewportBounds {
+function readViewportBounds(map: ReturnType<typeof useMapInstance>): ViewportBounds {
   const bounds = map.getBounds();
   return {
     south: bounds.getSouth(),
@@ -69,35 +65,29 @@ function ViewportReports({
 }
 
 function LocationFocus({ location }: { location: UserLocation }) {
-  const map = useMap();
+  const map = useMapInstance();
   useEffect(() => {
-    map.setView([location.latitude, location.longitude], Math.max(map.getZoom(), 16), {
-      animate: true,
-    });
+    focusMap(map, location.latitude, location.longitude);
   }, [location.latitude, location.longitude, map]);
   return null;
 }
 
 function ReportFocus({ location }: { location: UserLocation | null }) {
-  const map = useMap();
+  const map = useMapInstance();
   useEffect(() => {
-    if (location) {
-      map.setView([location.latitude, location.longitude], Math.max(map.getZoom(), 16), {
-        animate: true,
-      });
-    }
+    if (location) focusMap(map, location.latitude, location.longitude);
   }, [location, map]);
   return null;
 }
 
 function MapQueryFocus() {
-  const map = useMap();
+  const map = useMapInstance();
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const latitude = Number(params.get('focusLat'));
     const longitude = Number(params.get('focusLng'));
     if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-      map.setView([latitude, longitude], Math.max(map.getZoom(), 16), { animate: true });
+      focusMap(map, latitude, longitude);
     }
   }, [map]);
   return null;
@@ -396,17 +386,7 @@ export default function MapView({
       className={`map-stage${isPickingReportLocation ? ' map-stage--picking' : ''}`}
       aria-label="Mapa de calles de Buenos Aires"
     >
-      <MapContainer
-        center={mapConfig.center}
-        zoom={mapConfig.zoom}
-        minZoom={mapConfig.minZoom}
-        maxZoom={mapConfig.maxZoom}
-        maxBounds={mapConfig.maxBounds}
-        maxBoundsViscosity={0.8}
-        scrollWheelZoom
-        className="street-map"
-      >
-        <TileLayer url={mapConfig.tileUrl} attribution={mapConfig.tileAttribution} />
+      <MapCanvas className="street-map">
         <ViewportReports onViewportChange={handleViewportChange} />
         <MapQueryFocus />
         {(conditionLayerVisible || surfaceLayerVisible) && (
@@ -457,16 +437,18 @@ export default function MapView({
         {userLocation && (
           <>
             <LocationFocus location={userLocation} />
-            <Marker
+            <MapMarker
               position={[userLocation.latitude, userLocation.longitude]}
-              icon={currentLocationIcon}
-              zIndexOffset={1000}
-            >
-              <Popup>Mi ubicación</Popup>
-            </Marker>
+              className="user-marker-wrapper"
+              html='<span class="user-marker" aria-hidden="true"><span></span></span>'
+              size={[28, 28]}
+              anchor="center"
+              zIndex={1000}
+              popup="Mi ubicación"
+            />
           </>
         )}
-      </MapContainer>
+      </MapCanvas>
       {selectedRoadSegment && (
         <>
           <button

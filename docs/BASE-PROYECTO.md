@@ -8,14 +8,14 @@ App para consultar y reportar el estado de las calles de CABA. Dominio público:
 
 ## 2. Stack y arquitectura
 
-| Capa | Tecnología |
-| --- | --- |
-| Monorepo | npm workspaces (`frontend`, `backend`), TypeScript estricto, ESLint, Prettier, Vitest |
-| Frontend | React 19, Vite 6, Leaflet / react-leaflet, tiles OpenStreetMap |
-| Backend | Fastify 5, Drizzle ORM, `pg`, `@fastify/cookie`, `@fastify/cors`, `@fastify/rate-limit` |
-| Datos | PostgreSQL + PostGIS (`postgis/postgis:16-3.4` local, Supabase en `.env`) |
+| Capa          | Tecnología                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------- |
+| Monorepo      | npm workspaces (`frontend`, `backend`), TypeScript estricto, ESLint, Prettier, Vitest                         |
+| Frontend      | React 19, Vite 6, MapLibre GL (migrado desde Leaflet; estilo vía `VITE_MAP_STYLE_URL`)                        |
+| Backend       | Fastify 5, Drizzle ORM, `pg`, `@fastify/cookie`, `@fastify/cors`, `@fastify/rate-limit`                       |
+| Datos         | PostgreSQL + PostGIS (`postgis/postgis:16-3.4` local, Supabase en `.env`)                                     |
 | Integraciones | USIG (normalizador de direcciones), datasets abiertos de CABA (calles, barrios, comunas, ciclovías, Metrobus) |
-| Deploy | Plesk (frontend estático + backend Node), con restos de Vercel (`vercel.json`, `backend/api/[...path].ts`) |
+| Deploy        | Plesk (frontend estático + backend Node), con restos de Vercel (`vercel.json`, `backend/api/[...path].ts`)    |
 
 El backend es un monolito modular por capas: `modules/<dominio>/{domain,application,http}` más `infrastructure/{database,external}`.
 
@@ -40,13 +40,13 @@ Dominios: `reports`, `streets` (score, catálogo, información vial), `users`/au
 
 ## 3. Estado de salud (verificado hoy)
 
-| Chequeo | Resultado |
-| --- | --- |
-| Typecheck backend y frontend | OK |
-| ESLint | OK |
-| Tests frontend | 85/85 OK |
-| Tests backend | 82 OK, **41 omitidos**, 4 archivos fallan |
-| Causa de las fallas backend | Los tests de integración apuntan a la DB de Supabase de `.env` y esta responde `tenant/user ... not found` (proyecto pausado, borrado o credenciales viejas) |
+| Chequeo                      | Resultado                                                                                                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Typecheck backend y frontend | OK                                                                                                                                                           |
+| ESLint                       | OK                                                                                                                                                           |
+| Tests frontend               | 85/85 OK                                                                                                                                                     |
+| Tests backend                | 82 OK, **41 omitidos**, 4 archivos fallan                                                                                                                    |
+| Causa de las fallas backend  | Los tests de integración apuntan a la DB de Supabase de `.env` y esta responde `tenant/user ... not found` (proyecto pausado, borrado o credenciales viejas) |
 
 Conclusión: el código compila y la lógica pura está testeada, pero **hoy no se puede validar nada que toque la base** (reportes, scoring con PostGIS, información vial, importadores).
 
@@ -81,13 +81,13 @@ Trabajo sin commitear: 15 archivos modificados sobre la capa de estilos del mapa
 
 ## 5. Qué cambiar (decisiones abiertas)
 
-| Decisión | Opciones | Impacto |
-| --- | --- | --- |
+| Decisión                  | Opciones                                              | Impacto                                 |
+| ------------------------- | ----------------------------------------------------- | --------------------------------------- |
 | Hosting de backend y base | Plesk + Supabase / Vercel + Supabase / VPS con Docker | Define qué archivos de deploy se borran |
-| Entornos | dev local, test aislado, producción | Evita que los tests toquen datos reales |
-| Tiles del mapa | OSM público / proveedor / autoalojado | Costo y escalabilidad |
-| Calibración del score | Mantener pesos / ajustar con datos reales | Credibilidad del producto |
-| Alcance de fase 2 | Fotos, notificaciones, rutas, reputación | Esquema de datos y almacenamiento |
+| Entornos                  | dev local, test aislado, producción                   | Evita que los tests toquen datos reales |
+| Tiles del mapa            | OSM público / proveedor / autoalojado                 | Costo y escalabilidad                   |
+| Calibración del score     | Mantener pesos / ajustar con datos reales             | Credibilidad del producto               |
+| Alcance de fase 2         | Fotos, notificaciones, rutas, reputación              | Esquema de datos y almacenamiento       |
 
 ## 6. Plan de arranque sugerido
 

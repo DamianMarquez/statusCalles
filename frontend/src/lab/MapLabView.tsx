@@ -19,6 +19,9 @@ import {
   SCORE_RAMP_STOPS,
   scoreColorExpression,
   SEVERITY_COLORS,
+  streetCasingOpacityExpression,
+  streetCasingWidthExpression,
+  streetWidthExpression,
 } from './labConfig.js';
 import {
   createDrawController,
@@ -44,6 +47,8 @@ const DRAW_MODES: { value: DrawMode; label: string }[] = [
   { value: 'point', label: 'Marca' },
   { value: 'linestring', label: 'Línea' },
   { value: 'polygon', label: 'Zona' },
+  { value: 'freehand-linestring', label: 'Línea libre' },
+  { value: 'freehand', label: 'Zona libre' },
 ];
 
 function viewportBounds(map: MapLibreMap): ViewportBounds {
@@ -112,17 +117,38 @@ export default function MapLabView() {
 
     map.on('load', () => {
       map.addSource('streets', { type: 'geojson', data: EMPTY_COLLECTION });
-      map.addLayer({
-        id: 'streets-condition',
-        type: 'line',
-        source: 'streets',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': scoreColorExpression,
-          'line-opacity': 0.92,
-          'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.5, 16, 4, 19, 8],
+      // Debajo de las etiquetas del mapa base, para que los nombres de calles se lean sobre el color.
+      const beforeId = map.getStyle().layers.find((layer) => layer.type === 'symbol')?.id;
+      map.addLayer(
+        {
+          id: 'streets-casing',
+          type: 'line',
+          source: 'streets',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#ffffff',
+            'line-opacity': streetCasingOpacityExpression,
+            'line-width': streetCasingWidthExpression,
+            'line-blur': 0.6,
+          },
         },
-      });
+        beforeId,
+      );
+      map.addLayer(
+        {
+          id: 'streets-condition',
+          type: 'line',
+          source: 'streets',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': scoreColorExpression,
+            'line-opacity': ['interpolate', ['linear'], ['zoom'], 11, 0.75, 16, 0.95],
+            'line-width': streetWidthExpression,
+            'line-blur': 0.4,
+          },
+        },
+        beforeId,
+      );
       map.addLayer({
         id: 'streets-blocked',
         type: 'line',
@@ -150,14 +176,28 @@ export default function MapLabView() {
         type: 'fill',
         source: 'drawings',
         filter: ['==', ['geometry-type'], 'Polygon'],
-        paint: { 'fill-color': levelColorExpression, 'fill-opacity': 0.35 },
+        paint: { 'fill-color': levelColorExpression, 'fill-opacity': 0.28 },
+      });
+      map.addLayer({
+        id: 'drawings-casing',
+        type: 'line',
+        source: 'drawings',
+        filter: ['in', ['geometry-type'], ['literal', ['LineString', 'Polygon']]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 7.5,
+          'line-opacity': 0.9,
+          'line-blur': 0.5,
+        },
       });
       map.addLayer({
         id: 'drawings-line',
         type: 'line',
         source: 'drawings',
         filter: ['in', ['geometry-type'], ['literal', ['LineString', 'Polygon']]],
-        paint: { 'line-color': levelColorExpression, 'line-width': 5 },
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': levelColorExpression, 'line-width': 4.5 },
       });
       map.addLayer({
         id: 'drawings-point',
@@ -286,7 +326,9 @@ export default function MapLabView() {
       ['all', ['!', ['to-boolean', ['get', 'level']]], levels.includes(NO_DATA)],
     ];
     map.setFilter('streets-condition', levelFilter);
+    map.setFilter('streets-casing', levelFilter);
     map.setLayoutProperty('streets-condition', 'visibility', generalVisible ? 'visible' : 'none');
+    map.setLayoutProperty('streets-casing', 'visibility', generalVisible ? 'visible' : 'none');
     map.setLayoutProperty('streets-blocked', 'visibility', generalVisible ? 'visible' : 'none');
     applyReports(map, measures);
   }, [ready, measures, levels]);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { LatLng } from 'leaflet';
-import { GeoJSON, Popup, useMap, useMapEvents } from 'react-leaflet';
+import type { FilterSpecification, GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
+import type { FeatureCollection } from 'geojson';
 import { getStreetConditionInViewport } from '../../api/streetsApi.js';
 import type {
   StreetConditionFeature,
@@ -9,13 +9,22 @@ import type {
 } from '../../api/streetScoreTypes.js';
 import type { ViewportBounds } from '../../api/reportTypes.js';
 import { streetConditionLevel } from './streetConditionCatalog.js';
-import { streetConditionLineStyle } from './streetConditionStyle.js';
 import { STREET_ROAD_CLASS_OPTIONS } from './streetRoadClassCatalog.js';
-import { roadSurfaceLineStyle } from './roadSurfaceStyle.js';
-import type {
-  SurfaceCondition,
-  SurfaceType,
-  SpecialTreatment,
+import { surfaceConditionDashPattern } from './roadSurfaceStyle.js';
+import {
+  NO_DATA_COLOR,
+  scoreColorExpression,
+  streetCasingOpacityExpression,
+  streetCasingWidthExpression,
+  streetSurfaceWidthExpression,
+  streetWidthExpression,
+} from './streetLayerStyle.js';
+import { focusMap, MapPopup, useMapEvents, useMapInstance } from './maplibre/mapLibre.js';
+import {
+  SURFACE_TYPE_OPTIONS,
+  type SurfaceCondition,
+  type SurfaceType,
+  type SpecialTreatment,
 } from '../../api/roadInformationTypes.js';
 
 const vehicleInterpretations = {
@@ -26,7 +35,32 @@ const vehicleInterpretations = {
   Rally: 'Analogía recreativa basada en reportes; no habilita ni recomienda circular.',
 } as const;
 
-function currentBounds(map: ReturnType<typeof useMap>): ViewportBounds {
+const STREETS_SOURCE = 'street-score';
+const SURFACE_SOURCE = 'street-surface';
+const SURFACE_CONDITIONS: (SurfaceCondition | 'OTHER')[] = [
+  'GOOD',
+  'REGULAR',
+  'POOR',
+  'VERY_POOR',
+  'OTHER',
+];
+const SURFACE_LAYER_IDS = SURFACE_CONDITIONS.map((condition) => `street-surface-${condition}`);
+const STREET_LAYER_IDS = [
+  'street-score-casing',
+  'street-score-line',
+  'street-score-blocked',
+  ...SURFACE_LAYER_IDS,
+  'street-score-hit',
+];
+
+const surfaceColorExpression = [
+  'match',
+  ['get', 'surfaceType'],
+  ...SURFACE_TYPE_OPTIONS.flatMap((item) => [item.value, item.color]),
+  NO_DATA_COLOR,
+] as unknown as import('maplibre-gl').ExpressionSpecification;
+
+function currentBounds(map: MapLibreMap): ViewportBounds {
   const bounds = map.getBounds();
   return {
     south: bounds.getSouth(),
@@ -44,6 +78,30 @@ function confidenceLabel(confidence: string | null) {
       : confidence === 'LOW'
         ? 'baja'
         : 'sin datos';
+}
+
+/** Propiedades planas para pintar; el detalle completo se consulta por id al hacer clic. */
+function toStreetCollection(data: StreetConditionFeatureCollection): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: data.features.map((feature) => ({
+      type: 'Feature' as const,
+      geometry: feature.geometry,
+      properties: {
+        id: feature.properties.id,
+        level: feature.properties.level,
+        score: feature.properties.score,
+        hasEvidence: feature.properties.hasEvidence === true,
+        roadClass: feature.properties.roadClass,
+        availabilityStatus: feature.properties.availability?.status ?? 'UNKNOWN',
+      },
+    })),
+  } as FeatureCollection;
+}
+
+function levelFilter(levels: string[] | null | undefined): FilterSpecification | null {
+  if (levels === null || levels === undefined) return null;
+  return ['in', ['get', 'level'], ['literal', levels]];
 }
 
 export function StreetScoreLayer({
@@ -71,22 +129,28 @@ export function StreetScoreLayer({
   onRoadSegmentSelected: (feature: StreetConditionFeature) => void;
   onViewStreetReports: (streetId: string, streetName: string) => void;
 }) {
-  const map = useMap();
+  const map = useMapInstance();
   const [data, setData] = useState<StreetConditionFeatureCollection>({
     type: 'FeatureCollection',
     features: [],
   });
-  const [dataRevision, setDataRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [vehicleMode, setVehicleMode] = useState<keyof typeof vehicleInterpretations>('Auto común');
   const [selected, setSelected] = useState<{
     feature: StreetConditionFeature;
-    position: LatLng;
+    position: [number, number];
   } | null>(null);
   const activeController = useRef<AbortController | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sequence = useRef(0);
+  const featuresById = useRef(new Map<string, StreetConditionFeature>());
+  const selectingRef = useRef(selectingRoadSegment);
+  const onSelectedRef = useRef(onRoadSegmentSelected);
+  useEffect(() => {
+    selectingRef.current = selectingRoadSegment;
+    onSelectedRef.current = onRoadSegmentSelected;
+  });
   const levelKey = levels?.join(',') ?? '';
   const roadClassKey = roadClasses.join(',');
   const surfaceTypeKey = surfaceTypes?.join(',') ?? '';
@@ -110,10 +174,10 @@ export function StreetScoreLayer({
           controller.signal,
         );
         if (requestNumber !== sequence.current || controller.signal.aborted) return;
+        featuresById.current = new Map(
+          result.features.map((feature) => [feature.properties.id, feature]),
+        );
         setData(result);
-        // react-leaflet's GeoJSON layer does not apply changed `data` props to
-        // an existing Leaflet layer, so remount it after each successful fetch.
-        setDataRevision((revision) => revision + 1);
         setError(false);
       } catch {
         if (requestNumber !== sequence.current || controller.signal.aborted) return;
@@ -126,7 +190,7 @@ export function StreetScoreLayer({
 
   useMapEvents({ moveend: request, zoomend: request });
   useEffect(() => {
-    if (selectingRoadSegment && map.getZoom() < 16) map.setZoom(16);
+    if (selectingRoadSegment && map.getZoom() < 16) map.easeTo({ zoom: 16 });
   }, [map, selectingRoadSegment]);
   useEffect(() => {
     request();
@@ -137,96 +201,202 @@ export function StreetScoreLayer({
     };
   }, [request, refreshKey]);
 
+  // Fuentes y capas: se crean una vez y se actualizan por datos y filtros.
+  useEffect(() => {
+    const empty = { type: 'FeatureCollection', features: [] } as FeatureCollection;
+    // Debajo de las etiquetas del mapa base, para que los nombres de calles sigan legibles.
+    const beforeId = map.getStyle().layers.find((layer) => layer.type === 'symbol')?.id;
+    map.addSource(STREETS_SOURCE, { type: 'geojson', data: empty });
+    map.addSource(SURFACE_SOURCE, { type: 'geojson', data: empty });
+    for (const condition of SURFACE_CONDITIONS) {
+      const dash = surfaceConditionDashPattern(condition === 'OTHER' ? null : condition);
+      const known: SurfaceCondition[] = ['GOOD', 'REGULAR', 'POOR', 'VERY_POOR'];
+      const filter: FilterSpecification =
+        condition === 'OTHER'
+          ? ['!', ['in', ['get', 'surfaceCondition'], ['literal', known]]]
+          : ['==', ['get', 'surfaceCondition'], condition];
+      map.addLayer(
+        {
+          id: `street-surface-${condition}`,
+          type: 'line',
+          source: SURFACE_SOURCE,
+          filter,
+          layout: { 'line-cap': condition === 'GOOD' ? 'round' : 'butt', 'line-join': 'round' },
+          paint: {
+            'line-color': surfaceColorExpression,
+            'line-opacity': 0.9,
+            'line-width': streetSurfaceWidthExpression,
+            ...(dash ? { 'line-dasharray': dash } : {}),
+          },
+        },
+        beforeId,
+      );
+    }
+    map.addLayer(
+      {
+        id: 'street-score-casing',
+        type: 'line',
+        source: STREETS_SOURCE,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#ffffff',
+          'line-opacity': streetCasingOpacityExpression,
+          'line-width': streetCasingWidthExpression,
+          'line-blur': 0.6,
+        },
+      },
+      beforeId,
+    );
+    map.addLayer(
+      {
+        id: 'street-score-line',
+        type: 'line',
+        source: STREETS_SOURCE,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': scoreColorExpression,
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 11, 0.75, 16, 0.95],
+          'line-width': streetWidthExpression,
+          'line-blur': 0.4,
+        },
+      },
+      beforeId,
+    );
+    map.addLayer(
+      {
+        id: 'street-score-blocked',
+        type: 'line',
+        source: STREETS_SOURCE,
+        filter: ['==', ['get', 'availabilityStatus'], 'BLOCKED'],
+        paint: { 'line-color': '#222222', 'line-width': 1.5, 'line-dasharray': [2, 2] },
+      },
+      beforeId,
+    );
+    // Capa invisible más ancha: hace que tocar una calle fina sea fácil.
+    map.addLayer(
+      {
+        id: 'street-score-hit',
+        type: 'line',
+        source: STREETS_SOURCE,
+        paint: { 'line-color': '#000000', 'line-opacity': 0, 'line-width': 16 },
+      },
+      beforeId,
+    );
+    return () => {
+      for (const id of STREET_LAYER_IDS) if (map.getLayer(id)) map.removeLayer(id);
+      if (map.getSource(STREETS_SOURCE)) map.removeSource(STREETS_SOURCE);
+      if (map.getSource(SURFACE_SOURCE)) map.removeSource(SURFACE_SOURCE);
+    };
+  }, [map]);
+
+  // Datos de calles.
+  useEffect(() => {
+    (map.getSource(STREETS_SOURCE) as GeoJSONSource | undefined)?.setData(toStreetCollection(data));
+  }, [map, data]);
+
+  // Datos de pavimento: solo tramos con información, filtrados en cliente.
+  useEffect(() => {
+    const features = data.features.filter((feature) => {
+      const info = feature.properties.roadInformation;
+      if (
+        feature.properties.targetType !== 'SEGMENT' ||
+        (!info?.surfaceType && !info?.surfaceCondition)
+      )
+        return false;
+      if (surfaceTypes && (!info.surfaceType || !surfaceTypes.includes(info.surfaceType)))
+        return false;
+      if (
+        surfaceConditions &&
+        (!info.surfaceCondition || !surfaceConditions.includes(info.surfaceCondition))
+      )
+        return false;
+      if (
+        surfaceTreatments &&
+        (!info.specialTreatments ||
+          !info.specialTreatments.some((item: string) =>
+            surfaceTreatments.includes(item as SpecialTreatment),
+          ))
+      )
+        return false;
+      return true;
+    });
+    const collection = {
+      type: 'FeatureCollection',
+      features: features.map((feature) => ({
+        type: 'Feature',
+        geometry: feature.geometry,
+        properties: {
+          id: feature.properties.id,
+          roadClass: feature.properties.roadClass,
+          hasEvidence: feature.properties.hasEvidence === true,
+          surfaceType: feature.properties.roadInformation?.surfaceType ?? null,
+          surfaceCondition: feature.properties.roadInformation?.surfaceCondition ?? null,
+        },
+      })),
+    } as FeatureCollection;
+    (map.getSource(SURFACE_SOURCE) as GeoJSONSource | undefined)?.setData(collection);
+  }, [map, data, surfaceTypeKey, surfaceConditionKey, surfaceTreatmentKey]);
+
+  // Visibilidad y filtros por nivel (sin recargar datos).
+  useEffect(() => {
+    const filter = levelFilter(levels);
+    for (const id of ['street-score-casing', 'street-score-line', 'street-score-blocked']) {
+      if (!map.getLayer(id)) continue;
+      const base: FilterSpecification | null =
+        id === 'street-score-blocked' ? ['==', ['get', 'availabilityStatus'], 'BLOCKED'] : null;
+      const combined = (
+        base && filter ? ['all', base, filter] : (base ?? filter)
+      ) as FilterSpecification | null;
+      map.setFilter(id, combined);
+      // Con pavimento visible la banda de pavimento reemplaza al borde claro.
+      const visible = conditionVisible && !(id === 'street-score-casing' && surfaceVisible);
+      map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+    }
+    for (const id of SURFACE_LAYER_IDS) {
+      if (map.getLayer(id))
+        map.setLayoutProperty(id, 'visibility', surfaceVisible ? 'visible' : 'none');
+    }
+  }, [map, levelKey, levels, conditionVisible, surfaceVisible]);
+
+  // Clic y cursor sobre las calles.
+  useEffect(() => {
+    const onClick = (event: {
+      point: { x: number; y: number };
+      lngLat: { lat: number; lng: number };
+    }) => {
+      const hits = map.queryRenderedFeatures(
+        [event.point.x, event.point.y] as unknown as [number, number],
+        { layers: ['street-score-hit'] },
+      );
+      const id = hits[0]?.properties?.id as string | undefined;
+      const feature = id ? featuresById.current.get(id) : undefined;
+      if (!feature?.properties) return;
+      if (selectingRef.current && feature.properties.targetType === 'SEGMENT') {
+        setSelected(null);
+        onSelectedRef.current(feature);
+      } else setSelected({ feature, position: [event.lngLat.lat, event.lngLat.lng] });
+    };
+    const pointer = () => {
+      map.getCanvas().style.cursor = 'pointer';
+    };
+    const reset = () => {
+      map.getCanvas().style.cursor = '';
+    };
+    map.on('click', onClick);
+    map.on('mouseenter', 'street-score-hit', pointer);
+    map.on('mouseleave', 'street-score-hit', reset);
+    return () => {
+      map.off('click', onClick);
+      map.off('mouseenter', 'street-score-hit', pointer);
+      map.off('mouseleave', 'street-score-hit', reset);
+      reset();
+    };
+  }, [map]);
+
   return (
     <>
-      {surfaceVisible && (
-        <GeoJSON
-          key={`surface:${refreshKey}:${surfaceTypeKey}:${surfaceConditionKey}:${surfaceTreatmentKey}:${dataRevision}`}
-          data={data as never}
-          filter={(feature) => {
-            const properties = feature?.properties;
-            const info = properties?.roadInformation;
-            if (
-              properties?.targetType !== 'SEGMENT' ||
-              (!info?.surfaceType && !info?.surfaceCondition)
-            )
-              return false;
-            if (surfaceTypes && (!info?.surfaceType || !surfaceTypes.includes(info.surfaceType)))
-              return false;
-            if (
-              surfaceConditions &&
-              (!info.surfaceCondition || !surfaceConditions.includes(info.surfaceCondition))
-            )
-              return false;
-            if (
-              surfaceTreatments &&
-              (!info.specialTreatments ||
-                !info.specialTreatments.some((item: string) =>
-                  surfaceTreatments.includes(item as SpecialTreatment),
-                ))
-            )
-              return false;
-            return true;
-          }}
-          style={(feature) =>
-            roadSurfaceLineStyle(
-              (feature?.properties?.roadInformation?.surfaceType as SurfaceType | null) ?? null,
-              map.getZoom(),
-              (feature?.properties?.roadInformation?.surfaceCondition as SurfaceCondition | null) ??
-                null,
-            )
-          }
-          eventHandlers={{
-            click: (event) => {
-              const feature = (
-                event.layer as typeof event.layer & { feature?: StreetConditionFeature }
-              ).feature;
-              if (feature?.properties) {
-                if (selectingRoadSegment && feature.properties.targetType === 'SEGMENT') {
-                  setSelected(null);
-                  map.closePopup();
-                  onRoadSegmentSelected(feature);
-                } else setSelected({ feature, position: event.latlng });
-              }
-            },
-          }}
-        />
-      )}
-      {conditionVisible && (
-        <GeoJSON
-          key={`${refreshKey}:${levelKey}:${roadClassKey}:${dataRevision}`}
-          data={data as never}
-          filter={(feature) =>
-            levels === null ||
-            levels === undefined ||
-            levels.includes(feature?.properties?.condition)
-          }
-          style={(feature) => {
-            const level = (feature?.properties?.condition as string | null) ?? null;
-            return streetConditionLineStyle(
-              level,
-              map.getZoom(),
-              feature?.properties?.availability?.status ?? 'UNKNOWN',
-            );
-          }}
-          eventHandlers={{
-            click: (event) => {
-              const feature = (
-                event.layer as typeof event.layer & { feature?: StreetConditionFeature }
-              ).feature;
-              if (feature?.properties) {
-                if (selectingRoadSegment && feature.properties.targetType === 'SEGMENT') {
-                  setSelected(null);
-                  map.closePopup();
-                  onRoadSegmentSelected(feature);
-                } else setSelected({ feature, position: event.latlng });
-              }
-            },
-          }}
-        />
-      )}
       {selected && (
-        <Popup position={selected.position} eventHandlers={{ remove: () => setSelected(null) }}>
+        <MapPopup position={selected.position} onClose={() => setSelected(null)}>
           <div className="street-score-popup">
             <strong>{selected.feature.properties.streetName}</strong>
             <span>
@@ -280,7 +450,7 @@ export function StreetScoreLayer({
               </>
             ) : (
               <span>
-                Buena por defecto · sin reportes físicos suficientes para calcular un score.
+                Sin datos todavía · no hay reportes físicos suficientes para calcular un score.
               </span>
             )}
             <span>
@@ -310,8 +480,8 @@ export function StreetScoreLayer({
                   selected.feature.properties.streetId,
                   selected.feature.properties.streetName,
                 );
-                map.closePopup();
-                map.setView(selected.position, Math.max(map.getZoom(), 16));
+                setSelected(null);
+                focusMap(map, selected.position[0], selected.position[1]);
               }}
             >
               Ver reportes de esta calle
@@ -321,7 +491,7 @@ export function StreetScoreLayer({
               seguridad.
             </small>
           </div>
-        </Popup>
+        </MapPopup>
       )}
       <div className="street-score-status" aria-live="polite">
         {loading

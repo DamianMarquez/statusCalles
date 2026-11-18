@@ -58,3 +58,43 @@ Opcional: `VITE_MAP_STYLE_URL` en `frontend/.env` con un estilo vectorial (MapTi
 
 - `vite.config.ts` excluye `maplibre-gl` de `optimizeDeps`; sin eso el worker falla en dev.
 - Migrar el mapa principal implicaría ~500 líneas en ~10 archivos (`MapView`, `StreetScoreLayer`, marcadores, `AnalyticsDashboard`, estilos y mocks de tests).
+
+## Alternativas y estilo (fase 3)
+
+"OpenStreetMap" es una fuente de datos, no un motor. La dureza de las líneas venía de cómo se dibujaban y del mapa base raster, no de MapLibre.
+
+| Capa      | Opciones                                                                                                                    |
+| --------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Motor     | MapLibre GL (actual), Mapbox GL (pago), Google Maps JS, deck.gl sobre MapLibre para volúmenes enormes                       |
+| Mapa base | MapTiler (a probar), Stadia (Alidade Smooth), CARTO (Positron/Voyager), Mapbox, Protomaps (PMTiles propio, sin clave), Esri |
+| Datos     | OSM, BA Data, USIG (ya usados)                                                                                              |
+
+De la lista de USIG/Argenmap: casi todo es Leaflet (mismo problema visual) o datos. Útiles: PMTiles con un extracto de CABA como mapa base propio gratis, `@usig-gcba/callejero` y BA Data. Revisar precios y términos de cada proveedor antes de producción.
+
+### Qué se cambió
+
+- Calles: capa de borde claro (`streets-casing`) bajo el color, `line-blur` leve, ancho por zoom y clase vial (PRIMARY > SECONDARY > LOCAL), calles sin datos más finas y sin borde, y capas insertadas bajo las etiquetas del mapa base.
+- Dibujos: modos "Línea libre" y "Zona libre" (Terra Draw freehand); al terminar se simplifica (Douglas-Peucker) y se suaviza (Chaikin) en `frontend/src/lab/smooth.ts`. Líneas con borde y puntas redondas.
+- MapLibre exige que `['zoom']` sea el `interpolate` de nivel superior: los factores de datos van dentro de las salidas (ver `zoomScaled` en `labConfig.ts`).
+
+### Sin verificar
+
+- Trazo libre real con mouse (se probó con 4 puntos, que salió curvo).
+- Posible angulosidad por la simplificación del servidor a zoom medio.
+
+### MapTiler probado
+
+- La clave va en `frontend/.env.local` (ignorado por git) como `VITE_MAP_STYLE_URL`. Se compararon `streets-v2` (beige, más cargado) y `dataviz` (gris claro, pensado para superponer datos). **`dataviz` es el elegido**: los colores de puntaje resaltan y las etiquetas se leen sobre ellos.
+- Pendiente: las calles grises (sin datos) se confunden con las calles grises del mapa base; probar un gris más claro o ocultarlas por defecto.
+
+## Migración al mapa principal
+
+El mapa principal (`/`) ya usa MapLibre; Leaflet, react-leaflet y @types/leaflet se eliminaron.
+
+- Capa compartida: `frontend/src/components/map/maplibre/mapLibre.tsx` (`MapCanvas`, `MapMarker`, `MapPopup`, `useMapEvents`, `focusMap`). Los popups conservan contenido React mediante portales.
+- Estilo de calles compartido: `frontend/src/components/map/streetLayerStyle.ts` (degradado por puntaje, gris sin datos, borde, ancho por clase vial). `StreetScoreLayer.tsx` usa una capa invisible más ancha para facilitar el clic.
+- Pavimento: una capa por condición (continua o con guiones), debajo del color de la calle.
+- Analytics: `AnalyticsHeatMap.tsx` reemplaza el mapa de calor de Leaflet.
+- Los colores de los niveles de `streetConditionCatalog.ts` ahora coinciden con el degradado.
+- El lab (`/?lab=1`) sigue para el dibujo (marcas, líneas, zonas), que aún no está en el mapa principal.
+- Producción: definir `VITE_MAP_STYLE_URL` al compilar el frontend (ver `docs/plesk-configuracion.md`).

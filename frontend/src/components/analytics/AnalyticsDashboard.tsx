@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CircleMarker, MapContainer, Popup, TileLayer } from 'react-leaflet';
+import { AnalyticsHeatMap } from './AnalyticsHeatMap.js';
 import {
   getAnalyticsDashboard,
   type AnalyticsOverview,
@@ -256,37 +256,10 @@ export function AnalyticsDashboard() {
                   <span>GEOGRAFÍA</span>
                   <h2>Concentración de reportes</h2>
                 </div>
-                <small>Cuadrículas agregadas · OpenStreetMap</small>
+                <small>Cuadrículas agregadas</small>
               </div>
               <div className="analytics-heatmap">
-                <MapContainer
-                  center={[-34.6037, -58.3816]}
-                  zoom={11}
-                  scrollWheelZoom={false}
-                  zoomControl={true}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  {data.heatmap.map((cell, index) => (
-                    <CircleMarker
-                      key={`${cell.latitude}:${cell.longitude}:${index}`}
-                      center={[cell.latitude, cell.longitude]}
-                      radius={Math.min(22, 6 + Math.sqrt(cell.reports) * 3)}
-                      pathOptions={{
-                        color: '#b74429',
-                        fillColor: '#e66b45',
-                        fillOpacity: 0.45,
-                        weight: 1,
-                      }}
-                    >
-                      <Popup>
-                        {cell.reports} reportes · {cell.high_severity} de alta severidad
-                      </Popup>
-                    </CircleMarker>
-                  ))}
-                </MapContainer>
+                <AnalyticsHeatMap cells={data.heatmap} />
               </div>
             </section>
             <section className="analytics-card">

@@ -1,14 +1,18 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import {
   TerraDraw,
+  TerraDrawFreehandLineStringMode,
+  TerraDrawFreehandMode,
   TerraDrawLineStringMode,
   TerraDrawPointMode,
   TerraDrawPolygonMode,
 } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
+import { smoothGeometry } from './smooth.js';
 
-export type DrawMode = 'none' | 'point' | 'linestring' | 'polygon';
+export type DrawMode =
+  'none' | 'point' | 'linestring' | 'polygon' | 'freehand-linestring' | 'freehand';
 
 export interface DrawnProperties {
   level: string;
@@ -24,13 +28,19 @@ export type DrawnFeature = Feature<Geometry, DrawnProperties>;
 export function createDrawController(map: MapLibreMap, onFinish: (geometry: Geometry) => void) {
   const draw = new TerraDraw({
     adapter: new TerraDrawMapLibreGLAdapter({ map }),
-    modes: [new TerraDrawPointMode(), new TerraDrawLineStringMode(), new TerraDrawPolygonMode()],
+    modes: [
+      new TerraDrawPointMode(),
+      new TerraDrawLineStringMode(),
+      new TerraDrawPolygonMode(),
+      new TerraDrawFreehandLineStringMode(),
+      new TerraDrawFreehandMode(),
+    ],
   });
   draw.start();
   draw.on('finish', (id) => {
     const feature = draw.getSnapshot().find((candidate) => candidate.id === id);
     if (!feature) return;
-    onFinish(feature.geometry as Geometry);
+    onFinish(smoothGeometry(feature.geometry as Geometry));
     draw.removeFeatures([id]);
   });
   return {

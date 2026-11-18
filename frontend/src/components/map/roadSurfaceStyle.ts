@@ -33,3 +33,19 @@ export function roadSurfaceLineStyle(
     ...(dashArray ? { dashArray } : {}),
   };
 }
+
+/** Patrón de guiones para MapLibre (múltiplos del ancho de línea); null = línea continua. */
+export function surfaceConditionDashPattern(condition: SurfaceCondition | null): number[] | null {
+  switch (condition) {
+    case 'GOOD':
+      return null;
+    case 'REGULAR':
+      return [2, 1];
+    case 'POOR':
+      return [1, 0.8];
+    case 'VERY_POOR':
+      return [0.2, 1.2];
+    default:
+      return [0.5, 1];
+  }
+}

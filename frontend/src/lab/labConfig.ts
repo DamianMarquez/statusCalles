@@ -73,3 +73,46 @@ export const scoreColorExpression = [
 ] as unknown as import('maplibre-gl').ExpressionSpecification;
 
 export const NO_DATA_COLOR = NO_STREET_CONDITION_COLOR;
+
+const evidenceFactor = ['case', ['==', ['get', 'hasEvidence'], true], 1, 0.55];
+const roadClassFactor = ['match', ['get', 'roadClass'], 'PRIMARY', 1.5, 'SECONDARY', 1.2, 1];
+const ZOOM_WIDTHS: [number, number][] = [
+  [11, 1.2],
+  [14, 2.4],
+  [16, 4.5],
+  [19, 10],
+];
+
+type Expression = import('maplibre-gl').ExpressionSpecification;
+
+/** MapLibre exige que el zoom sea el `interpolate` de nivel superior; el resto va en las salidas. */
+function zoomScaled(output: (base: number) => unknown): Expression {
+  return [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    ...ZOOM_WIDTHS.flatMap(([zoom, base]) => [zoom, output(base)]),
+  ] as unknown as Expression;
+}
+
+/** Ancho: zoom x clase vial x evidencia (las calles sin datos son más finas). */
+export const streetWidthExpression = zoomScaled((base) => [
+  '*',
+  roadClassFactor,
+  evidenceFactor,
+  base,
+]);
+
+/** Borde claro bajo el color. */
+export const streetCasingWidthExpression = zoomScaled((base) => [
+  '+',
+  ['*', roadClassFactor, base],
+  2.2,
+]);
+
+export const streetCasingOpacityExpression = [
+  'case',
+  ['==', ['get', 'hasEvidence'], true],
+  0.85,
+  0,
+] as unknown as Expression;

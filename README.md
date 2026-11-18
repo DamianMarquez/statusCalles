@@ -4,7 +4,7 @@ MVP para consultar y reportar problemas de circulación en calles de la Ciudad A
 
 ## Alcance actual
 
-- Mapa interactivo de CABA con Leaflet y OpenStreetMap, marcador de ubicación del usuario y reportes cargados desde la API según el viewport visible.
+- Mapa interactivo de CABA con MapLibre GL (mapa base vectorial configurable con `VITE_MAP_STYLE_URL`, por defecto OpenStreetMap raster), marcador de ubicación del usuario y reportes cargados desde la API según el viewport visible.
 - Creación de reportes desde el mapa con selección de ubicación, validación y envío a la API.
 - Confirmaciones comunitarias por reporte; cada usuario puede confirmar o indicar que ya no existe, y cambiar su voto.
 - Registro, ingreso, cierre de sesión y perfil con sesión persistida y cookie protegida.
@@ -198,11 +198,11 @@ Las queries limitan resultados en SQL, parametrizan filtros y usan PostGIS para 
 
 El backend conserva `GET /api/addresses/search?q=corrientes%20y%20callao`. El formulario de reportes permite buscar una dirección como ayuda para ubicar el punto; la persona puede seguir marcándolo manualmente en el mapa. El endpoint usa el normalizador USIG de CABA, valida las respuestas y limita las consultas. La UI no incluye planificación de rutas.
 
-El mapa utiliza Leaflet y tiles de OpenStreetMap de forma independiente. OSRM no se usa para dibujar el mapa ni para consultar calles, reportes o scores.
+El mapa utiliza MapLibre GL con el estilo de `VITE_MAP_STYLE_URL` (o tiles de OpenStreetMap si no se define) de forma independiente. OSRM no se usa para dibujar el mapa ni para consultar calles, reportes o scores.
 
 ## Geografía oficial de CABA
 
-La app mantiene su base cartográfica propia en PostgreSQL/PostGIS y conserva Leaflet/OpenStreetMap para renderizar los tiles. La fuente oficial es Buenos Aires Data, bajo licencia CC-BY-2.5-AR: [Calles](https://data.buenosaires.gob.ar/dataset/calles), [Barrios](https://data.buenosaires.gob.ar/dataset/barrios) y [Comunas](https://data.buenosaires.gob.ar/dataset/comunas).
+La app mantiene su base cartográfica propia en PostgreSQL/PostGIS y usa MapLibre GL para renderizar el mapa; los tiles dependen del estilo configurado. La fuente oficial es Buenos Aires Data, bajo licencia CC-BY-2.5-AR: [Calles](https://data.buenosaires.gob.ar/dataset/calles), [Barrios](https://data.buenosaires.gob.ar/dataset/barrios) y [Comunas](https://data.buenosaires.gob.ar/dataset/comunas).
 
 El Callejero inspeccionado contiene registros lineales con `id` de tramo, `codigo` de calle, `nomoficial`, geometría GeoJSON `LineString`, alturas, sentido, barrio y comuna. Por eso `StreetSegment` conserva cada tramo publicado por GCBA y `Street` agrupa por `codigo` y nombre oficial normalizado; no se cortan geometrías artificialmente. Los barrios publican polígonos con `id`, `nombre` y `comuna`; las comunas publican el número y su geometría. Los adaptadores del formato original están aislados en `backend/src/infrastructure/external/caba`; el dominio recibe nombres normalizados y GeoJSON de líneas o polígonos.
 

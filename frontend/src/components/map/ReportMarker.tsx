@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { divIcon } from 'leaflet';
-import { Marker, Popup } from 'react-leaflet';
+import { MapMarker } from './maplibre/mapLibre.js';
 import type { ReportDto, ReportFeedbackType } from '../../api/reportTypes.js';
 import type { ReportFlagReason } from '../../api/reportsApi.js';
 import { ReportMarkerPopup } from './ReportMarkerPopup.js';
@@ -9,16 +8,6 @@ import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
 const markerClasses = Object.fromEntries(
   REPORT_TYPE_OPTIONS.map((option) => [option.value, option.markerClass]),
 ) as Record<ReportDto['type'], string>;
-
-function createReportIcon(type: ReportDto['type']) {
-  return divIcon({
-    className: 'report-marker-wrapper',
-    html: `<span class="report-marker report-marker--${markerClasses[type]}" aria-hidden="true"></span>`,
-    iconSize: [32, 38],
-    iconAnchor: [16, 34],
-    popupAnchor: [0, -32],
-  });
-}
 
 export function ReportMarker({
   report,
@@ -45,14 +34,16 @@ export function ReportMarker({
 }) {
   const [popupOpen, setPopupOpen] = useState(false);
   return (
-    <Marker
+    <MapMarker
       position={[report.location.latitude, report.location.longitude]}
-      icon={createReportIcon(report.type)}
-    >
-      <Popup
-        minWidth={240}
-        eventHandlers={{ add: () => setPopupOpen(true), remove: () => setPopupOpen(false) }}
-      >
+      className="report-marker-wrapper"
+      html={`<span class="report-marker report-marker--${markerClasses[report.type]}" aria-hidden="true"></span>`}
+      size={[32, 38]}
+      anchor="bottom"
+      offset={[0, 4]}
+      popupMaxWidth="320px"
+      onPopupToggle={setPopupOpen}
+      popup={
         <ReportMarkerPopup
           report={report}
           onVote={onVote}
@@ -66,7 +57,7 @@ export function ReportMarker({
           flagError={flagError}
           flagSuccess={flagSuccess}
         />
-      </Popup>
-    </Marker>
+      }
+    />
   );
 }

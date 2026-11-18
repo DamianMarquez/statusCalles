@@ -4,11 +4,11 @@ import { streetConditionLineStyle } from './streetConditionStyle.js';
 
 describe('streetConditionLineStyle', () => {
   it('uses four visual bands without changing score levels', () => {
-    expect(streetConditionLineStyle('EXCELLENT', 16, 'OPEN').color).toBe('#6f9f78');
-    expect(streetConditionLineStyle('GOOD', 16, 'OPEN').color).toBe('#6f9f78');
-    expect(streetConditionLineStyle('ACCEPTABLE', 16, 'OPEN').color).toBe('#c8ae55');
-    expect(streetConditionLineStyle('UNCOMFORTABLE', 16, 'OPEN').color).toBe('#cc8654');
-    expect(streetConditionLineStyle('CRITICAL', 16, 'OPEN').color).toBe('#c66a5e');
+    expect(streetConditionLineStyle('EXCELLENT', 16, 'OPEN').color).toBe('#3d853b');
+    expect(streetConditionLineStyle('GOOD', 16, 'OPEN').color).toBe('#9f9315');
+    expect(streetConditionLineStyle('ACCEPTABLE', 16, 'OPEN').color).toBe('#db870a');
+    expect(streetConditionLineStyle('UNCOMFORTABLE', 16, 'OPEN').color).toBe('#e06218');
+    expect(streetConditionLineStyle('CRITICAL', 16, 'OPEN').color).toBe('#8b1e1c');
   });
 
   it('keeps segments without evidence visually distinct and gray', () => {
