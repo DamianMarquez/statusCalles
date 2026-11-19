@@ -3443,3 +3443,14 @@ a {
   font-weight: 700;
   cursor: pointer;
 }
+
+.map-layer-legend__swatch--round {
+  border-radius: 50%;
+}
+
+.map-layer-controls__layers .map-layer-controls__swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+}

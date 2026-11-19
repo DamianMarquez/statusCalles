@@ -8,6 +8,7 @@ import { DrizzleStreetScoreStore } from './infrastructure/database/street-score-
 import { StreetScoreRefresher } from './modules/streets/application/street-score-refresher.js';
 import { DrizzleStreetTileRepository } from './infrastructure/database/street-tile-repository.drizzle.js';
 import { StreetTileService } from './modules/streets/application/street-tile-service.js';
+import { DrizzleMapFeaturesRepository } from './infrastructure/database/map-features-repository.drizzle.js';
 import { DrizzleAuthRepository } from './infrastructure/database/auth-repository.drizzle.js';
 import { DrizzleStreetCatalogRepository } from './infrastructure/database/street-catalog-repository.drizzle.js';
 import { DrizzleMobilityCatalogRepository } from './infrastructure/database/mobility-catalog-repository.drizzle.js';
@@ -32,6 +33,7 @@ export async function createServerApp(options: { logger?: boolean } = {}) {
           () => tileService.clear(),
         ),
         streetTileService: tileService,
+        mapFeaturesRepository: new DrizzleMapFeaturesRepository(database),
         roadInformationRepository: new DrizzleRoadInformationRepository(database),
         authRepository: new DrizzleAuthRepository(database),
         moderationDatabase: database,

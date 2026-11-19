@@ -174,6 +174,16 @@ El mapa no pide calles por viewport: descarga **tiles vectoriales** de `GET /api
 - Medición local (comprimido): zoom 13 ~100 KB, zoom 15 ~8 KB, zoom 16 ~3 KB.
 - Backend y frontend se despliegan juntos: el mapa nuevo ya no usa `GET /api/streets/condition`.
 
+## Marcas del mapa: obras, baches y reductores
+
+Los interruptores del mapa agrupan lo que se ve en cuatro categorías: **Obras y cortes**, **Baches y daños**, **Reductores y badenes** y **Otros reportes**. Cada una junta los reportes de la comunidad de ese tema (`mapCategories.ts`) con datos importados cuando existen.
+
+- **Reductores y badenes:** puntos de OpenStreetMap (`traffic_calming`: lomos cortos y anchos, sendas elevadas, badenes, cojines, angostamientos, bandas sonoras). `npm run import:osm:calming --workspace @street-status/backend` (acepta `--file=`; guarda la respuesta en `data/osm/`). En CABA hay alrededor de 1.600 puntos. © colaboradores de OpenStreetMap, ODbL. La cobertura es colaborativa y puede estar incompleta.
+- **Obras públicas del GCBA:** `npm run sync:caba:obras --workspace @street-status/backend` importa "BA Obras" de Buenos Aires Data (CC-BY-2.5-AR), solo las filas con coordenadas; no se guardan CUIT, razón social ni montos. Se muestran las vigentes (fin futuro, o sin fin pero iniciadas hace menos de un año). **No son cortes de tránsito** y el dataset se actualiza cada seis meses. El portal rechaza clientes sin `User-Agent` de navegador.
+- **Cortes en vivo:** la API de Transporte del GCBA ("Tránsito") exige registro propio y figura suspendida en BA Data, así que no hay una fuente abierta vigente; la app la sigue listando como suspendida.
+- Endpoint: `GET /api/map-features?categories=calming,works` (GeoJSON de puntos, una hora de caché). Los datos viven en `mobility_infrastructure`, sin migración.
+- Descartado: "Obras Registradas" de BA Data son permisos de obra edilicia, no obras de calle.
+
 ## Pavimento base y pavimento de la comunidad
 
 Hay dos capas de datos de pavimento y la app muestra una sola por tramo:

@@ -47,3 +47,14 @@ npm run scores:refresh --workspace @street-status/backend
 ```
 
 Antes del primer despliegue: aplicar la migración `0018` (`npm run db:migrate`) y correr este comando una vez para cargar los puntajes iniciales.
+
+## Reductores y obras públicas (importaciones)
+
+Después de desplegar, cargar los datos una vez (no hay migración de esquema nueva):
+
+```bash
+npm run import:osm:calming --workspace @street-status/backend
+npm run sync:caba:obras --workspace @street-status/backend
+```
+
+Los reductores cambian poco (repetir cada tanto); BA Obras se actualiza cada seis meses.

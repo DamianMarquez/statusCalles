@@ -276,6 +276,15 @@ export function StreetScoreLayer({
       point: { x: number; y: number };
       lngLat: { lat: number; lng: number };
     }) => {
+      // Si se tocó una marca (reductor u obra), el popup es el de la marca.
+      const marks = ['map-features-calming', 'map-features-works'].filter((id) => map.getLayer(id));
+      if (
+        marks.length > 0 &&
+        map.queryRenderedFeatures([event.point.x, event.point.y] as unknown as [number, number], {
+          layers: marks,
+        }).length > 0
+      )
+        return;
       const hits = map.queryRenderedFeatures(
         [event.point.x, event.point.y] as unknown as [number, number],
         { layers: ['street-score-hit'] },

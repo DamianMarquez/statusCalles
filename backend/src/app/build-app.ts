@@ -21,6 +21,8 @@ import type { StreetScoreRefresher } from '../modules/streets/application/street
 import { StreetScoreService } from '../modules/streets/application/street-score-service.js';
 import type { StreetTileService } from '../modules/streets/application/street-tile-service.js';
 import { registerStreetTileRoutes } from '../modules/streets/http/street-tiles.routes.js';
+import type { MapFeaturesRepository } from '../modules/mobility/application/map-features.js';
+import { registerMapFeatureRoutes } from '../modules/mobility/http/map-features.routes.js';
 import { registerStreetScoreRoutes } from '../modules/streets/http/street-score.routes.js';
 import type { RoadInformationRepository } from '../modules/streets/application/road-information-service.js';
 import { RoadInformationService } from '../modules/streets/application/road-information-service.js';
@@ -53,6 +55,7 @@ export function buildApp(
     moderationDatabase?: StreetStatusDatabase;
     streetCatalogRepository?: StreetCatalogRepository;
     mobilityCatalogRepository?: MobilityCatalogRepository;
+    mapFeaturesRepository?: MapFeaturesRepository;
     analyticsRepository?: AnalyticsRepository;
     addressSearchProvider?: AddressSearchProvider;
     checkDatabase?: () => Promise<unknown>;
@@ -141,6 +144,12 @@ export function buildApp(
     app.register(registerStreetScoreRoutes, {
       prefix: '/api',
       service: streetScoreService,
+    });
+  }
+  if (options.mapFeaturesRepository) {
+    app.register(registerMapFeatureRoutes, {
+      prefix: '/api',
+      repository: options.mapFeaturesRepository,
     });
   }
   if (options.streetTileService) {

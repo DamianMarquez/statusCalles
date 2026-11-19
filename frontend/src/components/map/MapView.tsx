@@ -31,6 +31,8 @@ import { filtersActiveCount } from './mapReportFilters.js';
 import { MapLegend } from './MapLegend.js';
 import { MapLayerControls } from './MapLayerControls.js';
 import { MapLayerLegend } from './MapLayerLegend.js';
+import { MapFeaturesLayer } from './MapFeaturesLayer.js';
+import { ALL_MAP_CATEGORIES, categoryOfReportType, type MapCategory } from './mapCategories.js';
 import type { StreetRoadClass } from '../../api/streetScoreTypes.js';
 import type {
   SpecialTreatment,
@@ -144,7 +146,7 @@ export default function MapView({
     legendToggleRef.current?.focus();
   }, []);
   const [scoreRefreshKey, setScoreRefreshKey] = useState(0);
-  const [reportsLayerVisible, setReportsLayerVisible] = useState(true);
+  const [visibleCategories, setVisibleCategories] = useState<MapCategory[]>(ALL_MAP_CATEGORIES);
   const [streetMode, setStreetMode] = useState<StreetMode>('condition');
   const [surfaceTypes, setSurfaceTypes] = useState<SurfaceType[] | null>(null);
   const [surfaceConditions, setSurfaceConditions] = useState<SurfaceCondition[] | null>(null);
@@ -375,7 +377,7 @@ export default function MapView({
           }}
           onViewStreetReports={(id, name) => {
             setStreetReportTarget({ id, name });
-            setReportsLayerVisible(true);
+            setVisibleCategories(ALL_MAP_CATEGORIES);
           }}
         />
         <ReportFocus location={reportFocusLocation} />
@@ -384,24 +386,25 @@ export default function MapView({
           location={reportLocation}
           onSelect={selectReportLocation}
         />
-        {reportsLayerVisible &&
-          reports
-            .filter((report) => !streetReportTarget || report.street?.id === streetReportTarget.id)
-            .map((report) => (
-              <ReportMarker
-                key={report.id}
-                report={report}
-                onVote={(type) => void voteOnReport(report.id, type)}
-                isVoting={votingReportIds.has(report.id)}
-                feedbackError={feedbackErrors[report.id] || null}
-                authenticated={Boolean(user)}
-                onRequestLogin={openAuthDialog}
-                onFlag={(reason) => void flagReportFromMap(report.id, reason)}
-                flagBusy={flagBusyIds.has(report.id)}
-                flagError={flagErrors[report.id] || null}
-                flagSuccess={flaggedIds.has(report.id)}
-              />
-            ))}
+        <MapFeaturesLayer categories={visibleCategories} />
+        {reports
+          .filter((report) => visibleCategories.includes(categoryOfReportType(report.type)))
+          .filter((report) => !streetReportTarget || report.street?.id === streetReportTarget.id)
+          .map((report) => (
+            <ReportMarker
+              key={report.id}
+              report={report}
+              onVote={(type) => void voteOnReport(report.id, type)}
+              isVoting={votingReportIds.has(report.id)}
+              feedbackError={feedbackErrors[report.id] || null}
+              authenticated={Boolean(user)}
+              onRequestLogin={openAuthDialog}
+              onFlag={(reason) => void flagReportFromMap(report.id, reason)}
+              flagBusy={flagBusyIds.has(report.id)}
+              flagError={flagErrors[report.id] || null}
+              flagSuccess={flaggedIds.has(report.id)}
+            />
+          ))}
         {userLocation && (
           <>
             <LocationFocus location={userLocation} />
@@ -495,14 +498,14 @@ export default function MapView({
         onRequestLogin={openAuthDialog}
       />
       <MapLayerControls
-        reports={reportsLayerVisible}
+        categories={visibleCategories}
         mode={streetMode}
         levels={conditionLevels}
         roadClasses={roadClasses}
         surfaceTypes={surfaceTypes}
         surfaceConditions={surfaceConditions}
         surfaceTreatments={surfaceTreatments}
-        onReportsChange={setReportsLayerVisible}
+        onCategoriesChange={setVisibleCategories}
         onModeChange={setStreetMode}
         onLevelsChange={setConditionLevels}
         onRoadClassesChange={setRoadClasses}
@@ -510,7 +513,7 @@ export default function MapView({
         onSurfaceConditionsChange={setSurfaceConditions}
         onSurfaceTreatmentsChange={setSurfaceTreatments}
       />
-      {streetReportTarget && reportsLayerVisible && (
+      {streetReportTarget && visibleCategories.length > 0 && (
         <div className="street-report-focus" role="status">
           Reportes de {streetReportTarget.name}
           <button type="button" onClick={() => setStreetReportTarget(null)}>
@@ -528,7 +531,12 @@ export default function MapView({
       >
         <span aria-hidden="true">ⓘ</span> Referencias
       </button>
-      <MapLayerLegend mode={streetMode} levels={conditionLevels} surfaceTypes={surfaceTypes} />
+      <MapLayerLegend
+        mode={streetMode}
+        levels={conditionLevels}
+        surfaceTypes={surfaceTypes}
+        categories={visibleCategories}
+      />
       <MapLegend open={legendOpen} onClose={closeLegend} />
       <div className="map-toolbar">
         <button

@@ -27,6 +27,7 @@ vi.mock('../../api/reportsApi.js', () => ({
   submitReportFeedback: mocks.submitReportFeedback,
 }));
 vi.mock('./StreetScoreLayer.js', () => ({ StreetScoreLayer: () => null }));
+vi.mock('./MapFeaturesLayer.js', () => ({ MapFeaturesLayer: () => null }));
 vi.mock('./maplibre/mapLibre.js', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
   return {
@@ -260,5 +261,19 @@ describe('MapView report creation', () => {
     );
     expect(screen.getByRole('button', { name: /Ya no existe/ })).toHaveTextContent('2');
     expect(screen.getByRole('button', { name: /Sigue existiendo/ })).toHaveTextContent('3');
+  });
+
+  it('hides the community reports of a category when its toggle is turned off', async () => {
+    mocks.getReportsInViewport.mockResolvedValue({ items: [report], hasMore: false });
+    renderAuthenticatedMap();
+
+    expect(await screen.findAllByTestId('marker')).toHaveLength(1);
+    fireEvent.click(screen.getByLabelText('Obras y cortes'));
+    expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    // El bache pertenece a "Baches y daños".
+    fireEvent.click(screen.getByLabelText('Baches y daños'));
+    expect(screen.queryAllByTestId('marker')).toHaveLength(0);
+    fireEvent.click(screen.getByLabelText('Baches y daños'));
+    expect(screen.getAllByTestId('marker')).toHaveLength(1);
   });
 });

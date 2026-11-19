@@ -54,7 +54,8 @@ export class DrizzleMobilityCatalogRepository implements MobilityCatalogReposito
     }>(sql`
       SELECT name, source_url, last_status, last_attempt_at, last_sync_at, last_record_count, last_error
       FROM geographic_sources
-      WHERE slug IN ('gcba-ciclovias', 'gcba-metrobus-corredores', 'gcba-metrobus-paradas')
+      WHERE slug IN ('gcba-ciclovias', 'gcba-metrobus-corredores', 'gcba-metrobus-paradas',
+        'osm-traffic-calming', 'gcba-ba-obras', 'osm-surface')
       ORDER BY slug
     `);
     return result.rows.map((row) => ({

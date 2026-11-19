@@ -3,6 +3,7 @@ import { STREET_CONDITION_LEVELS } from './streetConditionCatalog.js';
 import { STREET_ROAD_CLASS_OPTIONS } from './streetRoadClassCatalog.js';
 import type { StreetRoadClass } from '../../api/streetScoreTypes.js';
 import type { StreetMode } from './types.js';
+import { MAP_CATEGORIES, type MapCategory } from './mapCategories.js';
 import {
   SPECIAL_TREATMENT_OPTIONS,
   SURFACE_CONDITION_OPTIONS,
@@ -13,14 +14,14 @@ import {
 } from '../../api/roadInformationTypes.js';
 
 interface Props {
-  reports: boolean;
+  categories: MapCategory[];
   mode: StreetMode;
   levels: string[] | null;
   roadClasses: StreetRoadClass[];
   surfaceTypes?: SurfaceType[] | null;
   surfaceConditions?: SurfaceCondition[] | null;
   surfaceTreatments?: SpecialTreatment[] | null;
-  onReportsChange: (value: boolean) => void;
+  onCategoriesChange: (value: MapCategory[]) => void;
   onModeChange: (value: StreetMode) => void;
   onLevelsChange: (value: string[] | null) => void;
   onRoadClassesChange: (value: StreetRoadClass[]) => void;
@@ -90,15 +91,24 @@ export function MapLayerControls(props: Props) {
 
   return (
     <section className="map-layer-controls" aria-label="Capas del mapa">
-      <div className="map-layer-controls__layers" role="group" aria-label="Mostrar capas">
-        <label>
-          <input
-            type="checkbox"
-            checked={props.reports}
-            onChange={(event) => props.onReportsChange(event.target.checked)}
-          />
-          Reportes
-        </label>
+      <div className="map-layer-controls__layers" role="group" aria-label="Marcas del mapa">
+        {MAP_CATEGORIES.map((item) => (
+          <label key={item.value}>
+            <input
+              type="checkbox"
+              checked={props.categories.includes(item.value)}
+              onChange={(event) =>
+                props.onCategoriesChange(
+                  event.target.checked
+                    ? [...props.categories, item.value]
+                    : props.categories.filter((value) => value !== item.value),
+                )
+              }
+            />
+            <span className="map-layer-controls__swatch" style={{ background: item.color }} />
+            {item.label}
+          </label>
+        ))}
       </div>
       <div
         className="map-layer-controls__mode"

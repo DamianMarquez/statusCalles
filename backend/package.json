@@ -24,7 +24,9 @@
     "seed:lab": "tsx src/infrastructure/database/seed-lab-reports.ts",
     "sync:caba:infrastructure": "tsx src/infrastructure/external/caba/mobility-import-cli.ts all",
     "scores:refresh": "tsx src/infrastructure/database/street-score-refresh-cli.ts",
-    "import:osm:surface": "tsx src/infrastructure/external/osm/osm-import-cli.ts"
+    "import:osm:surface": "tsx src/infrastructure/external/osm/osm-import-cli.ts",
+    "import:osm:calming": "tsx src/infrastructure/external/osm/osm-calming-import-cli.ts",
+    "sync:caba:obras": "tsx src/infrastructure/external/caba/ba-obras-import-cli.ts"
   },
   "dependencies": {
     "@fastify/compress": "^9.3.0",
