@@ -4,7 +4,11 @@ import {
   REPORT_STATUS_OPTIONS,
   REPORT_TYPE_OPTIONS,
 } from '../../api/reportCatalog.js';
-import { STREET_CONDITION_LEVELS, streetConditionColor } from './streetConditionCatalog.js';
+import {
+  NO_STREET_CONDITION_COLOR,
+  STREET_CONDITION_LEVELS,
+  streetConditionColor,
+} from './streetConditionCatalog.js';
 import {
   SURFACE_CONDITION_OPTIONS,
   SURFACE_TYPE_OPTIONS,
@@ -174,10 +178,10 @@ export function MapLegend({ open, onClose }: { open: boolean; onClose: () => voi
         <span className="map-legend__item">
           <span
             className="map-legend__score"
-            style={{ backgroundColor: streetConditionColor('GOOD') }}
+            style={{ backgroundColor: NO_STREET_CONDITION_COLOR }}
             aria-hidden="true"
           />
-          Buena por defecto · sin score calculado
+          Sin datos · gris
         </span>
       </div>
     </section>

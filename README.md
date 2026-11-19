@@ -163,6 +163,17 @@ La verificación local de `EXPLAIN (ANALYZE, BUFFERS)` se hizo con 31.961 segmen
 
 Los tipos `ROAD_IRREGULARITY`, `ROAD_ELEVATION` y `ROAD_SUBSIDENCE` se agregaron con la migración aditiva `0013_loving_hex.sql`. La jerarquía vial normalizada y su backfill desde metadata oficial se agrega con `0014_blue_jean_grey.sql`. Aplicá las migraciones con `npm run db:migrate` en cada entorno antes de desplegar el backend nuevo; las migraciones no corren durante el startup. En Elevación anómala, la UI aclara que no se deben reportar lomos de burro o badenes intencionales. Reportes, filtros, marcadores, analíticas y validación del backend usan el catálogo extendido.
 
+## Calles en el mapa: tiles vectoriales
+
+El mapa no pide calles por viewport: descarga **tiles vectoriales** de `GET /api/tiles/streets/{z}/{x}/{y}.pbf` (PostGIS `ST_AsMVT`) con el estado y el pavimento de cada tramo, y colorea y filtra todo en el navegador. Por eso se ven calles desde zoom 10 y los filtros (nivel, jerarquía, tipo, condición y tratamiento de pavimento) funcionan igual a cualquier zoom sin volver a pedir datos.
+
+- Clases por zoom: principales desde 10, secundarias desde 11, locales desde 13 (`street-tiles.ts`). Hasta zoom 15 cada tramo lleva el puntaje de su calle; desde 16, el de su tramo.
+- El tile guarda atributos cortos (`sc`, `lv`, `ev`, `st`, `ss`, etc.; ver `StreetTileProperties` en el frontend).
+- El servidor guarda tiles en memoria por 30 s y los vacía cuando se recalculan puntajes; el navegador cachea 30 s y tras un reporte o voto propio pide los tiles con otra versión (`?v=`).
+- El selector **Estado | Pavimento | Ambos** decide qué se pinta, y la leyenda del mapa cambia con eso.
+- Medición local (comprimido): zoom 13 ~100 KB, zoom 15 ~8 KB, zoom 16 ~3 KB.
+- Backend y frontend se despliegan juntos: el mapa nuevo ya no usa `GET /api/streets/condition`.
+
 ## Pavimento base y pavimento de la comunidad
 
 Hay dos capas de datos de pavimento y la app muestra una sola por tramo:

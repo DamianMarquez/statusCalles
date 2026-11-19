@@ -113,11 +113,22 @@ function renderAuthenticatedMap() {
 }
 
 describe('MapView report creation', () => {
-  it('shows street condition and pavement together by default', () => {
+  it('shows the street state by default and lets the user switch to pavement or both', () => {
     render(<MapView />);
 
-    expect(screen.getByLabelText('Estado de calles')).toBeChecked();
-    expect(screen.getByLabelText('Pavimento')).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Estado' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: 'Pavimento' }));
+    expect(screen.getByRole('radio', { name: 'Pavimento' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('region', { name: 'Leyenda del mapa' })).toHaveTextContent(
+      'Tipo de pavimento',
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Ambos' }));
+    expect(screen.getByRole('region', { name: 'Leyenda del mapa' })).toHaveTextContent(
+      'Estado de la calle',
+    );
   });
 
   it('keeps the map and report flow without showing route planning controls', () => {

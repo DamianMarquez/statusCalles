@@ -99,9 +99,7 @@ export function HowToUse() {
                 {level.label}
               </span>
             ))}
-            <span style={{ background: STREET_CONDITION_LEVELS[1].color }}>
-              Buena por defecto · sin score
-            </span>
+            <span style={{ background: '#7b8490', color: '#fff' }}>Sin datos · gris</span>
           </div>
           <small>Vista ilustrativa · datos de ejemplo</small>
         </div>

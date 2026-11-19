@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { STREET_CONDITION_LEVELS } from './streetConditionCatalog.js';
 import { STREET_ROAD_CLASS_OPTIONS } from './streetRoadClassCatalog.js';
 import type { StreetRoadClass } from '../../api/streetScoreTypes.js';
+import type { StreetMode } from './types.js';
 import {
   SPECIAL_TREATMENT_OPTIONS,
   SURFACE_CONDITION_OPTIONS,
@@ -13,22 +14,26 @@ import {
 
 interface Props {
   reports: boolean;
-  condition: boolean;
-  surface?: boolean;
+  mode: StreetMode;
   levels: string[] | null;
   roadClasses: StreetRoadClass[];
   surfaceTypes?: SurfaceType[] | null;
   surfaceConditions?: SurfaceCondition[] | null;
   surfaceTreatments?: SpecialTreatment[] | null;
   onReportsChange: (value: boolean) => void;
-  onConditionChange: (value: boolean) => void;
-  onSurfaceChange?: (value: boolean) => void;
+  onModeChange: (value: StreetMode) => void;
   onLevelsChange: (value: string[] | null) => void;
   onRoadClassesChange: (value: StreetRoadClass[]) => void;
   onSurfaceTypesChange?: (value: SurfaceType[] | null) => void;
   onSurfaceConditionsChange?: (value: SurfaceCondition[] | null) => void;
   onSurfaceTreatmentsChange?: (value: SpecialTreatment[] | null) => void;
 }
+
+const STREET_MODES: { value: StreetMode; label: string }[] = [
+  { value: 'condition', label: 'Estado' },
+  { value: 'surface', label: 'Pavimento' },
+  { value: 'both', label: 'Ambos' },
+];
 
 export function MapLayerControls(props: Props) {
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -94,29 +99,32 @@ export function MapLayerControls(props: Props) {
           />
           Reportes
         </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={props.condition}
-            onChange={(event) => props.onConditionChange(event.target.checked)}
-          />
-          Estado de calles
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={props.surface ?? false}
-            onChange={(event) => props.onSurfaceChange?.(event.target.checked)}
-          />
-          Pavimento
-        </label>
+      </div>
+      <div
+        className="map-layer-controls__mode"
+        role="radiogroup"
+        aria-label="Qué mostrar en las calles"
+      >
+        <span>Calles</span>
+        {STREET_MODES.map((item) => (
+          <button
+            key={item.value}
+            type="button"
+            role="radio"
+            aria-checked={props.mode === item.value}
+            className={props.mode === item.value ? 'is-active' : ''}
+            onClick={() => props.onModeChange(item.value)}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
       <details open={filtersOpen} onToggle={(event) => setFiltersOpen(event.currentTarget.open)}>
         <summary>
           Más filtros{activeFilterCount > 0 ? ` · ${activeFilterCount} activos` : ''}
         </summary>
         <div className="map-layer-controls__advanced">
-          <fieldset disabled={!props.surface}>
+          <fieldset disabled={props.mode === 'condition'}>
             <legend>Tipo de pavimento</legend>
             {SURFACE_TYPE_OPTIONS.map((item) => (
               <label key={item.value}>
@@ -137,7 +145,7 @@ export function MapLayerControls(props: Props) {
               </label>
             ))}
           </fieldset>
-          <fieldset disabled={!props.surface}>
+          <fieldset disabled={props.mode === 'condition'}>
             <legend>Condición del pavimento</legend>
             {SURFACE_CONDITION_OPTIONS.map((item) => (
               <label key={item.value}>
@@ -160,7 +168,7 @@ export function MapLayerControls(props: Props) {
               </label>
             ))}
           </fieldset>
-          <fieldset disabled={!props.surface}>
+          <fieldset disabled={props.mode === 'condition'}>
             <legend>Tratamientos</legend>
             {SPECIAL_TREATMENT_OPTIONS.map((item) => (
               <label key={item.value}>
@@ -183,7 +191,7 @@ export function MapLayerControls(props: Props) {
               </label>
             ))}
           </fieldset>
-          <fieldset disabled={!props.condition}>
+          <fieldset>
             <legend>Jerarquía vial</legend>
             {STREET_ROAD_CLASS_OPTIONS.map((item) => (
               <label key={item.value}>
@@ -201,7 +209,7 @@ export function MapLayerControls(props: Props) {
               </label>
             ))}
           </fieldset>
-          <fieldset disabled={!props.condition}>
+          <fieldset disabled={props.mode === 'surface'}>
             <legend>Estado de calles</legend>
             {STREET_CONDITION_LEVELS.map((item) => (
               <label key={item.value}>

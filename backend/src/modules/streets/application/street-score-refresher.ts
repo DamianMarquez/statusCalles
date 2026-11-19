@@ -28,6 +28,7 @@ export class StreetScoreRefresher implements ScoreRefresher {
   constructor(
     private readonly store: StreetScoreStore,
     private readonly clock: () => Date = () => new Date(),
+    private readonly onRefreshed?: () => void,
   ) {}
 
   async refreshStreets(streetIds: string[]): Promise<void> {
@@ -60,6 +61,8 @@ export class StreetScoreRefresher implements ScoreRefresher {
       };
     });
     await this.store.saveStreetScores(updates);
+    // Los tiles guardados en memoria quedaron viejos.
+    this.onRefreshed?.();
   }
 
   /** No lanza: un fallo de recálculo no debe romper la operación del usuario. */

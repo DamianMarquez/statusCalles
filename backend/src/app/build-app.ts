@@ -19,6 +19,8 @@ import { StreetLocationResolverService } from '../modules/streets/application/st
 import { registerStreetCatalogRoutes } from '../modules/streets/http/street-catalog.routes.js';
 import type { StreetScoreRefresher } from '../modules/streets/application/street-score-refresher.js';
 import { StreetScoreService } from '../modules/streets/application/street-score-service.js';
+import type { StreetTileService } from '../modules/streets/application/street-tile-service.js';
+import { registerStreetTileRoutes } from '../modules/streets/http/street-tiles.routes.js';
 import { registerStreetScoreRoutes } from '../modules/streets/http/street-score.routes.js';
 import type { RoadInformationRepository } from '../modules/streets/application/road-information-service.js';
 import { RoadInformationService } from '../modules/streets/application/road-information-service.js';
@@ -45,6 +47,7 @@ export function buildApp(
     logger?: boolean;
     streetScoreRepository?: StreetScoreRepository;
     streetScoreRefresher?: StreetScoreRefresher;
+    streetTileService?: StreetTileService;
     roadInformationRepository?: RoadInformationRepository;
     authRepository?: AuthRepository;
     moderationDatabase?: StreetStatusDatabase;
@@ -75,7 +78,11 @@ export function buildApp(
   app.register(cors, { origin: allowedOrigins, credentials: true });
   app.register(cookie);
   // Las respuestas de calles son JSON grande y repetitivo: comprimen muy bien.
-  app.register(compress, { threshold: 1024 });
+  app.register(compress, {
+    threshold: 1024,
+    // Los tiles vectoriales no figuran como comprimibles por defecto.
+    customTypes: /json|text|javascript|xml|vnd\.mapbox-vector-tile/,
+  });
   app.register(rateLimit, {
     global: false,
     ...(options.rateLimitStore ? { store: options.rateLimitStore } : {}),
@@ -134,6 +141,12 @@ export function buildApp(
     app.register(registerStreetScoreRoutes, {
       prefix: '/api',
       service: streetScoreService,
+    });
+  }
+  if (options.streetTileService) {
+    app.register(registerStreetTileRoutes, {
+      prefix: '/api',
+      service: options.streetTileService,
     });
   }
   if (options.roadInformationRepository) {

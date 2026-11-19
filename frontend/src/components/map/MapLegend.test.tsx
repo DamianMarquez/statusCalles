@@ -24,7 +24,7 @@ describe('MapLegend', () => {
     expect(screen.getByText('Hormigón + carpeta asfáltica')).toBeInTheDocument();
     expect(screen.getByText(/tres confirmaciones independientes/)).toBeInTheDocument();
     expect(screen.getByText('Sin condición informada')).toBeInTheDocument();
-    expect(screen.getByText('Buena por defecto · sin score calculado')).toBeInTheDocument();
+    expect(screen.getByText('Sin datos · gris')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
   });

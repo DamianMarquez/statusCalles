@@ -101,12 +101,25 @@ export function MapCanvas({
       if (disposed) return;
       // El contenedor puede haber cambiado de tamaño entre el montaje y la carga del estilo.
       instance.resize();
+      // Con el contenedor sin tamaño, los límites del mapa lo dejan pegado a una esquina:
+      // se recentra ahora que el tamaño es el real.
+      instance.jumpTo({ center, zoom });
       setMap(instance);
     });
+    // Si el contenedor pasa por tamaño cero (pestaña o panel oculto), los límites del mapa lo
+    // dejan pegado a una esquina; al volver a tener tamaño se recentra en la vista inicial.
+    let hadSize = true;
+    const observer = new ResizeObserver(([entry]) => {
+      const hasSize = (entry?.contentRect.width ?? 0) > 0 && (entry?.contentRect.height ?? 0) > 0;
+      if (hasSize && !hadSize && !disposed) instance.jumpTo({ center, zoom });
+      hadSize = hasSize;
+    });
+    observer.observe(host.current);
     if (import.meta.env.DEV)
       (window as unknown as { __streetMap?: MapLibreMap }).__streetMap = instance;
     return () => {
       disposed = true;
+      observer.disconnect();
       setMap(null);
       instance.remove();
     };

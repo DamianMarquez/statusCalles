@@ -6,6 +6,8 @@ import { DrizzleReportFeedbackRepository } from './infrastructure/database/repor
 import { DrizzleStreetScoreRepository } from './infrastructure/database/street-score-repository.drizzle.js';
 import { DrizzleStreetScoreStore } from './infrastructure/database/street-score-store.drizzle.js';
 import { StreetScoreRefresher } from './modules/streets/application/street-score-refresher.js';
+import { DrizzleStreetTileRepository } from './infrastructure/database/street-tile-repository.drizzle.js';
+import { StreetTileService } from './modules/streets/application/street-tile-service.js';
 import { DrizzleAuthRepository } from './infrastructure/database/auth-repository.drizzle.js';
 import { DrizzleStreetCatalogRepository } from './infrastructure/database/street-catalog-repository.drizzle.js';
 import { DrizzleMobilityCatalogRepository } from './infrastructure/database/mobility-catalog-repository.drizzle.js';
@@ -17,13 +19,19 @@ import { UsigAddressSearchProvider } from './infrastructure/external/usig/usig-a
 export async function createServerApp(options: { logger?: boolean } = {}) {
   const { database, pool } = createDatabase(getDatabaseUrl());
   try {
+    const tileService = new StreetTileService(new DrizzleStreetTileRepository(database));
     const app = buildApp(
       new DrizzleReportRepository(database),
       new DrizzleReportFeedbackRepository(database),
       {
         logger: options.logger,
         streetScoreRepository: new DrizzleStreetScoreRepository(database),
-        streetScoreRefresher: new StreetScoreRefresher(new DrizzleStreetScoreStore(database)),
+        streetScoreRefresher: new StreetScoreRefresher(
+          new DrizzleStreetScoreStore(database),
+          undefined,
+          () => tileService.clear(),
+        ),
+        streetTileService: tileService,
         roadInformationRepository: new DrizzleRoadInformationRepository(database),
         authRepository: new DrizzleAuthRepository(database),
         moderationDatabase: database,

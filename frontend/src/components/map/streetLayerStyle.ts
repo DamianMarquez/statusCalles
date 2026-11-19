@@ -15,13 +15,13 @@ export const NO_DATA_COLOR = NO_STREET_CONDITION_COLOR;
 /** Color por puntaje; gris cuando la calle no tiene evidencia. */
 export const scoreColorExpression = [
   'case',
-  ['all', ['==', ['get', 'hasEvidence'], true], ['==', ['typeof', ['get', 'score']], 'number']],
-  ['interpolate', ['linear'], ['get', 'score'], ...SCORE_RAMP_STOPS.flat()],
+  ['all', ['==', ['get', 'ev'], true], ['==', ['typeof', ['get', 'sc']], 'number']],
+  ['interpolate', ['linear'], ['get', 'sc'], ...SCORE_RAMP_STOPS.flat()],
   NO_DATA_COLOR,
 ] as unknown as ExpressionSpecification;
 
-const evidenceFactor = ['case', ['==', ['get', 'hasEvidence'], true], 1, 0.55];
-const roadClassFactor = ['match', ['get', 'roadClass'], 'PRIMARY', 1.5, 'SECONDARY', 1.2, 1];
+const evidenceFactor = ['case', ['==', ['get', 'ev'], true], 1, 0.55];
+const roadClassFactor = ['match', ['get', 'rc'], 'PRIMARY', 1.5, 'SECONDARY', 1.2, 1];
 const ZOOM_WIDTHS: [number, number][] = [
   [11, 1.2],
   [14, 2.4],
@@ -61,9 +61,16 @@ export const streetSurfaceWidthExpression = zoomScaled((base) => [
   3,
 ]);
 
+/** Banda de pavimento cuando es lo único que se pinta: ancho normal, sin depender de la evidencia. */
+export const streetSurfaceOnlyWidthExpression = zoomScaled((base) => [
+  '*',
+  roadClassFactor,
+  base * 1.2,
+]);
+
 export const streetCasingOpacityExpression = [
   'case',
-  ['==', ['get', 'hasEvidence'], true],
+  ['==', ['get', 'ev'], true],
   0.85,
   0,
 ] as unknown as ExpressionSpecification;

@@ -3,26 +3,29 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MapLayerControls } from './MapLayerControls.js';
 
 describe('MapLayerControls', () => {
-  it('toggles report and condition layers independently', () => {
+  it('switches what is painted on the streets without touching the reports toggle', () => {
     const onReportsChange = vi.fn();
-    const onConditionChange = vi.fn();
+    const onModeChange = vi.fn();
     render(
       <MapLayerControls
         reports
-        condition
+        mode="condition"
         levels={[]}
         roadClasses={['PRIMARY', 'SECONDARY', 'LOCAL']}
         onReportsChange={onReportsChange}
-        onConditionChange={onConditionChange}
+        onModeChange={onModeChange}
         onLevelsChange={vi.fn()}
         onRoadClassesChange={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByLabelText('Reportes'));
     expect(onReportsChange).toHaveBeenCalledWith(false);
-    expect(onConditionChange).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByLabelText('Estado de calles'));
-    expect(onConditionChange).toHaveBeenCalledWith(false);
+    expect(onModeChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('radio', { name: 'Estado' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: 'Pavimento' }));
+    expect(onModeChange).toHaveBeenCalledWith('surface');
+    fireEvent.click(screen.getByRole('radio', { name: 'Ambos' }));
+    expect(onModeChange).toHaveBeenCalledWith('both');
     expect(onReportsChange).toHaveBeenCalledTimes(1);
   });
 
@@ -31,11 +34,11 @@ describe('MapLayerControls', () => {
     render(
       <MapLayerControls
         reports
-        condition
+        mode="condition"
         levels={null}
         roadClasses={['PRIMARY', 'SECONDARY', 'LOCAL']}
         onReportsChange={vi.fn()}
-        onConditionChange={vi.fn()}
+        onModeChange={vi.fn()}
         onLevelsChange={onLevelsChange}
         onRoadClassesChange={vi.fn()}
       />,
@@ -53,11 +56,11 @@ describe('MapLayerControls', () => {
     render(
       <MapLayerControls
         reports
-        condition
+        mode="condition"
         levels={null}
         roadClasses={['PRIMARY', 'SECONDARY', 'LOCAL']}
         onReportsChange={vi.fn()}
-        onConditionChange={vi.fn()}
+        onModeChange={vi.fn()}
         onLevelsChange={onLevelsChange}
         onRoadClassesChange={onRoadClassesChange}
       />,
@@ -68,24 +71,22 @@ describe('MapLayerControls', () => {
     expect(onLevelsChange).not.toHaveBeenCalled();
   });
 
-  it('toggles the surface overlay and its filters without changing report filters', () => {
-    const onSurfaceChange = vi.fn();
+  it('filters pavement types without changing report filters', () => {
+    const onModeChange = vi.fn();
     const onSurfaceTypesChange = vi.fn();
     const onLevelsChange = vi.fn();
     const onReportsChange = vi.fn();
     render(
       <MapLayerControls
         reports
-        condition
-        surface
+        mode="both"
         levels={null}
         roadClasses={['PRIMARY', 'SECONDARY', 'LOCAL']}
         surfaceTypes={null}
         surfaceConditions={null}
         surfaceTreatments={null}
         onReportsChange={onReportsChange}
-        onConditionChange={vi.fn()}
-        onSurfaceChange={onSurfaceChange}
+        onModeChange={onModeChange}
         onLevelsChange={onLevelsChange}
         onRoadClassesChange={vi.fn()}
         onSurfaceTypesChange={onSurfaceTypesChange}
@@ -95,8 +96,6 @@ describe('MapLayerControls', () => {
     );
     fireEvent.click(screen.getByText(/Más filtros/));
     expect(screen.getByText('Condición del pavimento')).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText('Pavimento'));
-    expect(onSurfaceChange).toHaveBeenCalledWith(false);
     fireEvent.click(screen.getByLabelText('Adoquín de granito'));
     expect(onSurfaceTypesChange).toHaveBeenCalledWith(
       expect.not.arrayContaining(['GRANITE_COBBLESTONE']),
@@ -113,16 +112,14 @@ describe('MapLayerControls', () => {
     render(
       <MapLayerControls
         reports
-        condition
-        surface
+        mode="both"
         levels={['BAD']}
         roadClasses={['PRIMARY']}
         surfaceTypes={[]}
         surfaceConditions={null}
         surfaceTreatments={null}
         onReportsChange={onReportsChange}
-        onConditionChange={vi.fn()}
-        onSurfaceChange={vi.fn()}
+        onModeChange={vi.fn()}
         onLevelsChange={onLevelsChange}
         onRoadClassesChange={onRoadClassesChange}
         onSurfaceTypesChange={onSurfaceTypesChange}

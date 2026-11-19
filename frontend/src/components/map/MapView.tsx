@@ -20,10 +20,9 @@ import { ReportForm } from './ReportForm.js';
 import { ReportLocationPicker } from './ReportLocationPicker.js';
 import { ReportMarker } from './ReportMarker.js';
 import { StreetScoreLayer } from './StreetScoreLayer.js';
-import type { StreetConditionFeature } from '../../api/streetScoreTypes.js';
 import { RoadInformationPanel } from './RoadInformationPanel.js';
 import { useViewportReports } from './useViewportReports.js';
-import type { UserLocation } from './types.js';
+import type { SelectedRoadSegment, StreetMode, UserLocation } from './types.js';
 import { useAuth } from '../../auth/AuthContext.js';
 import type { AddressSearchResult } from '../../api/addressesApi.js';
 import { MapFilters } from './MapFilters.js';
@@ -31,6 +30,7 @@ import { useMapReportFilters } from './useMapReportFilters.js';
 import { filtersActiveCount } from './mapReportFilters.js';
 import { MapLegend } from './MapLegend.js';
 import { MapLayerControls } from './MapLayerControls.js';
+import { MapLayerLegend } from './MapLayerLegend.js';
 import type { StreetRoadClass } from '../../api/streetScoreTypes.js';
 import type {
   SpecialTreatment,
@@ -113,31 +113,6 @@ function getLocationErrorMessage(error: unknown): string {
   }
 }
 
-function geometryLengthMeters(feature: StreetConditionFeature): number {
-  const lines =
-    feature.geometry.type === 'LineString'
-      ? [feature.geometry.coordinates as number[][]]
-      : (feature.geometry.coordinates as number[][][]);
-  let meters = 0;
-  for (const line of lines) {
-    for (let index = 1; index < line.length; index += 1) {
-      const previous = line[index - 1];
-      const current = line[index];
-      if (!previous || !current) continue;
-      const radians = Math.PI / 180;
-      const latitudeDelta = (current[1]! - previous[1]!) * radians;
-      const longitudeDelta = (current[0]! - previous[0]!) * radians;
-      const latitude1 = previous[1]! * radians;
-      const latitude2 = current[1]! * radians;
-      const haversine =
-        Math.sin(latitudeDelta / 2) ** 2 +
-        Math.cos(latitude1) * Math.cos(latitude2) * Math.sin(longitudeDelta / 2) ** 2;
-      meters += 6_371_000 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-    }
-  }
-  return meters;
-}
-
 export default function MapView({
   startReportOnOpen = false,
   onStartReportHandled,
@@ -152,9 +127,7 @@ export default function MapView({
   const [isLocating, setIsLocating] = useState(false);
   const [isPickingReportLocation, setIsPickingReportLocation] = useState(false);
   const [isSelectingRoadSegment, setIsSelectingRoadSegment] = useState(false);
-  const [selectedRoadSegment, setSelectedRoadSegment] = useState<StreetConditionFeature | null>(
-    null,
-  );
+  const [selectedRoadSegment, setSelectedRoadSegment] = useState<SelectedRoadSegment | null>(null);
   const [isReportFormOpen, setIsReportFormOpen] = useState(false);
   const [reportLocation, setReportLocation] = useState<UserLocation | null>(null);
   const [reportFocusLocation, setReportFocusLocation] = useState<UserLocation | null>(null);
@@ -172,8 +145,7 @@ export default function MapView({
   }, []);
   const [scoreRefreshKey, setScoreRefreshKey] = useState(0);
   const [reportsLayerVisible, setReportsLayerVisible] = useState(true);
-  const [conditionLayerVisible, setConditionLayerVisible] = useState(true);
-  const [surfaceLayerVisible, setSurfaceLayerVisible] = useState(true);
+  const [streetMode, setStreetMode] = useState<StreetMode>('condition');
   const [surfaceTypes, setSurfaceTypes] = useState<SurfaceType[] | null>(null);
   const [surfaceConditions, setSurfaceConditions] = useState<SurfaceCondition[] | null>(null);
   const [surfaceTreatments, setSurfaceTreatments] = useState<SpecialTreatment[] | null>(null);
@@ -259,7 +231,6 @@ export default function MapView({
     setSelectedRoadSegment(null);
     roadInfoReturnFocusRef.current = document.activeElement as HTMLElement | null;
     setIsSelectingRoadSegment(true);
-    setConditionLayerVisible(true);
   }
 
   useEffect(() => {
@@ -389,27 +360,24 @@ export default function MapView({
       <MapCanvas className="street-map">
         <ViewportReports onViewportChange={handleViewportChange} />
         <MapQueryFocus />
-        {(conditionLayerVisible || surfaceLayerVisible) && (
-          <StreetScoreLayer
-            refreshKey={scoreRefreshKey}
-            levels={conditionLevels}
-            roadClasses={roadClasses}
-            conditionVisible={conditionLayerVisible}
-            surfaceVisible={surfaceLayerVisible}
-            surfaceTypes={surfaceTypes}
-            surfaceConditions={surfaceConditions}
-            surfaceTreatments={surfaceTreatments}
-            selectingRoadSegment={isSelectingRoadSegment}
-            onRoadSegmentSelected={(feature) => {
-              setIsSelectingRoadSegment(false);
-              setSelectedRoadSegment(feature);
-            }}
-            onViewStreetReports={(id, name) => {
-              setStreetReportTarget({ id, name });
-              setReportsLayerVisible(true);
-            }}
-          />
-        )}
+        <StreetScoreLayer
+          refreshKey={scoreRefreshKey}
+          mode={streetMode}
+          levels={conditionLevels}
+          roadClasses={roadClasses}
+          surfaceTypes={surfaceTypes}
+          surfaceConditions={surfaceConditions}
+          surfaceTreatments={surfaceTreatments}
+          selectingRoadSegment={isSelectingRoadSegment}
+          onRoadSegmentSelected={(segment) => {
+            setIsSelectingRoadSegment(false);
+            setSelectedRoadSegment(segment);
+          }}
+          onViewStreetReports={(id, name) => {
+            setStreetReportTarget({ id, name });
+            setReportsLayerVisible(true);
+          }}
+        />
         <ReportFocus location={reportFocusLocation} />
         <ReportLocationPicker
           active={isPickingReportLocation}
@@ -484,9 +452,11 @@ export default function MapView({
             <header>
               <div>
                 <span className="road-information-eyebrow">Tramo oficial seleccionado</span>
-                <h2 id="road-information-title">{selectedRoadSegment.properties.streetName}</h2>
+                <h2 id="road-information-title">{selectedRoadSegment.streetName}</h2>
                 <p>
-                  Extensión aproximada: {Math.round(geometryLengthMeters(selectedRoadSegment))} m.
+                  {selectedRoadSegment.lengthMeters !== null
+                    ? `Extensión aproximada: ${Math.round(selectedRoadSegment.lengthMeters)} m. `
+                    : ''}
                   La propuesta se aplica a este tramo completo.
                 </p>
               </div>
@@ -500,8 +470,8 @@ export default function MapView({
               </button>
             </header>
             <RoadInformationPanel
-              key={selectedRoadSegment.properties.id}
-              segmentId={selectedRoadSegment.properties.id}
+              key={selectedRoadSegment.id}
+              segmentId={selectedRoadSegment.id}
               authenticated={Boolean(user)}
               onRequestLogin={openAuthDialog}
               onChanged={() => setScoreRefreshKey((current) => current + 1)}
@@ -526,16 +496,14 @@ export default function MapView({
       />
       <MapLayerControls
         reports={reportsLayerVisible}
-        condition={conditionLayerVisible}
-        surface={surfaceLayerVisible}
+        mode={streetMode}
         levels={conditionLevels}
         roadClasses={roadClasses}
         surfaceTypes={surfaceTypes}
         surfaceConditions={surfaceConditions}
         surfaceTreatments={surfaceTreatments}
         onReportsChange={setReportsLayerVisible}
-        onConditionChange={setConditionLayerVisible}
-        onSurfaceChange={setSurfaceLayerVisible}
+        onModeChange={setStreetMode}
         onLevelsChange={setConditionLevels}
         onRoadClassesChange={setRoadClasses}
         onSurfaceTypesChange={setSurfaceTypes}
@@ -560,6 +528,7 @@ export default function MapView({
       >
         <span aria-hidden="true">ⓘ</span> Referencias
       </button>
+      <MapLayerLegend mode={streetMode} levels={conditionLevels} surfaceTypes={surfaceTypes} />
       <MapLegend open={legendOpen} onClose={closeLegend} />
       <div className="map-toolbar">
         <button
