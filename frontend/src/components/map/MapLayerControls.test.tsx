@@ -156,5 +156,53 @@ describe('MapLayerControls', () => {
     expect(onSurfaceTypesChange).toHaveBeenCalledWith(null);
     expect(onCategoriesChange).not.toHaveBeenCalled();
   });
+
+  it('lets the user pick commune or neighborhood zones and what they are colored by', () => {
+    const onZoneSelectionChange = vi.fn();
+    const onZoneMetricChange = vi.fn();
+    const { rerender } = render(
+      <MapLayerControls
+        categories={ALL_MAP_CATEGORIES}
+        mode="condition"
+        levels={null}
+        roadClasses={['PRIMARY', 'SECONDARY', 'LOCAL']}
+        zoneSelection="none"
+        zoneMetric="condition"
+        onZoneSelectionChange={onZoneSelectionChange}
+        onZoneMetricChange={onZoneMetricChange}
+        onCategoriesChange={vi.fn()}
+        onModeChange={vi.fn()}
+        onLevelsChange={vi.fn()}
+        onRoadClassesChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.queryByRole('radiogroup', { name: 'Colorear zonas por' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'Comunas' }));
+    expect(onZoneSelectionChange).toHaveBeenCalledWith('commune');
+
+    rerender(
+      <MapLayerControls
+        categories={ALL_MAP_CATEGORIES}
+        mode="condition"
+        levels={null}
+        roadClasses={['PRIMARY', 'SECONDARY', 'LOCAL']}
+        zoneSelection="neighborhood"
+        zoneMetric="condition"
+        onZoneSelectionChange={onZoneSelectionChange}
+        onZoneMetricChange={onZoneMetricChange}
+        onCategoriesChange={vi.fn()}
+        onModeChange={vi.fn()}
+        onLevelsChange={vi.fn()}
+        onRoadClassesChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('radio', { name: 'Barrios' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: 'Críticos' }));
+    expect(onZoneMetricChange).toHaveBeenCalledWith('critical');
+    fireEvent.click(screen.getByRole('radio', { name: 'Obras y reductores' }));
+    expect(onZoneMetricChange).toHaveBeenCalledWith('intervention');
+  });
 });
 afterEach(() => cleanup());

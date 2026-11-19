@@ -4,6 +4,7 @@ import { STREET_ROAD_CLASS_OPTIONS } from './streetRoadClassCatalog.js';
 import type { StreetRoadClass } from '../../api/streetScoreTypes.js';
 import type { StreetMode } from './types.js';
 import { MAP_CATEGORIES, type MapCategory } from './mapCategories.js';
+import { ZONE_METRICS, type ZoneMetric, type ZoneSelection } from './zoneColors.js';
 import {
   SPECIAL_TREATMENT_OPTIONS,
   SURFACE_CONDITION_OPTIONS,
@@ -16,6 +17,10 @@ import {
 interface Props {
   categories: MapCategory[];
   mode: StreetMode;
+  zoneSelection?: ZoneSelection;
+  zoneMetric?: ZoneMetric;
+  onZoneSelectionChange?: (value: ZoneSelection) => void;
+  onZoneMetricChange?: (value: ZoneMetric) => void;
   levels: string[] | null;
   roadClasses: StreetRoadClass[];
   surfaceTypes?: SurfaceType[] | null;
@@ -29,6 +34,12 @@ interface Props {
   onSurfaceConditionsChange?: (value: SurfaceCondition[] | null) => void;
   onSurfaceTreatmentsChange?: (value: SpecialTreatment[] | null) => void;
 }
+
+const ZONE_SELECTIONS: { value: ZoneSelection; label: string }[] = [
+  { value: 'none', label: 'Ninguna' },
+  { value: 'commune', label: 'Comunas' },
+  { value: 'neighborhood', label: 'Barrios' },
+];
 
 const STREET_MODES: { value: StreetMode; label: string }[] = [
   { value: 'condition', label: 'Estado' },
@@ -129,6 +140,42 @@ export function MapLayerControls(props: Props) {
           </button>
         ))}
       </div>
+      <div className="map-layer-controls__mode" role="radiogroup" aria-label="Zonas del mapa">
+        <span>Zonas</span>
+        {ZONE_SELECTIONS.map((item) => (
+          <button
+            key={item.value}
+            type="button"
+            role="radio"
+            aria-checked={(props.zoneSelection ?? 'none') === item.value}
+            className={(props.zoneSelection ?? 'none') === item.value ? 'is-active' : ''}
+            onClick={() => props.onZoneSelectionChange?.(item.value)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      {(props.zoneSelection ?? 'none') !== 'none' && (
+        <div
+          className="map-layer-controls__mode map-layer-controls__mode--wrap"
+          role="radiogroup"
+          aria-label="Colorear zonas por"
+        >
+          <span>Colorear por</span>
+          {ZONE_METRICS.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              role="radio"
+              aria-checked={(props.zoneMetric ?? 'condition') === item.value}
+              className={(props.zoneMetric ?? 'condition') === item.value ? 'is-active' : ''}
+              onClick={() => props.onZoneMetricChange?.(item.value)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
       <details open={filtersOpen} onToggle={(event) => setFiltersOpen(event.currentTarget.open)}>
         <summary>
           Más filtros{activeFilterCount > 0 ? ` · ${activeFilterCount} activos` : ''}

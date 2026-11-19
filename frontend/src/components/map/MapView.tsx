@@ -32,6 +32,8 @@ import { MapLegend } from './MapLegend.js';
 import { MapLayerControls } from './MapLayerControls.js';
 import { MapLayerLegend } from './MapLayerLegend.js';
 import { MapFeaturesLayer } from './MapFeaturesLayer.js';
+import { ZonesLayer } from './ZonesLayer.js';
+import type { ZoneMetric, ZoneSelection } from './zoneColors.js';
 import { ALL_MAP_CATEGORIES, categoryOfReportType, type MapCategory } from './mapCategories.js';
 import type { StreetRoadClass } from '../../api/streetScoreTypes.js';
 import type {
@@ -148,6 +150,8 @@ export default function MapView({
   const [scoreRefreshKey, setScoreRefreshKey] = useState(0);
   const [visibleCategories, setVisibleCategories] = useState<MapCategory[]>(ALL_MAP_CATEGORIES);
   const [streetMode, setStreetMode] = useState<StreetMode>('condition');
+  const [zoneSelection, setZoneSelection] = useState<ZoneSelection>('none');
+  const [zoneMetric, setZoneMetric] = useState<ZoneMetric>('condition');
   const [surfaceTypes, setSurfaceTypes] = useState<SurfaceType[] | null>(null);
   const [surfaceConditions, setSurfaceConditions] = useState<SurfaceCondition[] | null>(null);
   const [surfaceTreatments, setSurfaceTreatments] = useState<SpecialTreatment[] | null>(null);
@@ -362,6 +366,11 @@ export default function MapView({
       <MapCanvas className="street-map">
         <ViewportReports onViewportChange={handleViewportChange} />
         <MapQueryFocus />
+        <ZonesLayer
+          selection={zoneSelection}
+          metric={zoneMetric}
+          interactive={!isPickingReportLocation && !isSelectingRoadSegment}
+        />
         <StreetScoreLayer
           refreshKey={scoreRefreshKey}
           mode={streetMode}
@@ -500,6 +509,10 @@ export default function MapView({
       <MapLayerControls
         categories={visibleCategories}
         mode={streetMode}
+        zoneSelection={zoneSelection}
+        zoneMetric={zoneMetric}
+        onZoneSelectionChange={setZoneSelection}
+        onZoneMetricChange={setZoneMetric}
         levels={conditionLevels}
         roadClasses={roadClasses}
         surfaceTypes={surfaceTypes}
@@ -536,6 +549,8 @@ export default function MapView({
         levels={conditionLevels}
         surfaceTypes={surfaceTypes}
         categories={visibleCategories}
+        zoneSelection={zoneSelection}
+        zoneMetric={zoneMetric}
       />
       <MapLegend open={legendOpen} onClose={closeLegend} />
       <div className="map-toolbar">

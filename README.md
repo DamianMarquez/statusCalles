@@ -184,6 +184,16 @@ Los interruptores del mapa agrupan lo que se ve en cuatro categorías: **Obras y
 - Endpoint: `GET /api/map-features?categories=calming,works` (GeoJSON de puntos, una hora de caché). Los datos viven en `mobility_infrastructure`, sin migración.
 - Descartado: "Obras Registradas" de BA Data son permisos de obra edilicia, no obras de calle.
 
+## Zonas: comunas y barrios coloreados
+
+El selector **Zonas** (Ninguna | Comunas | Barrios) pinta las 15 comunas o los 48 barrios con un color general según lo que se elija en **Colorear por**: estado, pavimento, obras y reductores, o críticos. `GET /api/zones?level=commune|neighborhood` calcula las métricas de cada zona (una consulta grande, ~1–2 s, guardada 10 minutos en el servidor y vaciada cuando se recalculan puntajes). Cada tramo se asigna a su zona con el `commune_id` / `neighborhood_id` del callejero y, si falta (≈5 %), por ubicación. Las definiciones y pesos están en `modules/zones/domain/zone-metrics.ts`.
+
+- **Estado:** promedio del puntaje de los tramos con puntaje; con menos de 5 tramos con puntaje se muestra gris ("datos insuficientes"), porque los puntajes solo existen donde hay reportes.
+- **Pavimento:** el tipo con más kilómetros (comunidad primero, base OSM/BA Data después). En CABA predomina el asfalto en todas las comunas (52–97 %), así que el color es parecido entre zonas: el popup muestra el desglose.
+- **Obras y reductores:** índice por cada 10 km (obra pública vigente, obra o corte reportado: peso 10; reductor: peso 1), coloreado en quintiles entre las zonas. Compara zonas entre sí; no son cortes en vivo.
+- **Críticos:** reportes activos de severidad crítica o alta (0, 1–2, 3–5, 6 o más). Cero no significa sin problemas: solo cuenta lo que reportó la comunidad.
+- Las zonas van debajo de las calles y se vuelven casi transparentes al acercar el mapa. Sin migración de esquema.
+
 ## Pavimento base y pavimento de la comunidad
 
 Hay dos capas de datos de pavimento y la app muestra una sola por tramo:

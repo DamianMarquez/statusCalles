@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { StreetStatusDatabase } from './database.js';
+import { publicWorkInForce } from './public-work-rule.js';
 import {
   MAP_FEATURE_TYPES,
   type MapFeature,
@@ -29,11 +30,7 @@ export class DrizzleMapFeaturesRepository implements MapFeaturesRepository {
       JOIN geographic_sources gs ON gs.id = mi.source_id
       CROSS JOIN LATERAL (SELECT ST_PointOnSurface(mi.geometry) AS pt) p
       WHERE mi.type IN ${typeList}
-        -- Obras públicas vigentes: fin futuro, o sin fecha de fin pero iniciadas hace menos de un año.
-        AND (mi.type <> 'PUBLIC_WORK'
-             OR mi.metadata ->> 'endDate' >= to_char(CURRENT_DATE, 'YYYY-MM-DD')
-             OR (mi.metadata ->> 'endDate' IS NULL
-                 AND mi.metadata ->> 'startDate' >= to_char(CURRENT_DATE - INTERVAL '1 year', 'YYYY-MM-DD')))
+        AND ${publicWorkInForce('mi')}
     `);
     return result.rows.map((row) => ({
       id: row.id,

@@ -28,6 +28,7 @@ vi.mock('../../api/reportsApi.js', () => ({
 }));
 vi.mock('./StreetScoreLayer.js', () => ({ StreetScoreLayer: () => null }));
 vi.mock('./MapFeaturesLayer.js', () => ({ MapFeaturesLayer: () => null }));
+vi.mock('./ZonesLayer.js', () => ({ ZonesLayer: () => null }));
 vi.mock('./maplibre/mapLibre.js', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
   return {
@@ -275,5 +276,27 @@ describe('MapView report creation', () => {
     expect(screen.queryAllByTestId('marker')).toHaveLength(0);
     fireEvent.click(screen.getByLabelText('Baches y daños'));
     expect(screen.getAllByTestId('marker')).toHaveLength(1);
+  });
+
+  it('lets the user color communes or neighborhoods and shows the matching legend', () => {
+    render(<MapView />);
+
+    expect(
+      screen.queryByRole('radiogroup', { name: 'Colorear zonas por' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'Comunas' }));
+    const zoneMetrics = within(screen.getByRole('radiogroup', { name: 'Colorear zonas por' }));
+    fireEvent.click(zoneMetrics.getByRole('radio', { name: 'Pavimento' }));
+    expect(screen.getByRole('region', { name: 'Leyenda del mapa' })).toHaveTextContent(
+      'Zonas: pavimento predominante',
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Críticos' }));
+    expect(screen.getByRole('region', { name: 'Leyenda del mapa' })).toHaveTextContent(
+      'Zonas: reportes críticos',
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Ninguna' }));
+    expect(screen.getByRole('region', { name: 'Leyenda del mapa' })).not.toHaveTextContent(
+      'Zonas:',
+    );
   });
 });

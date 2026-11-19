@@ -23,6 +23,8 @@ import type { StreetTileService } from '../modules/streets/application/street-ti
 import { registerStreetTileRoutes } from '../modules/streets/http/street-tiles.routes.js';
 import type { MapFeaturesRepository } from '../modules/mobility/application/map-features.js';
 import { registerMapFeatureRoutes } from '../modules/mobility/http/map-features.routes.js';
+import type { ZoneService } from '../modules/zones/application/zone-service.js';
+import { registerZoneRoutes } from '../modules/zones/http/zones.routes.js';
 import { registerStreetScoreRoutes } from '../modules/streets/http/street-score.routes.js';
 import type { RoadInformationRepository } from '../modules/streets/application/road-information-service.js';
 import { RoadInformationService } from '../modules/streets/application/road-information-service.js';
@@ -50,6 +52,7 @@ export function buildApp(
     streetScoreRepository?: StreetScoreRepository;
     streetScoreRefresher?: StreetScoreRefresher;
     streetTileService?: StreetTileService;
+    zoneService?: ZoneService;
     roadInformationRepository?: RoadInformationRepository;
     authRepository?: AuthRepository;
     moderationDatabase?: StreetStatusDatabase;
@@ -151,6 +154,9 @@ export function buildApp(
       prefix: '/api',
       repository: options.mapFeaturesRepository,
     });
+  }
+  if (options.zoneService) {
+    app.register(registerZoneRoutes, { prefix: '/api', service: options.zoneService });
   }
   if (options.streetTileService) {
     app.register(registerStreetTileRoutes, {

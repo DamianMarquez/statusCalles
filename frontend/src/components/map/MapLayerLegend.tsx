@@ -1,5 +1,12 @@
 import { SURFACE_TYPE_OPTIONS, type SurfaceType } from '../../api/roadInformationTypes.js';
 import { NO_STREET_CONDITION_COLOR, STREET_CONDITION_LEVELS } from './streetConditionCatalog.js';
+import {
+  CRITICAL_CLASSES,
+  INTERVENTION_RAMP,
+  NO_DATA_ZONE_COLOR,
+  type ZoneMetric,
+  type ZoneSelection,
+} from './zoneColors.js';
 import { SCORE_RAMP_STOPS } from './streetLayerStyle.js';
 import type { StreetMode } from './types.js';
 import {
@@ -123,20 +130,107 @@ function MarksLegend({ categories }: { categories: MapCategory[] }) {
   );
 }
 
+function ZonesLegend({ metric }: { metric: ZoneMetric }) {
+  if (metric === 'condition')
+    return (
+      <section aria-label="Leyenda de zonas">
+        <h3>Zonas: estado de las calles</h3>
+        <div
+          className="map-layer-legend__ramp"
+          style={{
+            background: `linear-gradient(to right, ${SCORE_RAMP_STOPS.map(([score, color]) => `${color} ${score}%`).join(', ')})`,
+          }}
+          aria-hidden="true"
+        />
+        <div className="map-layer-legend__ramp-labels">
+          <span>0 · crítico</span>
+          <span>100 · excelente</span>
+        </div>
+        <ul>
+          <li>
+            <span className="map-layer-legend__swatch" style={{ background: NO_DATA_ZONE_COLOR }} />
+            Datos insuficientes
+          </li>
+        </ul>
+        <small>Promedio de los tramos con puntaje de cada zona.</small>
+      </section>
+    );
+  if (metric === 'surface')
+    return (
+      <section aria-label="Leyenda de zonas">
+        <h3>Zonas: pavimento predominante</h3>
+        <ul>
+          {SURFACE_TYPE_OPTIONS.map((item) => (
+            <li key={item.value}>
+              <span className="map-layer-legend__swatch" style={{ background: item.color }} />
+              {item.label}
+            </li>
+          ))}
+          <li>
+            <span className="map-layer-legend__swatch" style={{ background: NO_DATA_ZONE_COLOR }} />
+            Sin datos
+          </li>
+        </ul>
+        <small>El tipo con más kilómetros en la zona.</small>
+      </section>
+    );
+  if (metric === 'intervention')
+    return (
+      <section aria-label="Leyenda de zonas">
+        <h3>Zonas: obras y reductores</h3>
+        <div
+          className="map-layer-legend__ramp"
+          style={{ background: `linear-gradient(to right, ${INTERVENTION_RAMP.join(', ')})` }}
+          aria-hidden="true"
+        />
+        <div className="map-layer-legend__ramp-labels">
+          <span>menos</span>
+          <span>más</span>
+        </div>
+        <small>
+          Obras públicas vigentes, obras y cortes reportados y reductores, por cada 10 km. Compara
+          las zonas entre sí.
+        </small>
+      </section>
+    );
+  return (
+    <section aria-label="Leyenda de zonas">
+      <h3>Zonas: reportes críticos</h3>
+      <ul>
+        {CRITICAL_CLASSES.map((item) => (
+          <li key={item.label}>
+            <span className="map-layer-legend__swatch" style={{ background: item.color }} />
+            {item.label}
+          </li>
+        ))}
+      </ul>
+      <small>
+        Reportes de severidad crítica o alta, activos. Cero no significa sin problemas: solo cuenta
+        lo que reportó la comunidad.
+      </small>
+    </section>
+  );
+}
+
 /** Leyenda de lo que se está viendo en las calles; cambia con el selector y los filtros. */
 export function MapLayerLegend({
   mode,
   levels,
   surfaceTypes,
   categories,
+  zoneSelection = 'none',
+  zoneMetric = 'condition',
 }: {
   mode: StreetMode;
   levels: string[] | null;
   surfaceTypes: SurfaceType[] | null;
   categories: MapCategory[];
+  zoneSelection?: ZoneSelection;
+  zoneMetric?: ZoneMetric;
 }) {
   return (
     <div className="map-layer-legend" role="region" aria-label="Leyenda del mapa">
+      {zoneSelection !== 'none' && <ZonesLegend metric={zoneMetric} />}
       {mode !== 'surface' && <ConditionLegend levels={levels} />}
       {mode !== 'condition' && <SurfaceLegend types={surfaceTypes} />}
       <MarksLegend categories={categories} />

@@ -3454,3 +3454,11 @@ a {
   flex: none;
   border-radius: 50%;
 }
+
+.map-layer-controls__mode--wrap {
+  flex-wrap: wrap;
+}
+
+.map-layer-controls__mode--wrap button {
+  flex: 1 1 40%;
+}
