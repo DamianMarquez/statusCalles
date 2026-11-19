@@ -45,9 +45,20 @@ export interface RoadInformationPatch {
   specialTreatments?: SpecialTreatment[];
 }
 
+/** Origen del tipo de pavimento mostrado: la comunidad o una fuente base importada. */
+export type SurfaceSource = 'COMMUNITY' | 'OSM' | 'GCBA';
+
+export function surfaceSourceFromSlug(slug: string | null | undefined): SurfaceSource | null {
+  if (slug === 'osm-surface') return 'OSM';
+  if (slug === 'gcba-adoquinado') return 'GCBA';
+  return null;
+}
+
 export interface RoadInformationProfile {
   roadType: RoadType | null;
   surfaceType: SurfaceType | null;
+  /** Solo informativo: de dónde sale `surfaceType` (la comunidad tiene prioridad). */
+  surfaceSource?: SurfaceSource | null;
   surfaceCondition: SurfaceCondition | null;
   specialTreatments: SpecialTreatment[] | null;
   updatedAt: string | null;

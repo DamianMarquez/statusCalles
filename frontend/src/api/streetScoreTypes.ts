@@ -3,6 +3,7 @@ import type {
   RoadType,
   SpecialTreatment,
   SurfaceCondition,
+  SurfaceSource,
   SurfaceType,
 } from './roadInformationTypes.js';
 
@@ -61,6 +62,7 @@ export interface StreetConditionProperties extends Omit<
   roadInformation: {
     roadType: RoadType | null;
     surfaceType: SurfaceType | null;
+    surfaceSource?: SurfaceSource | null;
     surfaceCondition: SurfaceCondition | null;
     specialTreatments: SpecialTreatment[] | null;
     updatedAt: string | null;

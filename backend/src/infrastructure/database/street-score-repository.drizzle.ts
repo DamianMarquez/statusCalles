@@ -9,6 +9,7 @@ import {
   type ReportType,
   type StreetReport,
 } from '../../modules/reports/domain/street-report.js';
+import { surfaceSourceFromSlug } from '../../modules/streets/domain/road-information.js';
 import type { StoredScore } from '../../modules/streets/domain/stored-street-score.js';
 import type {
   ConditionFeatureInput,
@@ -95,6 +96,7 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
         road_class: StreetRoadClass;
         road_type: 'STREET' | 'AVENUE' | 'PASSAGE' | 'BOULEVARD' | 'HIGHWAY' | 'ACCESS' | null;
         surface_type: string | null;
+        surface_source: string | null;
         surface_condition: string | null;
         special_treatments: string[] | null;
         information_updated_at: Date | string | null;
@@ -102,13 +104,17 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
         score_result: StoredScore | null;
       }>(sql`
         SELECT ss.id::text AS id, ss.street_id::text AS street_id, st.official_name AS street_name,
-          ss.road_class AS road_class, info.road_type, info.surface_type, info.surface_condition,
+          ss.road_class AS road_class, info.road_type,
+          COALESCE(info.surface_type, base.surface_type) AS surface_type,
+          CASE WHEN info.surface_type IS NOT NULL THEN 'COMMUNITY' ELSE base.source_slug END AS surface_source,
+          info.surface_condition,
           info.special_treatments, info.updated_at AS information_updated_at,
           ST_AsGeoJSON(ST_SimplifyPreserveTopology(ss.geometry, ${tolerance})) AS geometry,
           sc.result AS score_result
         FROM street_segments ss
         JOIN streets st ON st.id = ss.street_id
         LEFT JOIN street_segment_information info ON info.segment_id = ss.id
+        LEFT JOIN street_segment_surface_base base ON base.segment_id = ss.id
         LEFT JOIN street_segment_scores sc ON sc.segment_id = ss.id
         WHERE ss.geometry && ${envelope}
           AND ST_Intersects(ss.geometry, ${envelope})
@@ -124,6 +130,10 @@ export class DrizzleStreetScoreRepository implements StreetScoreRepository {
         roadInformation: {
           roadType: row.road_type,
           surfaceType: row.surface_type as never,
+          surfaceSource:
+            row.surface_source === 'COMMUNITY'
+              ? ('COMMUNITY' as const)
+              : surfaceSourceFromSlug(row.surface_source),
           surfaceCondition: row.surface_condition as never,
           specialTreatments: row.special_treatments as never,
           updatedAt: row.information_updated_at

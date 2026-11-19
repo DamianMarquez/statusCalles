@@ -60,9 +60,19 @@ export interface RoadInformationPatch {
   specialTreatments?: SpecialTreatment[];
 }
 
+/** Origen del pavimento mostrado: la comunidad o una fuente base importada. */
+export type SurfaceSource = 'COMMUNITY' | 'OSM' | 'GCBA';
+
+export const SURFACE_SOURCE_LABELS: Record<SurfaceSource, string> = {
+  COMMUNITY: 'Comunidad',
+  OSM: 'OpenStreetMap',
+  GCBA: 'Buenos Aires Data',
+};
+
 export interface RoadInformationProfile {
   roadType: RoadType | null;
   surfaceType: SurfaceType | null;
+  surfaceSource?: SurfaceSource | null;
   surfaceCondition: SurfaceCondition | null;
   specialTreatments: SpecialTreatment[] | null;
   updatedAt: string | null;

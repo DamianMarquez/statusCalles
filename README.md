@@ -163,6 +163,24 @@ La verificación local de `EXPLAIN (ANALYZE, BUFFERS)` se hizo con 31.961 segmen
 
 Los tipos `ROAD_IRREGULARITY`, `ROAD_ELEVATION` y `ROAD_SUBSIDENCE` se agregaron con la migración aditiva `0013_loving_hex.sql`. La jerarquía vial normalizada y su backfill desde metadata oficial se agrega con `0014_blue_jean_grey.sql`. Aplicá las migraciones con `npm run db:migrate` en cada entorno antes de desplegar el backend nuevo; las migraciones no corren durante el startup. En Elevación anómala, la UI aclara que no se deben reportar lomos de burro o badenes intencionales. Reportes, filtros, marcadores, analíticas y validación del backend usan el catálogo extendido.
 
+## Pavimento base y pavimento de la comunidad
+
+Hay dos capas de datos de pavimento y la app muestra una sola por tramo:
+
+1. **Comunidad** (`street_segment_information`): lo propuesto y confirmado por tres usuarios con "Informar calle". Tiene prioridad.
+2. **Base general** (`street_segment_surface_baseline`, vista `street_segment_surface_base`): importada de fuentes externas. Solo se ve donde la comunidad no cargó el tipo de pavimento. Reimportar reemplaza únicamente esta base y nunca toca lo comunitario.
+
+Fuente actual: OpenStreetMap, etiqueta `surface` de las vías de CABA (© colaboradores de OpenStreetMap, ODbL). Se traduce a asfalto, hormigón, adoquín de granito o intertrabado; OSM no distingue asfalto especial, granitullo ni permeable, y tierra o ripio no tienen equivalente.
+
+```bash
+npm run import:osm:surface --workspace @street-status/backend             # consulta Overpass por zonas
+npm run import:osm:surface --workspace @street-status/backend -- --file=/ruta/overpass.json
+```
+
+La respuesta de Overpass se guarda en `data/osm/` (ignorado por git). Cada tramo recibe la vía que más lo cubre (buffer de 10 m, al menos 50 % del tramo; desempate por nombre de calle). Al final se imprime la cobertura. El servidor público de Overpass puede rechazar o demorar consultas: si falla, reintentar más tarde o pasar un export con `--file=`.
+
+BA Data no tiene hoy un dataset de calles adoquinadas o de materialidad de calzada (el callejero oficial no trae pavimento). La vista ya reserva la fuente `gcba-adoquinado` con prioridad sobre OSM para cuando exista.
+
 ## Puntajes precalculados
 
 El mapa no calcula puntajes al vuelo: `GET /api/streets/condition` lee `street_segment_scores` y `street_scores` (migración `0018`) y la vista materializada `street_class_geometries` (calles unidas por clase vial). Las tablas son dispersas: sin fila significa "sin datos" (gris).

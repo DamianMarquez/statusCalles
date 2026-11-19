@@ -45,6 +45,8 @@ deploy/
 .deploy.tar.gz.next.*
 data/routing/
 backend/data/routing/
+data/osm/
+backend/data/osm/
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)

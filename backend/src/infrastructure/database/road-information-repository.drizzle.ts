@@ -1,6 +1,9 @@
 import { sql } from 'drizzle-orm';
 import type { StreetStatusDatabase } from './database.js';
-import { ROAD_INFORMATION_CONFIRMATION_THRESHOLD } from '../../modules/streets/domain/road-information.js';
+import {
+  ROAD_INFORMATION_CONFIRMATION_THRESHOLD,
+  surfaceSourceFromSlug,
+} from '../../modules/streets/domain/road-information.js';
 import type {
   RoadInformationHistoryEntry,
   RoadInformationPatch,
@@ -18,6 +21,7 @@ interface InformationRow extends Record<string, unknown> {
   street_name: string;
   road_type: RoadInformationProfile['roadType'];
   surface_type: RoadInformationProfile['surfaceType'];
+  surface_source?: string | null;
   surface_condition: RoadInformationProfile['surfaceCondition'];
   special_treatments: RoadInformationProfile['specialTreatments'];
   updated_at: Date | string | null;
@@ -46,6 +50,10 @@ function mapInformation(row: InformationRow, proposals: ProposalRow[], userId: s
   const profile: RoadInformationProfile = {
     roadType: row.road_type,
     surfaceType: row.surface_type,
+    surfaceSource:
+      row.surface_source === 'COMMUNITY'
+        ? ('COMMUNITY' as const)
+        : surfaceSourceFromSlug(row.surface_source),
     surfaceCondition: row.surface_condition,
     specialTreatments: row.special_treatments,
     updatedAt: iso(row.updated_at),
@@ -108,12 +116,15 @@ export class DrizzleRoadInformationRepository implements RoadInformationReposito
   ): Promise<SegmentRoadInformation | null> {
     const information = await this.database.execute<InformationRow>(sql`
       SELECT ss.id::text AS segment_id, s.id::text AS street_id,
-        s.official_name AS street_name, current.road_type, current.surface_type,
+        s.official_name AS street_name, current.road_type,
+        COALESCE(current.surface_type, base.surface_type) AS surface_type,
+        CASE WHEN current.surface_type IS NOT NULL THEN 'COMMUNITY' ELSE base.source_slug END AS surface_source,
         current.surface_condition, current.special_treatments::text[] AS special_treatments,
         current.updated_at
       FROM street_segments ss
       JOIN streets s ON s.id = ss.street_id
       LEFT JOIN street_segment_information current ON current.segment_id = ss.id
+      LEFT JOIN street_segment_surface_base base ON base.segment_id = ss.id
       WHERE ss.id = ${segmentId}::uuid
       LIMIT 1
     `);

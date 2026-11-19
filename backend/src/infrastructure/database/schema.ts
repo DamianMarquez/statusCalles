@@ -8,6 +8,8 @@ import {
   pgTable,
   jsonb,
   integer,
+  primaryKey,
+  real,
   smallint,
   timestamp,
   uniqueIndex,
@@ -238,6 +240,30 @@ export const streetSegmentInformation = pgTable('street_segment_information', {
   ),
   updatedAt: timestamp('updated_at', { withTimezone: true }),
 });
+
+/**
+ * Pavimento "base" importado de fuentes externas (OpenStreetMap, BA Data). Es independiente
+ * de la información comunitaria: nunca la pisa y se puede reimportar sin riesgo.
+ */
+export const streetSegmentSurfaceBaseline = pgTable(
+  'street_segment_surface_baseline',
+  {
+    segmentId: uuid('segment_id')
+      .notNull()
+      .references(() => streetSegments.id, { onDelete: 'cascade' }),
+    sourceId: uuid('source_id')
+      .notNull()
+      .references(() => geographicSources.id, { onDelete: 'cascade' }),
+    surfaceType: surfaceTypeEnum('surface_type').notNull(),
+    sourceRef: varchar('source_ref', { length: 100 }),
+    matchRatio: real('match_ratio').notNull(),
+    importedAt: timestamp('imported_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.segmentId, table.sourceId] }),
+    index('street_segment_surface_baseline_source_idx').on(table.sourceId),
+  ],
+);
 
 export const streetSegmentInformationProposals = pgTable(
   'street_segment_information_proposals',

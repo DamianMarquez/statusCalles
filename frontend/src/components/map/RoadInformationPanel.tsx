@@ -13,6 +13,7 @@ import {
   ROAD_TYPE_OPTIONS,
   SPECIAL_TREATMENT_OPTIONS,
   SURFACE_CONDITION_OPTIONS,
+  SURFACE_SOURCE_LABELS,
   SURFACE_TYPE_OPTIONS,
 } from '../../api/roadInformationTypes.js';
 
@@ -92,7 +93,13 @@ export function RoadInformationPanel({
       ['Tipo de vía', profile.roadType ? roadTypeLabels[profile.roadType] : 'Sin información'],
       [
         'Pavimento',
-        profile.surfaceType ? surfaceTypeLabels[profile.surfaceType] : 'Sin información',
+        profile.surfaceType
+          ? `${surfaceTypeLabels[profile.surfaceType]}${
+              profile.surfaceSource && profile.surfaceSource !== 'COMMUNITY'
+                ? ` (dato base: ${SURFACE_SOURCE_LABELS[profile.surfaceSource]})`
+                : ''
+            }`
+          : 'Sin información',
       ],
       [
         'Estado de calzada',
@@ -192,6 +199,13 @@ export function RoadInformationPanel({
               </div>
             ))}
           </dl>
+          {information.profile.surfaceSource &&
+            information.profile.surfaceSource !== 'COMMUNITY' && (
+              <small>
+                El pavimento viene de una base general importada. Si no coincide con la calle, podés
+                corregirlo con “Informar calle”.
+              </small>
+            )}
           {information.profile.updatedAt && (
             <small>
               Actualizado: {new Date(information.profile.updatedAt).toLocaleDateString('es-AR')}

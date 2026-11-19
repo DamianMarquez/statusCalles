@@ -139,6 +139,10 @@ export function MapLegend({ open, onClose }: { open: boolean; onClose: () => voi
         </span>
       </div>
       <p className="map-legend__note">
+        El pavimento base proviene de © colaboradores de OpenStreetMap (ODbL) y de Buenos Aires Data
+        (CC-BY); donde la comunidad cargó un dato, ese tiene prioridad.
+      </p>
+      <p className="map-legend__note">
         Son aportes de la comunidad asociados a un segmento oficial. Las propuestas requieren tres
         confirmaciones independientes; la falta de información no indica un tipo de pavimento.
       </p>

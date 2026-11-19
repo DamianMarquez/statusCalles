@@ -4,6 +4,7 @@ import type { StreetReport } from '../../reports/domain/street-report.js';
 import type { StreetRoadClass } from '../domain/street-road-class.js';
 import type { StoredScore } from '../domain/stored-street-score.js';
 import type {
+  SurfaceSource,
   RoadType,
   SpecialTreatment,
   SurfaceCondition,
@@ -34,6 +35,7 @@ export interface ConditionFeatureInput {
   roadInformation: {
     roadType: RoadType | null;
     surfaceType: SurfaceType | null;
+    surfaceSource: SurfaceSource | null;
     surfaceCondition: SurfaceCondition | null;
     specialTreatments: SpecialTreatment[] | null;
     updatedAt: string | null;

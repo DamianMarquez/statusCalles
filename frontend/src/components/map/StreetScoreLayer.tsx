@@ -234,7 +234,9 @@ export function StreetScoreLayer({
     map.addSource(STREETS_SOURCE, { type: 'geojson', data: empty });
     map.addSource(SURFACE_SOURCE, { type: 'geojson', data: empty });
     for (const condition of SURFACE_CONDITIONS) {
-      const dash = surfaceConditionDashPattern(condition === 'OTHER' ? null : condition);
+      // Sin condición informada (caso del pavimento base importado) la banda va continua:
+      // los guiones solo significan una condición conocida de la calzada.
+      const dash = condition === 'OTHER' ? null : surfaceConditionDashPattern(condition);
       const known: SurfaceCondition[] = ['GOOD', 'REGULAR', 'POOR', 'VERY_POOR'];
       const filter: FilterSpecification =
         condition === 'OTHER'
