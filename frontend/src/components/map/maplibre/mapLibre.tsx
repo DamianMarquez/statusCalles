@@ -8,9 +8,13 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { Map as MapLibreMap, Marker, NavigationControl, Popup } from 'maplibre-gl';
+import { Map as MapLibreMap, Marker, NavigationControl, Popup, setWorkerUrl } from 'maplibre-gl';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { mapConfig } from '../mapConfig.js';
+
+// Vite emite el worker como archivo propio con hash: así el build de producción siempre lo incluye.
+setWorkerUrl(workerUrl);
 
 const MapContext = createContext<MapLibreMap | null>(null);
 
