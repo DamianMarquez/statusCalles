@@ -8,6 +8,12 @@ describe('parseTrustProxy', () => {
     expect(parseTrustProxy(' FALSE ')).toBe(false);
   });
 
+  it('trusts the proxy by default on Vercel unless explicitly disabled', () => {
+    expect(parseTrustProxy('', true)).toBe(true);
+    expect(parseTrustProxy(undefined, true)).toBe(true);
+    expect(parseTrustProxy('false', true)).toBe(false);
+  });
+
   it('trusts the forwarding proxy when true', () => {
     expect(parseTrustProxy('true')).toBe(true);
     expect(parseTrustProxy('True')).toBe(true);

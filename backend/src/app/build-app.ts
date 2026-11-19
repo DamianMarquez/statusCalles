@@ -65,7 +65,7 @@ export function buildApp(
     rateLimitStore?: FastifyRateLimitStoreCtor;
   } = {},
 ): FastifyInstance {
-  const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+  const trustProxy = parseTrustProxy(process.env.TRUST_PROXY, process.env.VERCEL === '1');
   const app = Fastify({
     logger: options.logger ?? true,
     trustProxy,
@@ -201,12 +201,14 @@ export function buildApp(
 }
 
 /**
- * `TRUST_PROXY`: vacío o `false` no confía en proxies; `true` confía en el proxy que reenvía
+ * `TRUST_PROXY`: `false` no confía en proxies; vacío tampoco, salvo en Vercel, donde sí; `true` confía en el proxy que reenvía
  * la solicitud (p. ej. Vercel); una lista separada por comas se toma como IPs o rangos CIDR.
  */
-export function parseTrustProxy(raw: string | undefined): boolean | string[] {
+export function parseTrustProxy(raw: string | undefined, behindVercel = false): boolean | string[] {
   const value = (raw ?? '').trim();
-  if (value === '' || value.toLowerCase() === 'false') return false;
+  // En Vercel toda solicitud llega por su proxy: sin configurar nada se confía en él.
+  if (value === '') return behindVercel;
+  if (value.toLowerCase() === 'false') return false;
   if (value.toLowerCase() === 'true') return true;
   const entries = value
     .split(',')
