@@ -65,13 +65,10 @@ export function buildApp(
     rateLimitStore?: FastifyRateLimitStoreCtor;
   } = {},
 ): FastifyInstance {
-  const trustedProxies = (process.env.TRUST_PROXY ?? '')
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
+  const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
   const app = Fastify({
     logger: options.logger ?? true,
-    trustProxy: trustedProxies.length > 0 ? trustedProxies : false,
+    trustProxy,
   });
   const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
     .split(',')
@@ -201,4 +198,19 @@ export function buildApp(
   }
 
   return app;
+}
+
+/**
+ * `TRUST_PROXY`: vacío o `false` no confía en proxies; `true` confía en el proxy que reenvía
+ * la solicitud (p. ej. Vercel); una lista separada por comas se toma como IPs o rangos CIDR.
+ */
+export function parseTrustProxy(raw: string | undefined): boolean | string[] {
+  const value = (raw ?? '').trim();
+  if (value === '' || value.toLowerCase() === 'false') return false;
+  if (value.toLowerCase() === 'true') return true;
+  const entries = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return entries.length > 0 ? entries : false;
 }
