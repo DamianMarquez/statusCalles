@@ -1,6 +1,25 @@
 import { useState } from 'react';
 import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
-import { STREET_CONDITION_LEVELS } from '../map/streetConditionCatalog.js';
+import {
+  NO_STREET_CONDITION_COLOR,
+  STREET_CONDITION_LEVELS,
+} from '../map/streetConditionCatalog.js';
+import { CategoriesDemo } from './CategoriesDemo.js';
+import { PopupsDemo } from './PopupsDemo.js';
+import { StreetModesDemo } from './StreetModesDemo.js';
+import { ZonesDemo } from './ZonesDemo.js';
+
+const INDEX = [
+  { id: 'tutorial-map-title', label: 'Explorar' },
+  { id: 'tutorial-streets-title', label: 'Calles' },
+  { id: 'tutorial-categories-title', label: 'Marcas y categorías' },
+  { id: 'tutorial-zones-title', label: 'Zonas' },
+  { id: 'tutorial-popups-title', label: 'Leyenda y popups' },
+  { id: 'tutorial-filters-title', label: 'Filtros' },
+  { id: 'tutorial-contribute-title', label: 'Reportar' },
+  { id: 'tutorial-road-title', label: 'Informar una calle' },
+  { id: 'tutorial-account-title', label: 'Seguimiento' },
+] as const;
 
 const demoReports = [
   {
@@ -52,6 +71,14 @@ export function HowToUse() {
         </a>
       </header>
 
+      <nav className="tutorial-index" aria-label="Índice de la guía">
+        {INDEX.map((item) => (
+          <a key={item.id} href={`#${item.id}`}>
+            {item.label}
+          </a>
+        ))}
+      </nav>
+
       <section className="tutorial-section" aria-labelledby="tutorial-map-title">
         <div className="tutorial-copy">
           <span className="tutorial-step">01 · EXPLORAR</span>
@@ -59,9 +86,8 @@ export function HowToUse() {
           <p>
             Acercá, alejá y desplazate por el mapa. Los marcadores muestran reportes comunitarios;
             las líneas coloreadas representan la condición física estimada de segmentos oficiales;
-            en vistas lejanas se agrupan por calle. El verde también puede indicar el estado visual
-            predeterminado cuando no hay reportes físicos suficientes; en ese caso no se calcula un
-            score.
+            en vistas lejanas se agrupan por calle. Las calles en gris no tienen datos suficientes
+            todavía: no se calcula un puntaje y no significa que estén en buen estado.
           </p>
           <p>
             Usá <strong>Referencias</strong> para consultar tipos de reporte, estados y escala de
@@ -99,10 +125,69 @@ export function HowToUse() {
                 {level.label}
               </span>
             ))}
-            <span style={{ background: '#7b8490', color: '#fff' }}>Sin datos · gris</span>
+            <span style={{ background: NO_STREET_CONDITION_COLOR, color: '#fff' }}>
+              Sin datos · gris
+            </span>
           </div>
           <small>Vista ilustrativa · datos de ejemplo</small>
         </div>
+      </section>
+
+      <section className="tutorial-section" aria-labelledby="tutorial-streets-title">
+        <div className="tutorial-copy">
+          <span className="tutorial-step">02 · CALLES</span>
+          <h2 id="tutorial-streets-title">Estado, pavimento o ambos</h2>
+          <p>
+            Con el selector de calles elegís qué pintar: el <strong>estado</strong> según los
+            reportes, el <strong>tipo de pavimento</strong> o las dos cosas a la vez. El pavimento
+            parte de una base de OpenStreetMap y la comunidad puede corregirlo.
+          </p>
+        </div>
+        <StreetModesDemo />
+      </section>
+
+      <section
+        className="tutorial-section tutorial-section--reverse"
+        aria-labelledby="tutorial-categories-title"
+      >
+        <div className="tutorial-copy">
+          <span className="tutorial-step">03 · MARCAS Y CATEGORÍAS</span>
+          <h2 id="tutorial-categories-title">Qué marca cada categoría</h2>
+          <p>
+            Las marcas se agrupan en categorías que podés encender o apagar desde el mapa. Las obras
+            públicas vienen de BA Obras y los reductores de OpenStreetMap; ninguna de las dos es una
+            fuente de cortes de tránsito en vivo.
+          </p>
+        </div>
+        <CategoriesDemo />
+      </section>
+
+      <section className="tutorial-section" aria-labelledby="tutorial-zones-title">
+        <div className="tutorial-copy">
+          <span className="tutorial-step">04 · ZONAS</span>
+          <h2 id="tutorial-zones-title">Comunas y barrios con color</h2>
+          <p>
+            Activá las zonas para ver las comunas o los barrios y elegí qué colorear: el estado de
+            sus calles, el pavimento predominante, las obras y reductores, o los reportes críticos.
+            Es una lectura resumida: tocá una zona para ver el detalle.
+          </p>
+        </div>
+        <ZonesDemo />
+      </section>
+
+      <section
+        className="tutorial-section tutorial-section--reverse"
+        aria-labelledby="tutorial-popups-title"
+      >
+        <div className="tutorial-copy">
+          <span className="tutorial-step">05 · LEYENDA Y POPUPS</span>
+          <h2 id="tutorial-popups-title">Leer la leyenda y los detalles</h2>
+          <p>
+            La leyenda cambia según lo que mostrás. Al tocar una calle o una zona aparece un popup
+            breve con lo esencial; desde el de una calle podés ir a sus reportes.
+          </p>
+        </div>
+        <PopupsDemo />
       </section>
 
       <section
@@ -110,7 +195,7 @@ export function HowToUse() {
         aria-labelledby="tutorial-filters-title"
       >
         <div className="tutorial-copy">
-          <span className="tutorial-step">02 · PERSONALIZAR</span>
+          <span className="tutorial-step">06 · FILTROS</span>
           <h2 id="tutorial-filters-title">Encontrá lo que necesitás</h2>
           <p>
             Filtrá por tipo de problema y elegí qué reportes querés ver. Esta demostración es local:
@@ -149,7 +234,7 @@ export function HowToUse() {
 
       <section className="tutorial-steps" aria-labelledby="tutorial-contribute-title">
         <div>
-          <span className="tutorial-step">03 · CONTRIBUIR</span>
+          <span className="tutorial-step">07 · REPORTAR</span>
           <h2 id="tutorial-contribute-title">Reportar y confirmar</h2>
           <p>
             Podés crear un reporte desde el mapa, elegir su ubicación, tipo y severidad, y sumar una
@@ -188,9 +273,22 @@ export function HowToUse() {
         </div>
       </section>
 
+      <section className="tutorial-section" aria-labelledby="tutorial-road-title">
+        <div className="tutorial-copy">
+          <span className="tutorial-step">08 · INFORMAR UNA CALLE</span>
+          <h2 id="tutorial-road-title">Corregí el pavimento de una calle</h2>
+          <p>
+            Si el pavimento que ves no coincide con la realidad, abrí la calle y proponé el tipo
+            correcto. La base de OpenStreetMap es el punto de partida y los aportes de la comunidad
+            la reemplazan. Además de los reportes, podés sumar datos de la vía: tipo, pavimento y
+            condición.
+          </p>
+        </div>
+      </section>
+
       <section className="tutorial-section" aria-labelledby="tutorial-account-title">
         <div className="tutorial-copy">
-          <span className="tutorial-step">04 · SEGUIMIENTO</span>
+          <span className="tutorial-step">09 · SEGUIMIENTO</span>
           <h2 id="tutorial-account-title">Seguimiento de tus aportes</h2>
           <p>
             En <strong>Mis reportes</strong> consultás tus contribuciones, feedback y estado. Si sos
@@ -205,6 +303,11 @@ export function HowToUse() {
           La condición física se calcula con baches, daños, irregularidades, elevaciones anómalas y
           hundimientos reportados. Cortes, obras, inundaciones y tráfico se muestran aparte como
           señales de circulación. La cobertura y confianza varían según los datos disponibles.
+        </p>
+        <p>
+          Las zonas resumen solo lo que hay: con pocos tramos con puntaje se ven grises, y cero
+          críticos no equivale a ausencia de problemas. Los datos de pavimento y reductores de
+          OpenStreetMap son colaborativos (licencia ODbL) y los de obras provienen de BA Data.
         </p>
         <p>
           La interpretación para auto común, SUV/4x4, deportivo o rally es orientativa e

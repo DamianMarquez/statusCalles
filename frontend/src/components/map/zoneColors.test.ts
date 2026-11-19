@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ZoneProperties } from '../../api/zonesApi.js';
+import { makeZoneProperties } from '../../test/zoneFixture.js';
 import {
   CRITICAL_CLASSES,
   INTERVENTION_RAMP,
@@ -11,20 +12,21 @@ import {
 } from './zoneColors.js';
 
 function zone(overrides: Partial<ZoneProperties> = {}): ZoneProperties {
-  return {
-    id: 1,
-    name: 'Comuna 1',
-    level: 'commune',
-    communeId: null,
-    totalKm: 100,
+  return makeZoneProperties(1, {
     condition: {
       avgScore: 70,
       level: 'ACCEPTABLE',
       scoredSegments: 10,
       coveragePct: 4,
+      scoredKm: 4,
       sufficient: true,
     },
-    surface: { dominant: { type: 'CONCRETE', pct: 55 }, top: [], knownPct: 95 },
+    surface: {
+      dominant: { type: 'CONCRETE', pct: 55 },
+      top: [],
+      knownPct: 95,
+      kmByType: {},
+    },
     intervention: {
       index: 10,
       publicWorks: 1,
@@ -36,7 +38,7 @@ function zone(overrides: Partial<ZoneProperties> = {}): ZoneProperties {
     },
     critical: { critical: 0, high: 0, activeReports: 0, class: 0 },
     ...overrides,
-  };
+  });
 }
 
 describe('zone colors', () => {
@@ -54,6 +56,7 @@ describe('zone colors', () => {
         level: null,
         scoredSegments: 2,
         coveragePct: 0,
+        scoredKm: 0,
         sufficient: false,
       },
     });
@@ -64,7 +67,11 @@ describe('zone colors', () => {
   it('colors the pavement by the dominant type, gray without data', () => {
     expect(zoneColor(zone(), 'surface', [])).not.toBe(NO_DATA_ZONE_COLOR);
     expect(
-      zoneColor(zone({ surface: { dominant: null, top: [], knownPct: 0 } }), 'surface', []),
+      zoneColor(
+        zone({ surface: { dominant: null, top: [], knownPct: 0, kmByType: {} } }),
+        'surface',
+        [],
+      ),
     ).toBe(NO_DATA_ZONE_COLOR);
   });
 

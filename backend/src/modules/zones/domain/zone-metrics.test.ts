@@ -20,6 +20,7 @@ function zone(overrides: Partial<ZoneRaw> = {}): ZoneRaw {
     criticalReports: 0,
     highReports: 0,
     activeReports: 0,
+    reportsByType: {},
     ...overrides,
   };
 }
@@ -102,5 +103,21 @@ describe('zone metrics', () => {
     const metrics = computeZoneMetrics(zone({ totalKm: 0, publicWorks: 1 }));
     expect(metrics.intervention.index).toBe(0);
     expect(metrics.condition.coveragePct).toBe(0);
+  });
+
+  it('exposes kilometres per pavement type, scored kilometres, segments and reports by type', () => {
+    const metrics = computeZoneMetrics(
+      zone({
+        totalKm: 10,
+        segments: 120,
+        scoredKm: 1.234,
+        surfaceKm: { ASPHALT: 6.5555, CONCRETE: 2 },
+        reportsByType: { POTHOLE: 3, ROAD_WORK: 1 },
+      }),
+    );
+    expect(metrics.surface.kmByType).toEqual({ ASPHALT: 6.56, CONCRETE: 2 });
+    expect(metrics.condition.scoredKm).toBe(1.2);
+    expect(metrics.segments).toBe(120);
+    expect(metrics.reportsByType).toEqual({ POTHOLE: 3, ROAD_WORK: 1 });
   });
 });

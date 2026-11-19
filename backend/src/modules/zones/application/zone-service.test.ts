@@ -20,6 +20,7 @@ const zone: ZoneRaw = {
   criticalReports: 1,
   highReports: 0,
   activeReports: 3,
+  reportsByType: { POTHOLE: 2, ROAD_BLOCKED: 1 },
 };
 
 function repository(): ZoneStatsRepository & { findZones: ReturnType<typeof vi.fn> } {

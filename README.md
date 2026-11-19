@@ -253,6 +253,10 @@ Las rutas `/api/analytics/moderation/overview` requieren rol `MODERATOR` o `ADMI
 
 Las queries limitan resultados en SQL, parametrizan filtros y usan PostGIS para bounding boxes, celdas, radio y asignación a barrios/comunas. Revisé `EXPLAIN (ANALYZE, BUFFERS)` en la base local: el cruce con barrios usa `neighborhoods_geometry_gix`; tendencias y heatmap usaron scan secuencial sobre el conjunto local de 24 reportes por su tamaño, con ejecuciones menores a 1 ms. Los índices existentes `street_reports_created_at_idx`, `street_reports_location_gix`, `neighborhoods_geometry_gix` y `communes_geometry_gix` cubren las consultas probadas; no agregué índices sin evidencia de necesidad.
 
+### Pestañas de Estadísticas
+
+La página se organiza en **Resumen | Reportes | Zonas | Calles y marcas**. Solo los indicadores de reportes y la pestaña Reportes usan el período elegido; Resumen ("Ciudad hoy"), Zonas y Calles y marcas muestran el estado actual y lo dicen en pantalla. Los totales de la ciudad se calculan en el navegador sumando las comunas de `GET /api/zones` (que además de las métricas devuelve km por pavimento, tramos y reportes activos por tipo), así que no hay endpoints nuevos. Un fallo al pedir las zonas no bloquea el resto de la página.
+
 ## Búsqueda de direcciones
 
 El backend conserva `GET /api/addresses/search?q=corrientes%20y%20callao`. El formulario de reportes permite buscar una dirección como ayuda para ubicar el punto; la persona puede seguir marcándolo manualmente en el mapa. El endpoint usa el normalizador USIG de CABA, valida las respuestas y limita las consultas. La UI no incluye planificación de rutas.
@@ -319,7 +323,7 @@ El módulo `reports` mantiene dominio, aplicación, HTTP/DTO y repositorio separ
 
 ## Navegación y tutorial
 
-La aplicación sirve el tutorial en `/como-usar` con navegación del navegador. En Plesk, `frontend/public/.htaccess` se incluye en `frontend/dist` y permite abrir o recargar esa ruta directamente sin afectar el proxy de `/api`. El tutorial utiliza ejemplos locales ilustrativos: sus filtros y botones no escriben en el backend. El mapa base usa OpenStreetMap y la UI mantiene su atribución visible.
+La aplicación sirve el tutorial en `/como-usar` con navegación del navegador. En Plesk, `frontend/public/.htaccess` se incluye en `frontend/dist` y permite abrir o recargar esa ruta directamente sin afectar el proxy de `/api`. La guía tiene un índice de secciones (calles, categorías, zonas, popups, filtros, reportes) con demos locales que reutilizan los mismos colores y catálogos del mapa. El tutorial utiliza ejemplos locales ilustrativos: sus filtros y botones no escriben en el backend. El mapa base usa OpenStreetMap y la UI mantiene su atribución visible.
 
 ## Supabase PostgreSQL y despliegue en Plesk
 

@@ -35,6 +35,8 @@ export interface ZoneRaw {
   criticalReports: number;
   highReports: number;
   activeReports: number;
+  /** Reportes activos por tipo de reporte (para agruparlos por categoría). */
+  reportsByType: Record<string, number>;
 }
 
 export interface ZoneMetrics {
@@ -44,6 +46,7 @@ export interface ZoneMetrics {
     scoredSegments: number;
     /** Porcentaje de kilómetros de la zona con puntaje calculado. */
     coveragePct: number;
+    scoredKm: number;
     sufficient: boolean;
   };
   surface: {
@@ -51,6 +54,8 @@ export interface ZoneMetrics {
     top: Array<{ type: string; pct: number }>;
     /** Porcentaje de kilómetros con tipo de pavimento conocido. */
     knownPct: number;
+    /** Kilómetros por tipo de pavimento (todos los tipos conocidos). */
+    kmByType: Record<string, number>;
   };
   intervention: {
     /** Ponderado por cada 10 km de calle. */
@@ -70,6 +75,8 @@ export interface ZoneMetrics {
     class: 0 | 1 | 2 | 3;
   };
   totalKm: number;
+  segments: number;
+  reportsByType: Record<string, number>;
 }
 
 function round(value: number, digits = 1): number {
@@ -117,12 +124,16 @@ export function computeZoneMetrics(raw: ZoneRaw): ZoneMetrics {
       level: sufficient && avgScore !== null ? scoreToLevel(avgScore) : null,
       scoredSegments: raw.scoredSegments,
       coveragePct: raw.totalKm > 0 ? round((raw.scoredKm / raw.totalKm) * 100) : 0,
+      scoredKm: round(raw.scoredKm),
       sufficient,
     },
     surface: {
       dominant: top[0] ?? null,
       top,
       knownPct: raw.totalKm > 0 ? round((knownKm / raw.totalKm) * 100) : 0,
+      kmByType: Object.fromEntries(
+        Object.entries(raw.surfaceKm).map(([type, km]) => [type, round(km, 2)]),
+      ),
     },
     intervention: {
       index: raw.totalKm > 0 ? round((weighted / raw.totalKm) * 10) : 0,
@@ -140,5 +151,7 @@ export function computeZoneMetrics(raw: ZoneRaw): ZoneMetrics {
       class: criticalClass(raw.criticalReports + raw.highReports),
     },
     totalKm: round(raw.totalKm),
+    segments: raw.segments,
+    reportsByType: raw.reportsByType,
   };
 }

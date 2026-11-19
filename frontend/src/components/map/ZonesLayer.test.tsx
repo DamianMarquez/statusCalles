@@ -1,7 +1,8 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getZones, type ZoneFeatureCollection } from '../../api/zonesApi.js';
+import { getZones, type ZoneFeatureCollection, type ZoneProperties } from '../../api/zonesApi.js';
+import { makeZoneProperties } from '../../test/zoneFixture.js';
 import { ZonesLayer } from './ZonesLayer.js';
 
 const mocks = vi.hoisted(() => {
@@ -50,41 +51,12 @@ vi.mock('./maplibre/mapLibre.js', () => ({
   MapPopup: ({ children }: { children: ReactNode }) => <div data-testid="popup">{children}</div>,
 }));
 
-function zone(id: number, overrides: Record<string, unknown> = {}) {
+function zone(id: number, overrides: Partial<ZoneProperties> = {}) {
   return {
     type: 'Feature' as const,
     id,
     geometry: { type: 'Polygon' as const, coordinates: [] },
-    properties: {
-      id,
-      name: `Comuna ${id}`,
-      level: 'commune' as const,
-      communeId: null,
-      totalKm: 100,
-      condition: {
-        avgScore: 40,
-        level: 'BAD',
-        scoredSegments: 12,
-        coveragePct: 3,
-        sufficient: true,
-      },
-      surface: {
-        dominant: { type: 'ASPHALT', pct: 70 },
-        top: [{ type: 'ASPHALT', pct: 70 }],
-        knownPct: 95,
-      },
-      intervention: {
-        index: id * 3,
-        publicWorks: 2,
-        reportedWorks: 1,
-        reportedCuts: 0,
-        calming: 20,
-        calmingByType: { SPEED_BUMP: 20 },
-        calmingPerKm: 0.2,
-      },
-      critical: { critical: 1, high: 1, activeReports: 5, class: 1 as const },
-      ...overrides,
-    },
+    properties: makeZoneProperties(id, overrides),
   };
 }
 

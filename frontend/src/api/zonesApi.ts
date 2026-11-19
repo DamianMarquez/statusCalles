@@ -13,12 +13,14 @@ export interface ZoneProperties {
     level: string | null;
     scoredSegments: number;
     coveragePct: number;
+    scoredKm: number;
     sufficient: boolean;
   };
   surface: {
     dominant: { type: string; pct: number } | null;
     top: Array<{ type: string; pct: number }>;
     knownPct: number;
+    kmByType: Record<string, number>;
   };
   intervention: {
     index: number;
@@ -35,6 +37,8 @@ export interface ZoneProperties {
     activeReports: number;
     class: 0 | 1 | 2 | 3;
   };
+  segments: number;
+  reportsByType: Record<string, number>;
 }
 
 export interface ZoneFeatureCollection {

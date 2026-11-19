@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnalyticsHeatMap } from './AnalyticsHeatMap.js';
 import {
   getAnalyticsDashboard,
@@ -11,6 +11,12 @@ import {
   type OfficialAnalytics,
 } from '../../api/analyticsApi.js';
 import { REPORT_TYPE_OPTIONS } from '../../api/reportCatalog.js';
+import { SURFACE_TYPE_OPTIONS } from '../../api/roadInformationTypes.js';
+import { CALMING_TYPES, PUBLIC_WORK_COLOR } from '../map/mapCategories.js';
+import { groupReportsByCategory, summarizeCity } from './cityStats.js';
+import { panelId, StatsTabs, tabId } from './StatsTabs.js';
+import { useZones } from './useZones.js';
+import { ZoneExplorer } from './ZoneExplorer.js';
 
 interface DashboardData {
   overview: AnalyticsOverview;
@@ -23,6 +29,15 @@ interface DashboardData {
   heatmap: AnalyticsHeatCell[];
   official: OfficialAnalytics;
 }
+
+type TabId = 'summary' | 'reports' | 'zones' | 'streets';
+
+const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
+  { id: 'summary', label: 'Resumen' },
+  { id: 'reports', label: 'Reportes' },
+  { id: 'zones', label: 'Zonas' },
+  { id: 'streets', label: 'Calles y marcas' },
+];
 
 const reportLabels: Record<string, string> = Object.fromEntries(
   REPORT_TYPE_OPTIONS.map((option) => [option.value, option.pluralLabel]),
@@ -44,37 +59,97 @@ function formatHours(hours: number): string {
   return `${(hours / 24).toFixed(1)} días`;
 }
 
+function number(value: number, digits = 0): string {
+  return value.toLocaleString('es-AR', { maximumFractionDigits: digits });
+}
+
+/** Estado de una fuente guardado en la base → texto y variante de estilo. */
+function sourceStatus(status: string): { label: string; variant: string } {
+  switch (status) {
+    case 'SUCCEEDED':
+    case 'SUCCESS':
+      return { label: 'Actualizada', variant: 'success' };
+    case 'FAILED':
+      return { label: 'Error', variant: 'failed' };
+    case 'NEVER':
+      return { label: 'Sin sincronizar', variant: 'never' };
+    default:
+      return { label: status, variant: 'never' };
+  }
+}
+
 function BarList({
   items,
   label,
+  empty = 'Todavía no hay datos para este período.',
 }: {
-  items: Array<{ label: string; value: number }>;
+  items: Array<{ label: string; value: number; color?: string; valueLabel?: string }>;
   label: string;
+  empty?: string;
 }) {
   const maximum = Math.max(1, ...items.map((item) => item.value));
-  if (items.length === 0)
-    return <p className="analytics-empty">Todavía no hay datos para este período.</p>;
+  if (items.length === 0) return <p className="analytics-empty">{empty}</p>;
   return (
     <ul className="analytics-bars" aria-label={label}>
       {items.map((item) => (
         <li key={item.label}>
           <span>{item.label}</span>
           <span className="analytics-bars__track">
-            <span style={{ width: `${(item.value / maximum) * 100}%` }} />
+            <span
+              style={{
+                width: `${(item.value / maximum) * 100}%`,
+                ...(item.color ? { background: item.color } : {}),
+              }}
+            />
           </span>
-          <strong>{item.value}</strong>
+          <strong>{item.valueLabel ?? item.value}</strong>
         </li>
       ))}
     </ul>
   );
 }
 
+function Card({
+  eyebrow,
+  title,
+  wide = false,
+  note,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  wide?: boolean;
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={`analytics-card${wide ? ' analytics-card--wide' : ''}`}>
+      <div className="analytics-card__heading">
+        <div>
+          <span>{eyebrow}</span>
+          <h2>{title}</h2>
+        </div>
+        {note && <small>{note}</small>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export function AnalyticsDashboard() {
+  const [tab, setTab] = useState<TabId>('summary');
   const [period, setPeriod] = useState('90');
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [retryKey, setRetryKey] = useState(0);
+  const [zonesRetry, setZonesRetry] = useState(0);
+  const communes = useZones('commune', zonesRetry);
+  const city = useMemo(
+    () => (communes.zones ? summarizeCity(communes.zones) : null),
+    [communes.zones],
+  );
+  const usesPeriod = tab === 'summary' || tab === 'reports';
 
   useEffect(() => {
     const controller = new AbortController();
@@ -109,6 +184,7 @@ export function AnalyticsDashboard() {
           <select
             aria-label="Período"
             value={period}
+            disabled={!usesPeriod}
             onChange={(event) => setPeriod(event.target.value)}
           >
             <option value="30">Últimos 30 días</option>
@@ -118,6 +194,12 @@ export function AnalyticsDashboard() {
           </select>
         </label>
       </div>
+      <StatsTabs tabs={TABS} active={tab} onChange={setTab} label="Secciones de estadísticas" />
+      {!usesPeriod && (
+        <p className="analytics-note">
+          Esta sección muestra el estado actual de la ciudad; no usa el período elegido.
+        </p>
+      )}
       {error && (
         <div className="analytics-alert" role="alert">
           <span>{error}</span>
@@ -126,49 +208,103 @@ export function AnalyticsDashboard() {
           </button>
         </div>
       )}
-      {loading && (
+      {loading && usesPeriod && (
         <p className="analytics-loading" role="status">
           Actualizando indicadores…
         </p>
       )}
-      {data && (
-        <>
-          <section className="analytics-kpis" aria-label="Resumen de reportes">
-            <article>
-              <span>Reportes totales</span>
-              <strong>{data.overview.total.toLocaleString('es-AR')}</strong>
-            </article>
-            <article>
-              <span>Activos recientes</span>
-              <strong>{data.overview.active.toLocaleString('es-AR')}</strong>
-            </article>
-            <article>
-              <span>Resueltos</span>
-              <strong>{data.overview.resolved.toLocaleString('es-AR')}</strong>
-            </article>
-            <article>
-              <span>Considerados antiguos</span>
-              <strong>{data.overview.stale_percent}%</strong>
-              <small>{data.overview.stale} reportes</small>
-            </article>
-            <article>
-              <span>Con confirmación</span>
-              <strong>{data.overview.confirmed_percent}%</strong>
-              <small>{data.overview.confirmed} reportes</small>
-            </article>
-            <article>
-              <span>Tiempo medio de resolución</span>
-              <strong>{formatHours(data.overview.average_resolution_hours)}</strong>
-            </article>
-          </section>
-          <div className="analytics-grid">
-            <section className="analytics-card">
-              <div className="analytics-card__heading">
-                <div>
-                  <span>ACTIVIDAD</span>
-                  <h2>Evolución temporal</h2>
-                </div>
+
+      <div role="tabpanel" id={panelId(tab)} aria-labelledby={tabId(tab)}>
+        {tab === 'summary' && (
+          <>
+            {data && (
+              <section className="analytics-kpis" aria-label="Resumen de reportes">
+                <article>
+                  <span>Reportes totales</span>
+                  <strong>{number(data.overview.total)}</strong>
+                </article>
+                <article>
+                  <span>Activos recientes</span>
+                  <strong>{number(data.overview.active)}</strong>
+                </article>
+                <article>
+                  <span>Resueltos</span>
+                  <strong>{number(data.overview.resolved)}</strong>
+                </article>
+                <article>
+                  <span>Considerados antiguos</span>
+                  <strong>{data.overview.stale_percent}%</strong>
+                  <small>{data.overview.stale} reportes</small>
+                </article>
+                <article>
+                  <span>Con confirmación</span>
+                  <strong>{data.overview.confirmed_percent}%</strong>
+                  <small>{data.overview.confirmed} reportes</small>
+                </article>
+                <article>
+                  <span>Tiempo medio de resolución</span>
+                  <strong>{formatHours(data.overview.average_resolution_hours)}</strong>
+                </article>
+              </section>
+            )}
+            <h2 className="analytics-subtitle">Ciudad hoy</h2>
+            {communes.error && (
+              <div className="analytics-alert" role="alert">
+                <span>No pudimos cargar los datos de la ciudad.</span>
+                <button type="button" onClick={() => setZonesRetry((current) => current + 1)}>
+                  Reintentar
+                </button>
               </div>
+            )}
+            {communes.loading && <p className="analytics-loading">Cargando datos de la ciudad…</p>}
+            {city && (
+              <>
+                <section className="analytics-kpis" aria-label="Resumen de la ciudad">
+                  <article>
+                    <span>Kilómetros de calles</span>
+                    <strong>{number(city.totalKm)}</strong>
+                    <small>{number(city.segments)} tramos</small>
+                  </article>
+                  <article>
+                    <span>Pavimento conocido</span>
+                    <strong>{number(city.knownPct, 1)}%</strong>
+                    <small>de los kilómetros</small>
+                  </article>
+                  <article>
+                    <span>Estado calculado</span>
+                    <strong>{number(city.coveragePct, 1)}%</strong>
+                    <small>de los kilómetros con puntaje</small>
+                  </article>
+                  <article>
+                    <span>Reductores de velocidad</span>
+                    <strong>{number(city.calming)}</strong>
+                    <small>lomos, badenes y otros</small>
+                  </article>
+                  <article>
+                    <span>Obras públicas vigentes</span>
+                    <strong>{number(city.publicWorks)}</strong>
+                    <small>GCBA · no son cortes en vivo</small>
+                  </article>
+                  <article>
+                    <span>Críticos y altos activos</span>
+                    <strong>{number(city.critical + city.high)}</strong>
+                    <small>
+                      {city.critical} críticos · {city.high} altos
+                    </small>
+                  </article>
+                </section>
+                <p className="analytics-note">
+                  Los indicadores de la ciudad son del momento y no usan el período. El estado solo
+                  se calcula donde hay reportes, así que su cobertura crece con la comunidad.
+                </p>
+              </>
+            )}
+          </>
+        )}
+
+        {tab === 'reports' && data && (
+          <div className="analytics-grid">
+            <Card eyebrow="ACTIVIDAD" title="Evolución temporal">
               {data.trends.length ? (
                 <div
                   className="analytics-trend"
@@ -219,14 +355,18 @@ export function AnalyticsDashboard() {
               ) : (
                 <p className="analytics-empty">No hay actividad en este período.</p>
               )}
-            </section>
-            <section className="analytics-card">
-              <div className="analytics-card__heading">
-                <div>
-                  <span>PROBLEMAS</span>
-                  <h2>Reportes por tipo</h2>
-                </div>
-              </div>
+            </Card>
+            <Card eyebrow="CATEGORÍAS" title="Reportes por categoría">
+              <BarList
+                label="Reportes por categoría"
+                items={groupReportsByCategory(data.reports.byType).map((item) => ({
+                  label: `${item.icon} ${item.label}`,
+                  value: item.count,
+                  color: item.color,
+                }))}
+              />
+            </Card>
+            <Card eyebrow="PROBLEMAS" title="Reportes por tipo">
               <BarList
                 label="Reportes por tipo"
                 items={data.reports.byType.map((item) => ({
@@ -234,14 +374,8 @@ export function AnalyticsDashboard() {
                   value: item.count,
                 }))}
               />
-            </section>
-            <section className="analytics-card">
-              <div className="analytics-card__heading">
-                <div>
-                  <span>SEVERIDAD</span>
-                  <h2>Distribución por gravedad</h2>
-                </div>
-              </div>
+            </Card>
+            <Card eyebrow="SEVERIDAD" title="Distribución por gravedad">
               <BarList
                 label="Reportes por severidad"
                 items={data.reports.bySeverity.map((item) => ({
@@ -249,26 +383,18 @@ export function AnalyticsDashboard() {
                   value: item.count,
                 }))}
               />
-            </section>
-            <section className="analytics-card analytics-card--wide">
-              <div className="analytics-card__heading">
-                <div>
-                  <span>GEOGRAFÍA</span>
-                  <h2>Concentración de reportes</h2>
-                </div>
-                <small>Cuadrículas agregadas</small>
-              </div>
+            </Card>
+            <Card
+              eyebrow="GEOGRAFÍA"
+              title="Concentración de reportes"
+              wide
+              note="Cuadrículas agregadas"
+            >
               <div className="analytics-heatmap">
                 <AnalyticsHeatMap cells={data.heatmap} />
               </div>
-            </section>
-            <section className="analytics-card">
-              <div className="analytics-card__heading">
-                <div>
-                  <span>BARRIOS</span>
-                  <h2>Distribución geográfica</h2>
-                </div>
-              </div>
+            </Card>
+            <Card eyebrow="BARRIOS" title="Distribución geográfica">
               <BarList
                 label="Reportes por barrio"
                 items={data.neighborhoods
@@ -276,28 +402,16 @@ export function AnalyticsDashboard() {
                   .slice(0, 10)
                   .map((item) => ({ label: item.name!, value: item.reports }))}
               />
-            </section>
-            <section className="analytics-card">
-              <div className="analytics-card__heading">
-                <div>
-                  <span>COMUNAS</span>
-                  <h2>Reportes por comuna</h2>
-                </div>
-              </div>
+            </Card>
+            <Card eyebrow="COMUNAS" title="Reportes por comuna">
               <BarList
                 label="Reportes por comuna"
                 items={data.communes
                   .filter((item) => item.name)
                   .map((item) => ({ label: item.name!, value: item.reports }))}
               />
-            </section>
-            <section className="analytics-card">
-              <div className="analytics-card__heading">
-                <div>
-                  <span>STREET SCORE</span>
-                  <h2>Calles con menor score</h2>
-                </div>
-              </div>
+            </Card>
+            <Card eyebrow="STREET SCORE" title="Calles con menor score">
               <ol className="analytics-ranking">
                 {data.streets.map((item) => (
                   <li key={item.id}>
@@ -312,14 +426,8 @@ export function AnalyticsDashboard() {
               {!data.streets.length && (
                 <p className="analytics-empty">No hay calles con suficiente evidencia.</p>
               )}
-            </section>
-            <section className="analytics-card analytics-card--wide">
-              <div className="analytics-card__heading">
-                <div>
-                  <span>STREET SCORE</span>
-                  <h2>Segmentos con menor score</h2>
-                </div>
-              </div>
+            </Card>
+            <Card eyebrow="STREET SCORE" title="Segmentos con menor score" wide>
               <ol className="analytics-ranking analytics-ranking--segments">
                 {data.segments.map((item) => (
                   <li key={item.id}>
@@ -334,65 +442,138 @@ export function AnalyticsDashboard() {
               {!data.segments.length && (
                 <p className="analytics-empty">No hay segmentos con suficiente evidencia.</p>
               )}
-            </section>
-            <section className="analytics-card analytics-card--wide">
-              <div className="analytics-card__heading">
-                <div>
-                  <span>FUENTES PÚBLICAS</span>
-                  <h2>Infraestructura y sincronización oficial</h2>
-                </div>
-              </div>
-              <div className="analytics-official">
-                <div>
-                  <h3>Infraestructura cargada</h3>
-                  <BarList
-                    label="Infraestructura oficial por tipo"
-                    items={data.official.infrastructure.map((item) => ({
-                      label: item.type.replaceAll('_', ' ').toLowerCase(),
-                      value: item.count,
-                    }))}
-                  />
-                </div>
-                <div>
-                  <h3>Estado de fuentes</h3>
-                  <ul className="analytics-source-list">
-                    {data.official.sources.map((source) => (
-                      <li key={source.slug}>
-                        <span>{source.name}</span>
-                        <strong
-                          className={`analytics-source analytics-source--${source.status.toLowerCase()}`}
-                        >
-                          {source.status === 'SUCCESS'
-                            ? 'Actualizada'
-                            : source.status === 'FAILED'
-                              ? 'Error'
-                              : source.status === 'NEVER'
-                                ? 'Sin sincronizar'
-                                : source.status}
-                        </strong>
-                        <small>
-                          {source.lastSyncAt
-                            ? `Última sincronización: ${new Date(source.lastSyncAt).toLocaleDateString('es-AR')}`
-                            : 'Todavía no hay una sincronización registrada.'}
-                        </small>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="analytics-source-note">
-                    Tráfico e incidentes en tiempo real:{' '}
-                    {data.official.realtime_traffic_available ? 'disponibles' : 'no disponibles'}.
-                  </p>
-                </div>
-              </div>
-            </section>
+            </Card>
           </div>
-          <p className="analytics-footnote">
-            Los reportes ocultos por moderación no se incluyen en los indicadores públicos. Las
-            métricas describen datos disponibles y no representan una auditoría oficial de todas las
-            calles.
-          </p>
-        </>
-      )}
+        )}
+
+        {tab === 'zones' && (
+          <Card eyebrow="ZONAS" title="Comunas y barrios" wide>
+            <ZoneExplorer />
+          </Card>
+        )}
+
+        {tab === 'streets' && (
+          <div className="analytics-grid">
+            <Card eyebrow="PAVIMENTO" title="Tipo de pavimento de la ciudad">
+              {communes.error && <p className="analytics-empty">No pudimos cargar los datos.</p>}
+              {city && (
+                <>
+                  <BarList
+                    label="Kilómetros por tipo de pavimento"
+                    empty="Todavía no hay datos de pavimento."
+                    items={SURFACE_TYPE_OPTIONS.map((item) => ({
+                      label: item.label,
+                      value: city.surfaceKm[item.value] ?? 0,
+                      color: item.color,
+                      valueLabel: `${number(city.surfaceKm[item.value] ?? 0)} km`,
+                    })).filter((item) => item.value > 0)}
+                  />
+                  <small className="analytics-note">
+                    Se conoce el pavimento del {number(city.knownPct, 1)}% de los kilómetros. Base:
+                    © OpenStreetMap (ODbL); lo que cargó la comunidad tiene prioridad.
+                  </small>
+                </>
+              )}
+            </Card>
+            <Card eyebrow="REDUCTORES" title="Lomos, badenes y otros">
+              {city && (
+                <BarList
+                  label="Reductores de velocidad por tipo"
+                  empty="Todavía no hay reductores cargados."
+                  items={CALMING_TYPES.map((item) => ({
+                    label: item.label,
+                    value: city.calmingByType[item.value] ?? 0,
+                    color: item.color,
+                  })).filter((item) => item.value > 0)}
+                />
+              )}
+              <small className="analytics-note">
+                De OpenStreetMap: la cobertura es colaborativa y puede estar incompleta.
+              </small>
+            </Card>
+            <Card eyebrow="OBRAS Y CORTES" title="Obras y reportes activos">
+              {city && (
+                <BarList
+                  label="Obras y reportes activos"
+                  empty="No hay obras ni reportes activos."
+                  items={[
+                    {
+                      label: 'Obras públicas vigentes (GCBA)',
+                      value: city.publicWorks,
+                      color: PUBLIC_WORK_COLOR,
+                    },
+                    {
+                      label: 'Obras reportadas por la comunidad',
+                      value: city.reportedWorks,
+                      color: PUBLIC_WORK_COLOR,
+                    },
+                    {
+                      label: 'Cortes reportados por la comunidad',
+                      value: city.reportedCuts,
+                      color: '#c0392b',
+                    },
+                  ].filter((item) => item.value > 0)}
+                />
+              )}
+              <small className="analytics-note">
+                No hay una fuente abierta de cortes de tránsito en vivo; los cortes salen de
+                reportes de la comunidad.
+              </small>
+            </Card>
+            {data && (
+              <Card
+                eyebrow="FUENTES PÚBLICAS"
+                title="Infraestructura y sincronización oficial"
+                wide
+              >
+                <div className="analytics-official">
+                  <div>
+                    <h3>Infraestructura cargada</h3>
+                    <BarList
+                      label="Infraestructura oficial por tipo"
+                      items={data.official.infrastructure.map((item) => ({
+                        label: item.type.replaceAll('_', ' ').toLowerCase(),
+                        value: item.count,
+                      }))}
+                    />
+                  </div>
+                  <div>
+                    <h3>Estado de fuentes</h3>
+                    <ul className="analytics-source-list">
+                      {data.official.sources.map((source) => {
+                        const status = sourceStatus(source.status);
+                        return (
+                          <li key={source.slug}>
+                            <span>{source.name}</span>
+                            <strong
+                              className={`analytics-source analytics-source--${status.variant}`}
+                            >
+                              {status.label}
+                            </strong>
+                            <small>
+                              {source.lastSyncAt
+                                ? `Última sincronización: ${new Date(source.lastSyncAt).toLocaleDateString('es-AR')}`
+                                : 'Todavía no hay una sincronización registrada.'}
+                            </small>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className="analytics-source-note">
+                      Tráfico e incidentes en tiempo real:{' '}
+                      {data.official.realtime_traffic_available ? 'disponibles' : 'no disponibles'}.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
+      </div>
+      <p className="analytics-footnote">
+        Los reportes ocultos por moderación no se incluyen en los indicadores públicos. Las métricas
+        describen datos disponibles y no representan una auditoría oficial de todas las calles.
+      </p>
     </main>
   );
 }

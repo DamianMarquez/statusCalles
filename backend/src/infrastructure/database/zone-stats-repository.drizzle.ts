@@ -142,6 +142,7 @@ export class DrizzleZoneStatsRepository implements ZoneStatsRepository {
           criticalReports: 0,
           highReports: 0,
           activeReports: 0,
+          reportsByType: {},
         },
       ]),
     );
@@ -167,6 +168,7 @@ export class DrizzleZoneStatsRepository implements ZoneStatsRepository {
       if (!zone) continue;
       const count = Number(row.n);
       zone.activeReports += count;
+      zone.reportsByType[row.type] = (zone.reportsByType[row.type] ?? 0) + count;
       if (row.type === 'ROAD_WORK') zone.reportedWorks += count;
       if (row.type === 'ROAD_BLOCKED') zone.reportedCuts += count;
       if (Number(row.severity) === 4) zone.criticalReports += count;

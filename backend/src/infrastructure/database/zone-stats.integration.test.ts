@@ -152,6 +152,7 @@ describe('zone stats PostGIS integration', () => {
     // El reporte alto está resuelto: no cuenta como activo.
     expect(ours?.highReports).toBe(0);
     expect(ours?.activeReports).toBe(2);
+    expect(ours?.reportsByType).toEqual({ POTHOLE: 1, ROAD_WORK: 1 });
     expect(computeZoneMetrics(ours!).surface.dominant?.type).toBe('ASPHALT');
   });
 
