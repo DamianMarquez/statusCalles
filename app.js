@@ -1,1 +1,1 @@
-import './backend/dist/server.js';
+import './backend/dist/main.js';
